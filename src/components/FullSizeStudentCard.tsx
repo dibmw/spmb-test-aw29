@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { cardToPng, createCardTab, renderCardImageInTab } from "../utils/captureCard";
+import { cardToPng, createCardTab, openCardImageInTab } from "../utils/captureCard";
 import QRCode from "qrcode";
 import {
   SiswaJadwal,
@@ -75,7 +75,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2.2);
-      renderCardImageInTab(w, dataUrl, "Kartu SPMB");
+      openCardImageInTab(w, dataUrl, "Kartu SPMB");
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {

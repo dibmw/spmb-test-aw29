@@ -52,3 +52,24 @@ export function renderCardImageInTab(w: Window, dataUrl: string, title: string):
   w.document.body.appendChild(img);
   w.focus();
 }
+
+export function openCardImageInTab(w: Window, dataUrl: string, title: string): void {
+  w.document.title = title;
+  try {
+    const mime = dataUrl.match(/^data:([^;]+);/)?.[1] ?? 'image/png';
+    const binary = atob(dataUrl.split(',')[1]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    const revoke = () => URL.revokeObjectURL(url);
+    w.addEventListener('load', revoke, { once: true });
+    window.setTimeout(revoke, 60000);
+    w.location.replace(url);
+  } catch {
+    renderCardImageInTab(w, dataUrl, title);
+    return;
+  }
+  w.focus();
+}

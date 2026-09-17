@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Check, UserCheck, Users } from 'lucide-react';
-import { cardToPng, createCardTab, renderCardImageInTab } from '../utils/captureCard';
+import { cardToPng, createCardTab, openCardImageInTab } from '../utils/captureCard';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
@@ -61,7 +61,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2);
-      renderCardImageInTab(w, dataUrl, 'Kartu Ujian SPMB');
+      openCardImageInTab(w, dataUrl, 'Kartu Ujian SPMB');
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
