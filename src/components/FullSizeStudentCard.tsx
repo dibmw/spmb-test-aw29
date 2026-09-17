@@ -1,24 +1,24 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { 
-  Download, 
-  Printer, 
-  Check, 
-  UserCheck, 
-  Users, 
-  Search, 
-  CheckCircle2, 
-  AlertCircle 
-} from 'lucide-react';
-import html2canvas from 'html2canvas';
-import QRCode from 'qrcode';
-import { 
-  SiswaJadwal, 
-  PresensiRecord, 
-  formatKelas, 
-  getJenjangFromKelas, 
-  getSortedSiswaExamStations 
-} from '../types/spmb';
-import { SchoolLogo } from './SchoolLogo';
+import React, { useRef, useState, useEffect } from "react";
+import {
+  Download,
+  Printer,
+  Check,
+  UserCheck,
+  Users,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+import { toPng } from "html-to-image";
+import QRCode from "qrcode";
+import {
+  SiswaJadwal,
+  PresensiRecord,
+  formatKelas,
+  getJenjangFromKelas,
+  getSortedSiswaExamStations,
+} from "../types/spmb";
+import { SchoolLogo } from "./SchoolLogo";
 
 interface FullSizeStudentCardProps {
   siswa: SiswaJadwal;
@@ -29,10 +29,10 @@ interface FullSizeStudentCardProps {
 export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
   siswa,
   presensiList,
-  onBackToSearch
+  onBackToSearch,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [downloading, setDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -43,20 +43,24 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       width: 150,
       margin: 1,
       color: {
-        dark: '#1E3A8A',
-        light: '#FFFFFF'
-      }
+        dark: "#1E3A8A",
+        light: "#FFFFFF",
+      },
     })
-      .then(url => setQrDataUrl(url))
-      .catch(err => console.error('QR code generation error:', err));
+      .then((url) => setQrDataUrl(url))
+      .catch((err) => console.error("QR code generation error:", err));
   }, [siswa.id]);
 
   const unit = getJenjangFromKelas(siswa.kelas, siswa.grade);
   const sortedStations = getSortedSiswaExamStations(siswa, unit);
 
   // Check student attendance status
-  const studentCheck = presensiList.some(p => p.id_siswa === siswa.id && p.tipe_presensi === 'Siswa');
-  const walmurCheck = presensiList.some(p => p.id_siswa === siswa.id && p.tipe_presensi === 'Walmur');
+  const studentCheck = presensiList.some(
+    (p) => p.id_siswa === siswa.id && p.tipe_presensi === "Siswa",
+  );
+  const walmurCheck = presensiList.some(
+    (p) => p.id_siswa === siswa.id && p.tipe_presensi === "Walmur",
+  );
 
   const handleDownloadPNG = async () => {
     if (!cardRef.current) return;
@@ -64,16 +68,12 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2.2, // High resolution for print
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#FFFFFF',
-        logging: false
+      const dataUrl = await toPng(element, {
+        pixelRatio: 2.2,
+        backgroundColor: "#FFFFFF",
       });
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `KARTU_SPMB_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, '_')}.png`;
+      const link = document.createElement("a");
+      link.download = `KARTU_SPMB_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, "_")}.png`;
       link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
@@ -81,15 +81,52 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
-      console.error('Download card image error:', err);
-      setDownloadError('Terjadi kendala unduh otomatis. Silakan gunakan tombol Cetak.');
+      console.error("Download card image error:", err);
+      setDownloadError(
+        "Terjadi kendala unduh otomatis. Silakan gunakan tombol Cetak.",
+      );
     } finally {
       setDownloading(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const w = window.open("", "_blank");
+    try {
+      if (!cardRef.current) {
+        if (w) w.close();
+        window.print();
+        return;
+      }
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 3,
+        backgroundColor: "#FFFFFF",
+      });
+      if (!w) {
+        window.print();
+        return;
+      }
+      w.document.write(`
+        <html>
+          <head>
+            <title>Cetak Kartu SPMB</title>
+            <style>
+              @page { size: A4 portrait; margin: 0; }
+              body { margin: 0; display: flex; justify-content: center; align-items: flex-start; }
+              img { width: 100%; height: auto; }
+            </style>
+          </head>
+          <body>
+            <img src="${dataUrl}" onload="this.onload=null; window.focus(); window.print();" />
+          </body>
+        </html>
+      `);
+      w.document.close();
+    } catch (err) {
+      console.error("Failed to print card image:", err);
+      if (w) w.close();
+      window.print();
+    }
   };
 
   return (
@@ -129,7 +166,9 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
             ) : (
               <>
                 <Download className="w-4 h-4 text-amber-300" />
-                <span>{downloading ? 'Memproses PNG...' : 'Unduh Kartu PNG'}</span>
+                <span>
+                  {downloading ? "Memproses PNG..." : "Unduh Kartu PNG"}
+                </span>
               </>
             )}
           </button>
@@ -170,7 +209,9 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                 <h1 className="text-base sm:text-xl font-black tracking-tight leading-tight text-slate-900">
                   KARTU JADWAL PESERTA SPMB
                 </h1>
-                <p className="text-xs text-slate-500 font-medium">Tahun Pelajaran 2027/2028</p>
+                <p className="text-xs text-slate-500 font-medium">
+                  Tahun Pelajaran 2027/2028
+                </p>
               </div>
             </div>
           </div>
@@ -190,22 +231,38 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-500 block">Nomor Pendaftaran:</span>
-                    <div className="font-mono font-bold text-slate-900 text-sm">{siswa.id}</div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Estimasi Waktu:</span>
-                    <div className="font-bold text-[#1E3A8A]">{siswa.waktu_all}</div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Jenis Kelamin:</span>
-                    <div className="font-semibold text-slate-800">
-                      {siswa.gender === 'L' ? 'Laki-Laki (Ikhwan)' : 'Perempuan (Akhwat)'}
+                    <span className="text-[10px] text-slate-500 block">
+                      Nomor Pendaftaran:
+                    </span>
+                    <div className="font-mono font-bold text-slate-900 text-sm">
+                      {siswa.id}
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 block">Kelas:</span>
-                    <div className="font-bold text-[#1E3A8A]">{formatKelas(siswa.kelas)}</div>
+                    <span className="text-[10px] text-slate-500 block">
+                      Estimasi Waktu:
+                    </span>
+                    <div className="font-bold text-[#1E3A8A]">
+                      {siswa.waktu_all}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      Jenis Kelamin:
+                    </span>
+                    <div className="font-semibold text-slate-800">
+                      {siswa.gender === "L"
+                        ? "Laki-Laki (Ikhwan)"
+                        : "Perempuan (Akhwat)"}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      Kelas:
+                    </span>
+                    <div className="font-bold text-[#1E3A8A]">
+                      {formatKelas(siswa.kelas)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -213,7 +270,11 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
               {/* QR Code Barcode */}
               <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-slate-200 shadow-sm shrink-0 self-center sm:self-auto">
                 {qrDataUrl ? (
-                  <img src={qrDataUrl} alt={`QR Code ${siswa.id}`} className="w-28 h-28" />
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR Code ${siswa.id}`}
+                    className="w-28 h-28"
+                  />
                 ) : (
                   <div className="w-28 h-28 bg-slate-100 flex items-center justify-center text-xs text-slate-400">
                     QR Code
@@ -229,30 +290,42 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
           {/* Presensi Check-in Status Banner */}
           <div className="px-6 py-3 bg-slate-50 border-b border-slate-200">
             <div className="grid grid-cols-2 gap-3">
-              <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                studentCheck 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                  : 'bg-amber-50/70 border-amber-200/80 text-amber-900'
-              }`}>
-                <CheckCircle2 className={`w-4 h-4 shrink-0 ${studentCheck ? 'text-emerald-600' : 'text-amber-500'}`} />
+              <div
+                className={`p-2.5 rounded-xl border flex items-center gap-2 ${
+                  studentCheck
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : "bg-amber-50/70 border-amber-200/80 text-amber-900"
+                }`}
+              >
+                <CheckCircle2
+                  className={`w-4 h-4 shrink-0 ${studentCheck ? "text-emerald-600" : "text-amber-500"}`}
+                />
                 <div>
-                  <div className="text-[10px] font-bold uppercase text-slate-500">Presensi Siswa</div>
+                  <div className="text-[10px] font-bold uppercase text-slate-500">
+                    Presensi Siswa
+                  </div>
                   <div className="text-xs font-bold">
-                    {studentCheck ? 'Hadir di Lokasi' : 'Menunggu Check-in'}
+                    {studentCheck ? "Hadir di Lokasi" : "Menunggu Check-in"}
                   </div>
                 </div>
               </div>
 
-              <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                walmurCheck 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                  : 'bg-amber-50/70 border-amber-200/80 text-amber-900'
-              }`}>
-                <CheckCircle2 className={`w-4 h-4 shrink-0 ${walmurCheck ? 'text-emerald-600' : 'text-amber-500'}`} />
+              <div
+                className={`p-2.5 rounded-xl border flex items-center gap-2 ${
+                  walmurCheck
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : "bg-amber-50/70 border-amber-200/80 text-amber-900"
+                }`}
+              >
+                <CheckCircle2
+                  className={`w-4 h-4 shrink-0 ${walmurCheck ? "text-emerald-600" : "text-amber-500"}`}
+                />
                 <div>
-                  <div className="text-[10px] font-bold uppercase text-slate-500">Presensi Orang Tua</div>
+                  <div className="text-[10px] font-bold uppercase text-slate-500">
+                    Presensi Orang Tua
+                  </div>
                   <div className="text-xs font-bold">
-                    {walmurCheck ? 'Hadir di Lokasi' : 'Menunggu Check-in'}
+                    {walmurCheck ? "Hadir di Lokasi" : "Menunggu Check-in"}
                   </div>
                 </div>
               </div>
@@ -271,14 +344,18 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                   </h3>
                 </div>
                 <div className="text-xs text-slate-700 pl-6 flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-500">Ruangan Siswa:</span>
-                  <strong className="text-slate-900 font-bold">{siswa.ruangan_siswa}</strong>
+                  <span className="font-semibold text-slate-500">
+                    Ruangan Siswa:
+                  </span>
+                  <strong className="text-slate-900 font-bold">
+                    {siswa.ruangan_siswa}
+                  </strong>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {sortedStations.map((station) => (
-                  <div 
+                  <div
                     key={station.id}
                     className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 flex flex-col justify-between"
                   >
@@ -287,12 +364,18 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                         {station.title}
                       </h4>
                       <div className="text-xs text-slate-700">
-                        Waktu: <strong className="text-slate-900">{station.waktu}</strong>
+                        Waktu:{" "}
+                        <strong className="text-slate-900">
+                          {station.waktu}
+                        </strong>
                       </div>
                     </div>
 
                     <div className="pt-2 mt-2 border-t border-slate-200/80 text-[11px] text-slate-600">
-                      Penguji: <strong className="text-slate-800">{station.penguji}</strong>
+                      Penguji:{" "}
+                      <strong className="text-slate-800">
+                        {station.penguji}
+                      </strong>
                     </div>
                   </div>
                 ))}
@@ -305,7 +388,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#D97706]" />
                   <h3 className="text-xs sm:text-sm font-black text-[#D97706] uppercase tracking-wide">
-                    Jadwal Wawancara Orang Tua (Paralel)
+                    Jadwal Wawancara Orang Tua
                   </h3>
                 </div>
                 <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md border border-amber-200 self-start sm:self-auto">
@@ -319,16 +402,26 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                     Wawancara Orang Tua / Wali Calon Siswa
                   </h4>
                   <div className="text-xs text-slate-700">
-                    Waktu Wawancara: <strong className="text-slate-900">{siswa.waktu_interview}</strong>
+                    Waktu Wawancara:{" "}
+                    <strong className="text-slate-900">
+                      {siswa.waktu_interview}
+                    </strong>
                   </div>
                   <div className="text-xs text-slate-600">
-                    Pewawancara: <strong className="text-[#1E3A8A]">{siswa.interview_walmur}</strong>
+                    Pewawancara:{" "}
+                    <strong className="text-[#1E3A8A]">
+                      {siswa.interview_walmur}
+                    </strong>
                   </div>
                 </div>
 
                 <div className="text-left sm:text-right bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-lg border sm:border-0 border-slate-200 shrink-0">
-                  <span className="text-[10px] text-slate-500 block">Ruangan Orang Tua</span>
-                  <div className="text-xs sm:text-sm font-black text-[#1E3A8A]">{siswa.ruangan_walmur}</div>
+                  <span className="text-[10px] text-slate-500 block">
+                    Ruangan Orang Tua
+                  </span>
+                  <div className="text-xs sm:text-sm font-black text-[#1E3A8A]">
+                    {siswa.ruangan_walmur}
+                  </div>
                 </div>
               </div>
             </div>
@@ -336,7 +429,8 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
 
           {/* Notice bottom */}
           <div className="bg-slate-100 px-6 py-3 text-[10px] text-slate-500 text-center border-t border-slate-200">
-            *Tunjukkan kartu ini kepada petugas Timekeeper di meja registrasi sekolah untuk pemindaian presensi barcode kedatangan.
+            *Tunjukkan kartu ini kepada petugas Timekeeper di meja registrasi
+            sekolah untuk pemindaian presensi barcode kedatangan.
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Printer, Check, UserCheck, Users } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
@@ -55,14 +55,10 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#FFFFFF',
-        logging: false
+      const dataUrl = await toPng(element, {
+        pixelRatio: 2,
+        backgroundColor: '#FFFFFF'
       });
-      const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `KARTU_UJIAN_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, '_')}.png`;
       link.href = dataUrl;
@@ -79,8 +75,43 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const w = window.open('', '_blank');
+    try {
+      if (!cardRef.current) {
+        if (w) w.close();
+        window.print();
+        return;
+      }
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 3,
+        backgroundColor: '#FFFFFF'
+      });
+      if (!w) {
+        window.print();
+        return;
+      }
+      w.document.write(`
+        <html>
+          <head>
+            <title>Cetak Kartu SPMB</title>
+            <style>
+              @page { size: A4 portrait; margin: 0; }
+              body { margin: 0; display: flex; justify-content: center; align-items: flex-start; }
+              img { width: 100%; height: auto; }
+            </style>
+          </head>
+          <body>
+            <img src="${dataUrl}" onload="this.onload=null; window.focus(); window.print();" />
+          </body>
+        </html>
+      `);
+      w.document.close();
+    } catch (err) {
+      console.error('Failed to print card image:', err);
+      if (w) w.close();
+      window.print();
+    }
   };
 
   return (

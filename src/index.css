@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
   body * {
     visibility: hidden;
   }
@@ -15,9 +19,13 @@
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   #spmb-student-card-render *,
   #fullsize-spmb-card * {
     visibility: visible;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
