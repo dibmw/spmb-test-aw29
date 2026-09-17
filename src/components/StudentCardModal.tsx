@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Download, Printer, Check, UserCheck, Users } from 'lucide-react';
-import { cardToPng } from '../utils/captureCard';
+import { X, Download, Check, UserCheck, Users } from 'lucide-react';
+import { cardToPng, openCardImageInNewTab } from '../utils/captureCard';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
@@ -51,60 +51,24 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
   const handleDownload = async () => {
     if (!cardRef.current) return;
+    const w = window.open('', '_blank');
     try {
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2);
-      const link = document.createElement('a');
-      link.download = `KARTU_UJIAN_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, '_')}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (!w || !openCardImageInNewTab(dataUrl, 'Kartu Ujian SPMB')) {
+        setDownloadError('Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.');
+        return;
+      }
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
-      console.error('Failed to export card image:', err);
-      setDownloadError('Terjadi kendala unduh otomatis. Silakan gunakan tombol Cetak.');
+      console.error('Failed to generate card image:', err);
+      if (w) w.close();
+      setDownloadError('Gagal membuat gambar kartu. Silakan coba lagi.');
     } finally {
       setDownloading(false);
-    }
-  };
-
-  const handlePrint = async () => {
-    const w = window.open('', '_blank');
-    try {
-      if (!cardRef.current) {
-        if (w) w.close();
-        window.print();
-        return;
-      }
-      const dataUrl = await cardToPng(cardRef.current, 3);
-      if (!w) {
-        window.print();
-        return;
-      }
-      w.document.write(`
-        <html>
-          <head>
-            <title>Cetak Kartu SPMB</title>
-            <style>
-              @page { size: A4 portrait; margin: 0; }
-              body { margin: 0; display: flex; justify-content: center; align-items: flex-start; }
-              img { width: 100%; height: auto; }
-            </style>
-          </head>
-          <body>
-            <img src="${dataUrl}" onload="this.onload=null; window.focus(); window.print();" />
-          </body>
-        </html>
-      `);
-      w.document.close();
-    } catch (err) {
-      console.error('Failed to print card image:', err);
-      if (w) w.close();
-      window.print();
     }
   };
 
@@ -125,15 +89,6 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
             <h3 className="font-bold text-slate-800 text-sm sm:text-base">Kartu Resmi Jadwal Peserta SPMB</h3>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="p-2 text-slate-600 hover:text-[#1E3A8A] hover:bg-slate-100 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Cetak Langsung"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Cetak</span>
-            </button>
             <button
               type="button"
               onClick={handleDownload}
@@ -164,15 +119,8 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
         </div>
 
         {downloadError && (
-          <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+          <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
             <span>{downloadError}</span>
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="underline font-bold text-[#1E3A8A] ml-2"
-            >
-              Buka Cetak
-            </button>
           </div>
         )}
 
@@ -211,7 +159,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
                     </h2>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-[10px] text-slate-500 block">Nomor Pendaftaran:</span>
                       <div className="font-mono font-bold text-slate-800 text-sm">{siswa.id}</div>
@@ -331,7 +279,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
         {/* Modal Bottom Actions */}
         <div className="px-4 sm:px-6 py-3 bg-white flex items-center justify-between border-t border-slate-200 text-xs text-slate-500">
-          <span>Simpan PNG di ponsel atau cetak fisik untuk dibawa ke lokasi tes.</span>
+          <span>Buka gambar kartu di tab baru, lalu klik kanan untuk menyimpan.</span>
           <button
             type="button"
             onClick={onClose}

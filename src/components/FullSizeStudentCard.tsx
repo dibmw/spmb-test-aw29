@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import {
   Download,
-  Printer,
   Check,
   UserCheck,
   Users,
@@ -9,7 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { cardToPng } from "../utils/captureCard";
+import { cardToPng, openCardImageInNewTab } from "../utils/captureCard";
 import QRCode from "qrcode";
 import {
   SiswaJadwal,
@@ -64,62 +63,26 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
 
   const handleDownloadPNG = async () => {
     if (!cardRef.current) return;
+    const w = window.open("", "_blank");
     try {
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2.2);
-      const link = document.createElement("a");
-      link.download = `KARTU_SPMB_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, "_")}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (!w || !openCardImageInNewTab(dataUrl, "Kartu SPMB")) {
+        setDownloadError(
+          "Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.",
+        );
+        return;
+      }
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
-      console.error("Download card image error:", err);
-      setDownloadError(
-        "Terjadi kendala unduh otomatis. Silakan gunakan tombol Cetak.",
-      );
+      console.error("Failed to generate card image:", err);
+      if (w) w.close();
+      setDownloadError("Gagal membuat gambar kartu. Silakan coba lagi.");
     } finally {
       setDownloading(false);
-    }
-  };
-
-  const handlePrint = async () => {
-    const w = window.open("", "_blank");
-    try {
-      if (!cardRef.current) {
-        if (w) w.close();
-        window.print();
-        return;
-      }
-      const dataUrl = await cardToPng(cardRef.current, 3);
-      if (!w) {
-        window.print();
-        return;
-      }
-      w.document.write(`
-        <html>
-          <head>
-            <title>Cetak Kartu SPMB</title>
-            <style>
-              @page { size: A4 portrait; margin: 0; }
-              body { margin: 0; display: flex; justify-content: center; align-items: flex-start; }
-              img { width: 100%; height: auto; }
-            </style>
-          </head>
-          <body>
-            <img src="${dataUrl}" onload="this.onload=null; window.focus(); window.print();" />
-          </body>
-        </html>
-      `);
-      w.document.close();
-    } catch (err) {
-      console.error("Failed to print card image:", err);
-      if (w) w.close();
-      window.print();
     }
   };
 
@@ -137,15 +100,6 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
         </button>
 
         <div className="flex items-center gap-2.5 self-end sm:self-auto">
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-slate-600" />
-            <span>Cetak Kartu</span>
-          </button>
-
           <button
             type="button"
             onClick={handleDownloadPNG}
@@ -170,18 +124,9 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       </div>
 
       {downloadError && (
-        <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>{downloadError}</span>
-          </div>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="underline font-bold text-[#1E3A8A] ml-2 cursor-pointer"
-          >
-            Buka Jendela Cetak
-          </button>
+        <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{downloadError}</span>
         </div>
       )}
 
@@ -223,7 +168,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 block">
                       Nomor Pendaftaran:

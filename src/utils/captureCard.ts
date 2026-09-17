@@ -29,3 +29,17 @@ export async function cardToPng(source: HTMLElement, pixelRatio: number): Promis
     clone.remove();
   }
 }
+
+export function openCardImageInNewTab(dataUrl: string, title: string): boolean {
+  const w = window.open('', '_blank');
+  if (!w) {
+    return false;
+  }
+  w.document.write(
+    `<!doctype html><html><head><title>${title}</title>
+      <style>body{margin:0;background:#e2e8f0;display:flex;justify-content:center;align-items:flex-start;padding:16px}img{max-width:100%;height:auto}</style>
+      </head><body><img src="${dataUrl}" alt="${title}"/></body></html>`
+  );
+  w.document.close();
+  return true;
+}
