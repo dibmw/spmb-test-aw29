@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Printer, Check, UserCheck, Users } from 'lucide-react';
-import { toPng } from 'html-to-image';
+import { cardToPng } from '../utils/captureCard';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
@@ -55,10 +55,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
-      const dataUrl = await toPng(element, {
-        pixelRatio: 2,
-        backgroundColor: '#FFFFFF'
-      });
+      const dataUrl = await cardToPng(element, 2);
       const link = document.createElement('a');
       link.download = `KARTU_UJIAN_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, '_')}.png`;
       link.href = dataUrl;
@@ -83,10 +80,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
         window.print();
         return;
       }
-      const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 3,
-        backgroundColor: '#FFFFFF'
-      });
+      const dataUrl = await cardToPng(cardRef.current, 3);
       if (!w) {
         window.print();
         return;
@@ -296,33 +290,33 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
               {/* BAGIAN 2: JADWAL WAWANCARA ORANG TUA (PARALEL) */}
               <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-200">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-[#D97706]" />
-                    <h3 className="text-xs font-black text-[#D97706] uppercase tracking-wide">
-                      Jadwal Wawancara Orang Tua (Paralel)
-                    </h3>
+                <div className="space-y-1 pb-1.5 border-b border-slate-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-[#D97706]" />
+                      <h3 className="text-xs font-black text-[#D97706] uppercase tracking-wide">
+                        Jadwal Wawancara Orang Tua (Paralel)
+                      </h3>
+                    </div>
+                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                      Berjalan Bersamaan / Paralel dengan Ujian Siswa
+                    </span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
-                    Berjalan Bersamaan / Paralel dengan Ujian Siswa
-                  </span>
+                  <div className="text-[11px] text-slate-700 pl-5.5 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-500">Ruangan Orang Tua:</span>
+                    <strong className="text-slate-900 font-bold">{siswa.ruangan_walmur}</strong>
+                  </div>
                 </div>
 
-                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 block">
-                      Wawancara Orang Tua / Wali Calon Siswa
-                    </span>
-                    <div className="text-[11px] text-slate-600 mt-1">
-                      Waktu Wawancara: <strong className="text-slate-900">{siswa.waktu_interview}</strong>
-                    </div>
-                    <div className="text-[11px] text-slate-700 mt-1 font-medium">
-                      Pewawancara: <strong className="text-[#1E3A8A]">{siswa.interview_walmur}</strong>
-                    </div>
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50">
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Wawancara Orang Tua / Wali Calon Siswa
+                  </span>
+                  <div className="text-[11px] text-slate-600 mt-1">
+                    Waktu Wawancara: <strong className="text-slate-900">{siswa.waktu_interview}</strong>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] text-slate-500 block">Ruangan Orang Tua</span>
-                    <div className="text-xs font-bold text-[#1E3A8A]">{siswa.ruangan_walmur}</div>
+                  <div className="text-[11px] text-slate-700 mt-1 font-medium">
+                    Pewawancara: <strong className="text-[#1E3A8A]">{siswa.interview_walmur}</strong>
                   </div>
                 </div>
               </div>

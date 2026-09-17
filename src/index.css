@@ -1,5 +1,50 @@
 @import "tailwindcss";
 
+.capture-fixed {
+  width: 660px !important;
+  max-width: none !important;
+}
+.capture-fixed .sm\:grid-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+.capture-fixed .sm\:grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+.capture-fixed .sm\:text-xs {
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+.capture-fixed .sm\:text-sm {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+.capture-fixed .sm\:text-xl {
+  font-size: 1.25rem !important;
+  line-height: 1.75rem !important;
+}
+.capture-fixed .sm\:text-2xl {
+  font-size: 1.5rem !important;
+  line-height: 2rem !important;
+}
+.capture-fixed .sm\:flex-row {
+  flex-direction: row !important;
+}
+.capture-fixed .sm\:items-center {
+  align-items: center !important;
+}
+.capture-fixed .sm\:self-auto {
+  align-self: auto !important;
+}
+.capture-fixed .sm\:w-24 {
+  width: 6rem !important;
+}
+.capture-fixed .sm\:h-24 {
+  height: 6rem !important;
+}
+.capture-fixed .sm\:p-5 {
+  padding: 1.25rem !important;
+}
+
 @media print {
   @page {
     size: A4 portrait;

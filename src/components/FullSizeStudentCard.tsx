@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { toPng } from "html-to-image";
+import { cardToPng } from "../utils/captureCard";
 import QRCode from "qrcode";
 import {
   SiswaJadwal,
@@ -68,10 +68,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
-      const dataUrl = await toPng(element, {
-        pixelRatio: 2.2,
-        backgroundColor: "#FFFFFF",
-      });
+      const dataUrl = await cardToPng(element, 2.2);
       const link = document.createElement("a");
       link.download = `KARTU_SPMB_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, "_")}.png`;
       link.href = dataUrl;
@@ -98,10 +95,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
         window.print();
         return;
       }
-      const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 3,
-        backgroundColor: "#FFFFFF",
-      });
+      const dataUrl = await cardToPng(cardRef.current, 3);
       if (!w) {
         window.print();
         return;
@@ -384,19 +378,29 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
 
             {/* BAGIAN 2: JADWAL WAWANCARA ORANG TUA (PARALEL) */}
             <div className="space-y-2.5 pt-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1.5 border-b border-slate-200 gap-1">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#D97706]" />
-                  <h3 className="text-xs sm:text-sm font-black text-[#D97706] uppercase tracking-wide">
-                    Jadwal Wawancara Orang Tua
-                  </h3>
+              <div className="space-y-1 pb-2 border-b border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-[#D97706]" />
+                    <h3 className="text-xs sm:text-sm font-black text-[#D97706] uppercase tracking-wide">
+                      Jadwal Wawancara Orang Tua
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md border border-amber-200 self-start sm:self-auto">
+                    Berjalan Bersamaan / Paralel dengan Ujian Siswa
+                  </span>
                 </div>
-                <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md border border-amber-200 self-start sm:self-auto">
-                  Berjalan Bersamaan / Paralel dengan Ujian Siswa
-                </span>
+                <div className="text-xs text-slate-700 pl-6 flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-500">
+                    Ruangan Orang Tua:
+                  </span>
+                  <strong className="text-slate-900 font-bold">
+                    {siswa.ruangan_walmur}
+                  </strong>
+                </div>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
                 <div className="space-y-1">
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900">
                     Wawancara Orang Tua / Wali Calon Siswa
@@ -412,15 +416,6 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                     <strong className="text-[#1E3A8A]">
                       {siswa.interview_walmur}
                     </strong>
-                  </div>
-                </div>
-
-                <div className="text-left sm:text-right bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-lg border sm:border-0 border-slate-200 shrink-0">
-                  <span className="text-[10px] text-slate-500 block">
-                    Ruangan Orang Tua
-                  </span>
-                  <div className="text-xs sm:text-sm font-black text-[#1E3A8A]">
-                    {siswa.ruangan_walmur}
                   </div>
                 </div>
               </div>
