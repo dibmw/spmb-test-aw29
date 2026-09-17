@@ -52,21 +52,27 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
   const handleDownload = async () => {
     if (!cardRef.current) return;
     const w = createCardTab('Kartu Ujian SPMB');
-    if (!w) {
-      setDownloadError('Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.');
-      return;
-    }
     try {
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2);
-      openCardImageInTab(w, dataUrl, 'Kartu Ujian SPMB');
+      if (w) {
+        openCardImageInTab(w, dataUrl, 'Kartu Ujian SPMB');
+      } else {
+        setDownloadError('Gagal membuka tab baru, tetapi gambar tetap terunduh. Mohon izinkan pop-up untuk situs ini.');
+      }
+      const link = document.createElement('a');
+      link.download = `KARTU_UJIAN_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, '_')}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
       console.error('Failed to generate card image:', err);
-      w.close();
+      if (w) w.close();
       setDownloadError('Gagal membuat gambar kartu. Silakan coba lagi.');
     } finally {
       setDownloading(false);
@@ -280,7 +286,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
         {/* Modal Bottom Actions */}
         <div className="px-4 sm:px-6 py-3 bg-white flex items-center justify-between border-t border-slate-200 text-xs text-slate-500">
-          <span>Buka gambar kartu di tab baru, lalu klik kanan untuk menyimpan.</span>
+          <span>Gambar kartu terunduh otomatis dan tampil juga di tab baru.</span>
           <button
             type="button"
             onClick={onClose}
