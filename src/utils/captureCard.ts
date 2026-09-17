@@ -30,8 +30,7 @@ export async function cardToPng(source: HTMLElement, pixelRatio: number): Promis
   }
 }
 
-export function openCardImageInNewTab(dataUrl: string, title: string): boolean {
-  const w = window.open('', '_blank');
+export function renderImageInNewTab(w: Window | null, dataUrl: string, title: string): boolean {
   if (!w) {
     return false;
   }

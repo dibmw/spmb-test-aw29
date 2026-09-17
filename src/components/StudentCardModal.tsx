@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Check, UserCheck, Users } from 'lucide-react';
-import { cardToPng, openCardImageInNewTab } from '../utils/captureCard';
+import { cardToPng, renderImageInNewTab } from '../utils/captureCard';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
@@ -52,12 +52,16 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
   const handleDownload = async () => {
     if (!cardRef.current) return;
     const w = window.open('', '_blank');
+    if (!w) {
+      setDownloadError('Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.');
+      return;
+    }
     try {
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2);
-      if (!w || !openCardImageInNewTab(dataUrl, 'Kartu Ujian SPMB')) {
+      if (!renderImageInNewTab(w, dataUrl, 'Kartu Ujian SPMB')) {
         setDownloadError('Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.');
         return;
       }
@@ -65,7 +69,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
       console.error('Failed to generate card image:', err);
-      if (w) w.close();
+      w.close();
       setDownloadError('Gagal membuat gambar kartu. Silakan coba lagi.');
     } finally {
       setDownloading(false);
