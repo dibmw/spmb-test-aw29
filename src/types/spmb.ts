@@ -73,6 +73,10 @@ export interface SkorCalistungSD {
   paham_indo: number; // 0 - 100
   baca_inggris: number; // 0 - 100
   paham_inggris: number; // 0 - 100
+  catatan_baca_indo: string;
+  catatan_paham_indo: string;
+  catatan_baca_inggris: string;
+  catatan_paham_inggris: string;
   catatan: string;
 }
 
@@ -180,7 +184,7 @@ export function getSortedSiswaExamStations(siswa: SiswaJadwal, unit: 'SD' | 'SMP
 
   const stationB: ExamStationItem = {
     id: 'CATUNG_ENG',
-    title: "Ujian English",
+    title: unit === 'SD' ? "Ujian Calistung" : "Ujian English",
     waktu: siswa.waktu_catung_eng,
     posBadge: siswa.ord_catung_eng || 'Pos B',
     penguji: siswa.penguji_catung_eng,

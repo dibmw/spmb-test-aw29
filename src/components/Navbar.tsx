@@ -39,7 +39,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo & School Title */}
           <div 
-            onClick={() => onSelectTab('landing')}
+            onClick={() => {
+              if (session) {
+                if (session.activeRole === 'ADMIN') onSelectTab('admin');
+                else if (session.activeRole === 'TIMEKEEPER') onSelectTab('timekeeper');
+                else if (session.activeRole === 'PENGUJI') onSelectTab('penguji');
+                else onSelectTab('landing');
+              } else {
+                onSelectTab('landing');
+              }
+            }}
             className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group select-none min-w-0 mr-2"
           >
             <SchoolLogo size="md" className="group-hover:scale-105 transition-transform shrink-0" />
@@ -59,14 +68,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             {(session?.activeRole === 'TIMEKEEPER' || session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('timekeeper')}
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                title="Portal Timekeeper - Presensi Scanner"
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center transition-all cursor-pointer ${
                   currentTab === 'timekeeper'
                     ? 'bg-[#1E3A8A] text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-[#1E3A8A]'
                 }`}
               >
                 <QrCode className="w-4 h-4 text-[#D97706]" />
-                <span>Presensi Scanner</span>
               </button>
             )}
 
@@ -74,14 +83,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             {(session?.activeRole === 'PENGUJI' || session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('penguji')}
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                title="Portal Penguji - Input Nilai"
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center transition-all cursor-pointer ${
                   currentTab === 'penguji'
                     ? 'bg-[#1E3A8A] text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-[#1E3A8A]'
                 }`}
               >
                 <FileCheck className="w-4 h-4 text-emerald-600" />
-                <span>Input Nilai</span>
               </button>
             )}
 
@@ -188,24 +197,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             {(session?.activeRole === 'TIMEKEEPER' || session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('timekeeper')}
-                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1 cursor-pointer ${
+                title="Presensi Scanner"
+                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center cursor-pointer ${
                   currentTab === 'timekeeper' ? 'bg-[#1E3A8A] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <QrCode className="w-3.5 h-3.5 text-[#D97706]" />
-                <span>Presensi</span>
               </button>
             )}
 
             {(session?.activeRole === 'PENGUJI' || session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('penguji')}
-                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1 cursor-pointer ${
+                title="Portal Penguji - Input Nilai"
+                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center cursor-pointer ${
                   currentTab === 'penguji' ? 'bg-[#1E3A8A] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Nilai</span>
               </button>
             )}
 

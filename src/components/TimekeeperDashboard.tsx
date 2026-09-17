@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   QrCode, 
   Camera, 
@@ -14,10 +14,11 @@ import {
   Sparkles,
   Check,
   ShieldCheck,
-  History
+  History,
+  CalendarClock
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { SiswaJadwal, PresensiRecord, UserSession, formatKelas } from '../types/spmb';
+import { SiswaJadwal, PresensiRecord, UserSession, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
 import { apiService } from '../services/apiService';
 
 interface TimekeeperDashboardProps {
@@ -63,22 +64,27 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
       if (!qrReaderRef.current) {
         qrReaderRef.current = new Html5Qrcode(scannerElementId);
       }
+      if (qrReaderRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+        return;
+      }
 
-      await qrReaderRef.current.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
-        },
-        (decodedText) => {
-          handleCodeDetected(decodedText);
-        },
-        (errorMessage) => {
-          // ignore parsing frame glitches
-        }
-      );
+      // Show scanner container BEFORE starting so the video renders properly
+      // (html5-qrcode cannot render into a display:none element on laptops/Mac).
       setIsScanning(true);
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      };
+      const onDetect = (decodedText: string) => handleCodeDetected(decodedText);
+
+      try {
+        // Try back camera first (mobile), then fall back to default webcam (laptop/Mac)
+        await qrReaderRef.current.start({ facingMode: 'environment' }, config, onDetect, () => {});
+      } catch (err) {
+        await qrReaderRef.current.start({}, config, onDetect, () => {});
+      }
     } catch (err: any) {
       console.error('Failed to start camera:', err);
       setCameraError('Gagal mengakses kamera. Pastikan izin kamera aktif atau gunakan form input manual ID.');
@@ -182,6 +188,22 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
     .filter(p => p.petugas_timekeeper.toLowerCase() === session.nama.toLowerCase() || session.activeRole === 'ADMIN')
     .slice(0, 8);
 
+  // Schedule plot: students assigned to this timekeeper, sorted by session time
+  const scheduleList = useMemo(() => {
+    const isAdmin = session.activeRole === 'ADMIN';
+    const tkName = session.nama.trim().toLowerCase();
+    const list = isAdmin
+      ? [...jadwalList]
+      : jadwalList.filter(s =>
+          s.timekeeper_siswa.trim().toLowerCase() === tkName ||
+          s.timekeeper_walmur.trim().toLowerCase() === tkName
+        );
+    return list.sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
+  }, [jadwalList, session.nama, session.activeRole]);
+
+  const isStudentPresent = (id: string) =>
+    presensiList.some(p => p.id_siswa.toUpperCase() === id.toUpperCase() && p.tipe_presensi === 'Siswa');
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Header Banner */}
@@ -225,10 +247,77 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
         </div>
       </div>
 
+      {/* Plot Jadwal Ujian */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-[#1E3A8A]" />
+            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Plot Jadwal Ujian Hari Ini
+            </h2>
+          </div>
+          <span className="text-[11px] font-bold text-[#D97706]">
+            {scheduleList.length} Peserta
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
+              <tr>
+                <th className="p-3">Waktu Sesi</th>
+                <th className="p-3">Nama Siswa</th>
+                <th className="p-3">Jenjang</th>
+                <th className="p-3">Ruangan</th>
+                <th className="p-3">Status Presensi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {scheduleList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-6 text-center text-slate-400">
+                    Tidak ada jadwal peserta yang ditugaskan kepada Anda.
+                  </td>
+                </tr>
+              ) : (
+                scheduleList.map((s) => {
+                  const present = isStudentPresent(s.id);
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all}</td>
+                      <td className="p-3 font-bold text-slate-900">
+                        {s.nama_siswa}
+                        <span className="block text-[10px] text-slate-400 font-normal font-mono">{s.id}</span>
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1E3A8A]">
+                          {getJenjangFromKelas(s.kelas, s.grade)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-600">{s.ruangan_siswa}</td>
+                      <td className="p-3">
+                        {present ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Hadir
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-amber-700 font-bold">
+                            <AlertCircle className="w-3.5 h-3.5" /> Belum Hadir
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Scanner & Manual Input (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Camera Scanner Box */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -259,14 +348,14 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
               </button>
             </div>
 
-            <div className="p-6 flex flex-col items-center justify-center bg-slate-900 min-h-[300px] text-white relative">
+            <div className="p-6 flex items-center justify-center bg-slate-900 min-h-[300px] text-white relative">
               <div
                 id={scannerElementId}
-                className={`w-full max-w-sm rounded-xl overflow-hidden ${isScanning ? 'block' : 'hidden'}`}
+                className="w-full max-w-sm rounded-xl overflow-hidden min-h-[220px] flex items-center justify-center"
               ></div>
 
               {!isScanning && (
-                <div className="text-center space-y-3 py-8">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-3 bg-slate-900/95 p-6">
                   <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto text-amber-400">
                     <QrCode className="w-8 h-8" />
                   </div>
@@ -286,7 +375,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
               )}
 
               {cameraError && (
-                <div className="mt-4 p-3 bg-rose-900/80 border border-rose-700 text-rose-200 text-xs rounded-xl flex items-center gap-2 max-w-md">
+                <div className="absolute bottom-4 left-4 right-4 p-3 bg-rose-900/90 border border-rose-700 text-rose-200 text-xs rounded-xl flex items-center gap-2 max-w-md mx-auto z-10">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{cameraError}</span>
                 </div>

@@ -299,7 +299,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </span>
               <h4 className="font-bold text-slate-800 text-sm">Ujian Siswa & Wawancara Paralel</h4>
               <p className="leading-relaxed">
-                Ujian calon siswa (Al-Qur'an & Ujian English) dan Wawancara Orang Tua berjalan secara paralel bersamaan di ruangan masing-masing yang telah ditentukan.
+                Ujian calon siswa (Al-Qur'an & Ujian Calistung untuk SD / English untuk SMP-SMA) dan Wawancara Orang Tua berjalan secara paralel bersamaan di ruangan masing-masing yang telah ditentukan.
               </p>
             </div>
           </div>

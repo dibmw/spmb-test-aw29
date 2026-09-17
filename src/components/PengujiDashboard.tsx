@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileCheck, 
   Search, 
@@ -14,7 +14,8 @@ import {
   BookOpen, 
   Sparkles 
 } from 'lucide-react';
-import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, formatKelas } from '../types/spmb';
+import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
+import { apiService } from '../services/apiService';
 import { RubrikModal } from './RubrikModal';
 
 interface PengujiDashboardProps {
@@ -46,6 +47,9 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
   // Filter students assigned to this examiner (or all if admin)
   const isSuperAdmin = session.activeRole === 'ADMIN';
 
+  // Robust jenjang resolution (falls back to parsing "kelas" if grade field is missing/bad)
+  const gradeOf = (s: SiswaJadwal): 'SD' | 'SMP' | 'SMA' => getJenjangFromKelas(s.kelas, s.grade);
+
   const myStudents = useMemo(() => {
     return jadwalList.filter((s) => {
       if (isSuperAdmin) return true;
@@ -58,17 +62,32 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
     });
   }, [jadwalList, session.nama, isSuperAdmin]);
 
+  // Live presensi auto-refresh (sync from localStorage periodically)
+  const [livePresensi, setLivePresensi] = useState<PresensiRecord[]>(presensiList);
+
+  useEffect(() => {
+    setLivePresensi(presensiList);
+  }, [presensiList]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLivePresensi(apiService.getPresensiList());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Determine what exam categories this examiner handles for a given student
   const getExaminerCategoriesForStudent = (s: SiswaJadwal): KategoriUjian[] => {
     const examinerName = session.nama.trim().toLowerCase();
     const categories: KategoriUjian[] = [];
+    const unit = gradeOf(s);
 
     const isAlqExaminer = isSuperAdmin || s.penguji_alq_arab.trim().toLowerCase() === examinerName;
     const isCatungExaminer = isSuperAdmin || s.penguji_catung_eng.trim().toLowerCase() === examinerName;
     const isInterviewExaminer = isSuperAdmin || s.interview_walmur.trim().toLowerCase() === examinerName;
 
     if (isAlqExaminer) {
-      if (s.grade === 'SD') {
+      if (unit === 'SD') {
         categories.push('Al-Quran SD');
       } else {
         categories.push('Al-Quran SMP/SMA');
@@ -77,7 +96,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
     }
 
     if (isCatungExaminer) {
-      if (s.grade === 'SD') {
+      if (unit === 'SD') {
         categories.push('Calistung');
       } else {
         categories.push('English');
@@ -91,27 +110,47 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
     return categories;
   };
 
+  // Session time for a student based on the categories handled by THIS examiner
+  const getExaminerSessionTime = (s: SiswaJadwal, cats: KategoriUjian[]): string => {
+    const candidates: { label: string; t: number }[] = [];
+    const hasAlq = cats.includes('Al-Quran SD') || cats.includes('Al-Quran SMP/SMA') || cats.includes('Bahasa Arab');
+    const hasCatung = cats.includes('Calistung') || cats.includes('English');
+    const hasInterview = cats.includes('Interview Walmur');
+    if (hasAlq) candidates.push({ label: s.waktu_alq_arab, t: parseStartTimeMinutes(s.waktu_alq_arab) });
+    if (hasCatung) candidates.push({ label: s.waktu_catung_eng, t: parseStartTimeMinutes(s.waktu_catung_eng) });
+    if (hasInterview) candidates.push({ label: s.waktu_interview, t: parseStartTimeMinutes(s.waktu_interview) });
+    if (candidates.length === 0) return s.waktu_all;
+    candidates.sort((a, b) => a.t - b.t);
+    return candidates[0].label;
+  };
+
   // Find grades submitted for a student
   const getStudentGrades = (studentId: string) => {
     return nilaiList.filter(n => n.id_siswa.toUpperCase() === studentId.toUpperCase());
   };
 
-  // Filtered student list
+  // Filtered student list (sorted by the examiner's own session time)
   const filteredStudents = useMemo(() => {
-    return myStudents.filter((s) => {
-      const q = searchQuery.trim().toLowerCase();
-      const matchQuery = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.kelas.toLowerCase().includes(q);
-      
-      const studentGrades = getStudentGrades(s.id);
-      const categories = getExaminerCategoriesForStudent(s);
-      const isAllGraded = categories.length > 0 && categories.every(cat => studentGrades.some(g => g.kategori_ujian === cat));
-      
-      let matchStatus = true;
-      if (statusFilter === 'GRADED') matchStatus = isAllGraded;
-      if (statusFilter === 'PENDING') matchStatus = !isAllGraded;
+    return myStudents
+      .filter((s) => {
+        const q = searchQuery.trim().toLowerCase();
+        const matchQuery = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.kelas.toLowerCase().includes(q);
 
-      return matchQuery && matchStatus;
-    });
+        const studentGrades = getStudentGrades(s.id);
+        const categories = getExaminerCategoriesForStudent(s);
+        const isAllGraded = categories.length > 0 && categories.every(cat => studentGrades.some(g => g.kategori_ujian === cat));
+
+        let matchStatus = true;
+        if (statusFilter === 'GRADED') matchStatus = isAllGraded;
+        if (statusFilter === 'PENDING') matchStatus = !isAllGraded;
+
+        return matchQuery && matchStatus;
+      })
+      .sort((a, b) => {
+        const ta = parseStartTimeMinutes(getExaminerSessionTime(a, getExaminerCategoriesForStudent(a)));
+        const tb = parseStartTimeMinutes(getExaminerSessionTime(b, getExaminerCategoriesForStudent(b)));
+        return ta - tb;
+      });
   }, [myStudents, searchQuery, statusFilter, nilaiList]);
 
   const handleOpenGrading = (siswa: SiswaJadwal, kategori: KategoriUjian) => {
@@ -201,7 +240,8 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
           {filteredStudents.map((siswa) => {
             const categories = getExaminerCategoriesForStudent(siswa);
             const studentGrades = getStudentGrades(siswa.id);
-            const hasStudentAttendance = presensiList.some(p => p.id_siswa === siswa.id && p.tipe_presensi === 'Siswa');
+            const hasStudentAttendance = livePresensi.some(p => p.id_siswa.toUpperCase() === siswa.id.toUpperCase() && p.tipe_presensi === 'Siswa');
+            const sessionTime = getExaminerSessionTime(siswa, categories);
 
             return (
               <div
@@ -213,7 +253,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-[#1E3A8A] text-white text-[10px] font-black rounded uppercase">
-                        {siswa.grade}
+                        {gradeOf(siswa)}
                       </span>
                       <span className="font-mono text-xs font-bold text-slate-600">{siswa.id}</span>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -234,7 +274,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
 
                   <div className="text-right">
                     <span className="text-[10px] text-slate-400 block uppercase font-bold">Jadwal Sesi</span>
-                    <span className="text-xs font-bold text-[#1E3A8A] font-mono">{siswa.waktu_all}</span>
+                    <span className="text-xs font-bold text-[#1E3A8A] font-mono">{sessionTime}</span>
                   </div>
                 </div>
 
@@ -311,14 +351,6 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
                       );
                     })}
                   </div>
-                </div>
-
-                {/* Footer notes */}
-                <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-1">
-                  <span>
-                    Wawancara Orang Tua ({siswa.ruangan_walmur}) • Pewawancara: <strong className="text-slate-800">{siswa.interview_walmur}</strong>
-                  </span>
-                  <span className="font-mono text-slate-500">{siswa.waktu_interview}</span>
                 </div>
               </div>
             );
