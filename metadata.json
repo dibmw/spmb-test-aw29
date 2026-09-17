@@ -1,0 +1,10 @@
+{
+  "name": "Tes SPMB AL-WILDAN ISLAMIC SCHOOL 29 DEPOK",
+  "description": "Sistem Informasi & Manajemen Tes SPMB AL-WILDAN ISLAMIC SCHOOL 29 DEPOK: Cetak Kartu Ujian, Presensi Barcode Timekeeper, Rubrik Penilaian Penguji, dan Controlling Center Admin.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
