@@ -3,7 +3,6 @@ import {
   Download, 
   Printer, 
   Check, 
-  ShieldCheck, 
   UserCheck, 
   Users, 
   Search, 
@@ -189,10 +188,14 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 block">Nomor Pendaftaran:</span>
                     <div className="font-mono font-bold text-slate-900 text-sm">{siswa.id}</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">Estimasi Waktu:</span>
+                    <div className="font-bold text-[#1E3A8A]">{siswa.waktu_all}</div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Jenis Kelamin:</span>
@@ -328,18 +331,6 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                   <div className="text-xs sm:text-sm font-black text-[#1E3A8A]">{siswa.ruangan_walmur}</div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Sesi Total & Status Footer */}
-          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <span className="text-slate-500">Estimasi Keseluruhan Sesi:</span>{' '}
-              <strong className="text-slate-800">{siswa.waktu_all}</strong>
-            </div>
-            <div className="flex items-center gap-1.5 text-[#1E3A8A] font-bold">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>DOKUMEN RESMI SPMB AL-WILDAN 29 DEPOK</span>
             </div>
           </div>
 

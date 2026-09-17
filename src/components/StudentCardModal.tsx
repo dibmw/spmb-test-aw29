@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Download, Printer, Check, ShieldCheck, UserCheck, Users } from 'lucide-react';
+import { X, Download, Printer, Check, UserCheck, Users } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
@@ -186,10 +186,14 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
                     </h2>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div>
                       <span className="text-[10px] text-slate-500 block">Nomor Pendaftaran:</span>
                       <div className="font-mono font-bold text-slate-800 text-sm">{siswa.id}</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Estimasi Waktu:</span>
+                      <div className="font-bold text-[#1E3A8A]">{siswa.waktu_all}</div>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-500 block">Jenis Kelamin:</span>
@@ -290,18 +294,6 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
                     <div className="text-xs font-bold text-[#1E3A8A]">{siswa.ruangan_walmur}</div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Total Time & Footnote */}
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-600 flex items-center justify-between">
-              <div>
-                <span className="text-slate-500">Estimasi Keseluruhan:</span>{' '}
-                <strong className="text-slate-800">{siswa.waktu_all}</strong>
-              </div>
-              <div className="flex items-center gap-1 text-[#1E3A8A] font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Dokumen Resmi SPMB</span>
               </div>
             </div>
 

@@ -24,7 +24,6 @@ export const SchoolLogo: React.FC<SchoolLogoProps> = ({
       <img
         src={SCHOOL_LOGO_URL}
         alt="AL-WILDAN ISLAMIC SCHOOL 29 DEPOK"
-        crossOrigin="anonymous"
         className="w-full h-full object-contain"
       />
     </div>

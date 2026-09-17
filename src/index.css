@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #spmb-student-card-render,
+  #fullsize-spmb-card {
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  #spmb-student-card-render *,
+  #fullsize-spmb-card * {
+    visibility: visible;
+  }
+}
