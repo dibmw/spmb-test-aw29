@@ -30,15 +30,25 @@ export async function cardToPng(source: HTMLElement, pixelRatio: number): Promis
   }
 }
 
-export function renderImageInNewTab(w: Window | null, dataUrl: string, title: string): boolean {
+export function createCardTab(title: string): Window | null {
+  const w = window.open('', '_blank');
   if (!w) {
-    return false;
+    return null;
   }
   w.document.write(
-    `<!doctype html><html><head><title>${title}</title>
+    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
       <style>body{margin:0;background:#e2e8f0;display:flex;justify-content:center;align-items:flex-start;padding:16px}img{max-width:100%;height:auto}</style>
-      </head><body><img src="${dataUrl}" alt="${title}"/></body></html>`
+      </head><body></body></html>`
   );
   w.document.close();
-  return true;
+  return w;
+}
+
+export function renderCardImageInTab(w: Window, dataUrl: string, title: string): void {
+  w.document.title = title;
+  const img = w.document.createElement('img');
+  img.src = dataUrl;
+  img.alt = title;
+  w.document.body.appendChild(img);
+  w.focus();
 }

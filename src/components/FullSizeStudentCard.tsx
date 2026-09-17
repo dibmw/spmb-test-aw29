@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { cardToPng, renderImageInNewTab } from "../utils/captureCard";
+import { cardToPng, createCardTab, renderCardImageInTab } from "../utils/captureCard";
 import QRCode from "qrcode";
 import {
   SiswaJadwal,
@@ -63,7 +63,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
 
   const handleDownloadPNG = async () => {
     if (!cardRef.current) return;
-    const w = window.open("", "_blank");
+    const w = createCardTab("Kartu SPMB");
     if (!w) {
       setDownloadError(
         "Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.",
@@ -75,12 +75,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2.2);
-      if (!renderImageInNewTab(w, dataUrl, "Kartu SPMB")) {
-        setDownloadError(
-          "Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini, lalu coba lagi.",
-        );
-        return;
-      }
+      renderCardImageInTab(w, dataUrl, "Kartu SPMB");
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
