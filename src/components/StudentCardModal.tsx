@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Check, UserCheck, Users } from 'lucide-react';
-import { cardToPng, createCardTab, openCardImageInTab } from '../utils/captureCard';
+import { cardToPng } from '../utils/captureCard';
 import QRCode from 'qrcode';
 import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
@@ -51,17 +51,11 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
   const handleDownload = async () => {
     if (!cardRef.current) return;
-    const w = createCardTab('Kartu Ujian SPMB');
     try {
       setDownloading(true);
       setDownloadError(null);
       const element = cardRef.current;
       const dataUrl = await cardToPng(element, 2);
-      if (w) {
-        openCardImageInTab(w, dataUrl, 'Kartu Ujian SPMB');
-      } else {
-        setDownloadError('Gagal membuka tab baru, tetapi gambar tetap terunduh. Mohon izinkan pop-up untuk situs ini.');
-      }
       const link = document.createElement('a');
       link.download = `KARTU_UJIAN_${siswa.id}_${siswa.nama_siswa.replace(/\s+/g, '_')}.png`;
       link.href = dataUrl;
@@ -72,7 +66,6 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
       setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
       console.error('Failed to generate card image:', err);
-      if (w) w.close();
       setDownloadError('Gagal membuat gambar kartu. Silakan coba lagi.');
     } finally {
       setDownloading(false);
@@ -286,7 +279,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
         {/* Modal Bottom Actions */}
         <div className="px-4 sm:px-6 py-3 bg-white flex items-center justify-between border-t border-slate-200 text-xs text-slate-500">
-          <span>Gambar kartu terunduh otomatis dan tampil juga di tab baru.</span>
+          <span>Gambar kartu terunduh otomatis dalam format PNG.</span>
           <button
             type="button"
             onClick={onClose}
