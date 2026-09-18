@@ -46,6 +46,33 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const scannerElementId = 'timekeeper-reader';
 
+  const tkName = session.nama.trim().toLowerCase();
+  const isAdmin = session.activeRole === 'ADMIN';
+
+  // Peran timekeeper sesuai plot: hanya siswa, hanya walmur, atau keduanya
+  const timekeeperRoles = useMemo(() => {
+    if (isAdmin) return { siswa: true, walmur: true };
+    const canSiswa = jadwalList.some(
+      s => s.status !== 'Selesai' && s.timekeeper_siswa.trim().toLowerCase() === tkName
+    );
+    const canWalmur = jadwalList.some(
+      s => s.status !== 'Selesai' && s.timekeeper_walmur.trim().toLowerCase() === tkName
+    );
+    return { siswa: canSiswa, walmur: canWalmur };
+  }, [jadwalList, tkName, isAdmin]);
+
+  // Sinkronkan mode presensi dengan peran timekeeper
+  useEffect(() => {
+    if (timekeeperRoles.siswa && !timekeeperRoles.walmur) setAttendanceType('Siswa');
+    else if (!timekeeperRoles.siswa && timekeeperRoles.walmur) setAttendanceType('Walmur');
+  }, [timekeeperRoles]);
+
+  const canTakeAttendanceFor = (siswa: SiswaJadwal, type: 'Siswa' | 'Walmur'): boolean => {
+    if (isAdmin) return true;
+    if (type === 'Siswa') return siswa.timekeeper_siswa.trim().toLowerCase() === tkName;
+    return siswa.timekeeper_walmur.trim().toLowerCase() === tkName;
+  };
+
   // Cleanup scanner on unmount
   useEffect(() => {
     return () => {
@@ -115,6 +142,10 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
         showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} berstatus Selesai dan tidak dapat melakukan presensi.`, 'error');
         return;
       }
+      if (!canTakeAttendanceFor(student, attendanceType)) {
+        showToast('Presensi Ditolak', `Anda tidak bertugas sebagai ${attendanceType === 'Siswa' ? 'timekeeper siswa' : 'timekeeper orang tua'} untuk ${student.nama_siswa} (${student.id}).`, 'error');
+        return;
+      }
       setScannedStudent(student);
       // Play audio beep tone
       playAudioBeep();
@@ -158,6 +189,10 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
         showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} berstatus Selesai dan tidak dapat melakukan presensi.`, 'error');
         return;
       }
+      if (!canTakeAttendanceFor(student, attendanceType)) {
+        showToast('Presensi Ditolak', `Anda tidak bertugas sebagai ${attendanceType === 'Siswa' ? 'timekeeper siswa' : 'timekeeper orang tua'} untuk ${student.nama_siswa} (${student.id}).`, 'error');
+        return;
+      }
       setScannedStudent(student);
       showToast('Data Ditemukan', `Calon siswa: ${student.nama_siswa}`, 'info');
     } else {
@@ -167,6 +202,10 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
   const handleConfirmAttendance = async () => {
     if (!scannedStudent) return;
+    if (!canTakeAttendanceFor(scannedStudent, attendanceType)) {
+      showToast('Presensi Ditolak', 'Siswa ini tidak berada dalam lingkup tugas Anda untuk mode presensi aktif.', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await apiService.submitPresensi(
@@ -192,8 +231,6 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
   // Schedule plot: students assigned to this timekeeper, sorted by session time
   const scheduleList = useMemo(() => {
-    const isAdmin = session.activeRole === 'ADMIN';
-    const tkName = session.nama.trim().toLowerCase();
     const list = isAdmin
       ? [...jadwalList]
       : jadwalList.filter(s =>
@@ -203,7 +240,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
     return list
       .filter(s => s.status !== 'Selesai')
       .sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
-  }, [jadwalList, session.nama, session.activeRole]);
+  }, [jadwalList, tkName, isAdmin]);
 
   const isStudentPresent = (id: string) =>
     presensiList.some(p => p.id_siswa.toUpperCase() === id.toUpperCase() && p.tipe_presensi === 'Siswa');
@@ -226,28 +263,32 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
         {/* Tipe Presensi Switcher */}
         <div className="bg-blue-950/70 p-1.5 rounded-xl flex items-center gap-1 border border-blue-700/60 shrink-0">
-          <button
-            onClick={() => setAttendanceType('Siswa')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-              attendanceType === 'Siswa'
-                ? 'bg-[#D97706] text-white shadow'
-                : 'text-blue-200 hover:text-white'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>Presensi Siswa</span>
-          </button>
-          <button
-            onClick={() => setAttendanceType('Walmur')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-              attendanceType === 'Walmur'
-                ? 'bg-[#D97706] text-white shadow'
-                : 'text-blue-200 hover:text-white'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Presensi Orang Tua</span>
-          </button>
+          {timekeeperRoles.siswa && (
+            <button
+              onClick={() => setAttendanceType('Siswa')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                attendanceType === 'Siswa'
+                  ? 'bg-[#D97706] text-white shadow'
+                  : 'text-blue-200 hover:text-white'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Presensi Siswa</span>
+            </button>
+          )}
+          {timekeeperRoles.walmur && (
+            <button
+              onClick={() => setAttendanceType('Walmur')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                attendanceType === 'Walmur'
+                  ? 'bg-[#D97706] text-white shadow'
+                  : 'text-blue-200 hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Presensi Orang Tua</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -381,36 +422,40 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Ruangan Ujian Siswa:</span>
-                    <strong className="text-slate-800">{scannedStudent.ruangan_siswa}</strong>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Wawancara Orang Tua:</span>
-                    <strong className="text-slate-800">{scannedStudent.ruangan_walmur}</strong>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Pewawancara Orang Tua:</span>
-                    <strong className="text-[#1E3A8A]">{scannedStudent.interview_walmur}</strong>
-                  </div>
-                  <div className="flex items-center justify-between">
                     <span className="text-slate-500">Hari & Tanggal:</span>
                     <strong className="text-slate-800">{scannedStudent.hari_tanggal || '-'}</strong>
-                  </div>
-                  <div className="pt-2 border-t border-slate-200 space-y-1.5">
-                    <span className="text-slate-500 block font-bold">Penguji Ujian (sesuai urutan waktu):</span>
-                    {getSortedSiswaExamStations(scannedStudent, scannedStudent.grade).map((st, idx) => (
-                      <div key={st.id} className="flex items-center justify-between gap-2">
-                        <span className="text-slate-600">
-                          <span className="inline-block w-4 font-bold text-[#1E3A8A]">{idx + 1}.</span>
-                          {st.title} <span className="text-slate-400 font-mono">({st.posBadge})</span>
-                        </span>
-                        <strong className="text-slate-800 text-right">{st.penguji}</strong>
-                      </div>
-                    ))}
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Waktu Sesi:</span>
                     <strong className="text-[#1E3A8A] font-mono">{scannedStudent.waktu_all}</strong>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Ruangan Ujian Siswa:</span>
+                      <strong className="text-slate-800">{scannedStudent.ruangan_siswa}</strong>
+                    </div>
+                    <div className="space-y-1.5">
+                      <span className="text-slate-500 block font-bold">Penguji Ujian (sesuai urutan waktu):</span>
+                      {getSortedSiswaExamStations(scannedStudent, scannedStudent.grade).map((st, idx) => (
+                        <div key={st.id} className="flex items-center justify-between gap-2">
+                          <span className="text-slate-600">
+                            <span className="inline-block w-4 font-bold text-[#1E3A8A]">{idx + 1}.</span>
+                            {st.title} <span className="text-slate-400 font-mono">({st.posBadge})</span>
+                          </span>
+                          <strong className="text-slate-800 text-right">{st.penguji}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Ruang Wawancara Orang Tua:</span>
+                      <strong className="text-slate-800">{scannedStudent.ruangan_walmur}</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Pewawancara Orang Tua:</span>
+                      <strong className="text-[#1E3A8A]">{scannedStudent.interview_walmur}</strong>
+                    </div>
                   </div>
                 </div>
 
@@ -472,6 +517,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
               <tr>
                 <th className="p-3">Waktu Sesi</th>
                 <th className="p-3">Nama Siswa</th>
+                <th className="p-3">Gender</th>
                 <th className="p-3">Jenjang</th>
                 <th className="p-3">Ruangan</th>
                 <th className="p-3">Status Presensi</th>
@@ -480,7 +526,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
             <tbody className="divide-y divide-slate-200">
               {scheduleList.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-6 text-center text-slate-400">
+                  <td colSpan={6} className="p-6 text-center text-slate-400">
                     Tidak ada jadwal peserta yang ditugaskan kepada Anda.
                   </td>
                 </tr>
@@ -494,6 +540,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                         {s.nama_siswa}
                         <span className="block text-[10px] text-slate-400 font-normal font-mono">{s.id}</span>
                       </td>
+                      <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                       <td className="p-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1E3A8A]">
                           {getJenjangFromKelas(s.kelas, s.grade)}

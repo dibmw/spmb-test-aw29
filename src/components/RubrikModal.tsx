@@ -552,7 +552,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji English
+                  Catatan Penguji English (Opsional)
                 </label>
                 <textarea
                   rows={3}
@@ -590,7 +590,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji Al-Qur'an SD
+                  Catatan Penguji Al-Qur'an SD (Opsional)
                 </label>
                 <textarea
                   rows={3}
@@ -641,7 +641,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji Al-Qur'an SMP/SMA
+                  Catatan Penguji Al-Qur'an SMP/SMA (Opsional)
                 </label>
                 <textarea
                   rows={3}
@@ -693,7 +693,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji Bahasa Arab
+                  Catatan Penguji Bahasa Arab (Opsional)
                 </label>
                 <textarea
                   rows={3}
@@ -711,7 +711,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
             <div className="space-y-5">
               <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 font-medium flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  Wawancara Orang Tua. Rentang skor: <strong>1 s/d 5</strong>. Seluruh skor wajib diisi dan lengkapi catatan per aspek.
+                  Wawancara Orang Tua. Rentang skor: <strong>1 s/d 5</strong>. Seluruh skor wajib diisi; catatan per aspek bersifat opsional.
                 </div>
                 <div className="text-xs font-bold text-[#1E3A8A] bg-white px-2.5 py-1 rounded-lg border border-amber-200">
                   Pewawancara: {siswa.interview_walmur}
@@ -793,7 +793,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Umum / Rekomendasi Akhir Walmur
+                  Catatan Umum / Rekomendasi Akhir Walmur (Opsional)
                 </label>
                 <textarea
                   rows={3}
