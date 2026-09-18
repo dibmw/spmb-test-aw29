@@ -53,10 +53,10 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
   const timekeeperRoles = useMemo(() => {
     if (isAdmin) return { siswa: true, walmur: true };
     const canSiswa = jadwalList.some(
-      s => s.status !== 'Selesai' && s.timekeeper_siswa.trim().toLowerCase() === tkName
+      s => s.status === 'Aktif' && s.timekeeper_siswa.trim().toLowerCase() === tkName
     );
     const canWalmur = jadwalList.some(
-      s => s.status !== 'Selesai' && s.timekeeper_walmur.trim().toLowerCase() === tkName
+      s => s.status === 'Aktif' && s.timekeeper_walmur.trim().toLowerCase() === tkName
     );
     return { siswa: canSiswa, walmur: canWalmur };
   }, [jadwalList, tkName, isAdmin]);
@@ -138,8 +138,8 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
     const student = apiService.getSiswaById(clean);
     if (student) {
-      if (student.status === 'Selesai') {
-        showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} berstatus Selesai dan tidak dapat melakukan presensi.`, 'error');
+      if (student.status !== 'Aktif') {
+        showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} tidak berstatus Aktif dan tidak dapat melakukan presensi.`, 'error');
         return;
       }
       if (!canTakeAttendanceFor(student, attendanceType)) {
@@ -185,8 +185,8 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
     const student = apiService.getSiswaById(clean);
     if (student) {
-      if (student.status === 'Selesai') {
-        showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} berstatus Selesai dan tidak dapat melakukan presensi.`, 'error');
+      if (student.status !== 'Aktif') {
+        showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} tidak berstatus Aktif dan tidak dapat melakukan presensi.`, 'error');
         return;
       }
       if (!canTakeAttendanceFor(student, attendanceType)) {
@@ -238,7 +238,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
           s.timekeeper_walmur.trim().toLowerCase() === tkName
         );
     return list
-      .filter(s => s.status !== 'Selesai')
+      .filter(s => s.status === 'Aktif')
       .sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
   }, [jadwalList, tkName, isAdmin]);
 

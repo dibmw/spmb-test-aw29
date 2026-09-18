@@ -47,7 +47,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
     return jadwalList.filter((item) => {
-      if (item.status === 'Selesai') return false;
+      if (item.status !== 'Aktif') return false;
       return (
         item.nama_siswa.toLowerCase().includes(q) ||
         item.id.toLowerCase().includes(q) ||

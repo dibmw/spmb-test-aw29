@@ -48,6 +48,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'export' | 'gas' | 'cetak'>('kpi');
   const [searchFilter, setSearchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
 
   // Print target state untuk cetak jadwal per ruangan
   const [printTarget, setPrintTarget] = useState<null | { group: 'siswa' | 'walmur'; room: string | null }>(null);
@@ -92,28 +93,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
 
   // KPI Calculations
+  const activeJadwalList = useMemo(() => jadwalList.filter(s => s.status === 'Aktif'), [jadwalList]);
+  const activeIds = useMemo(() => new Set(activeJadwalList.map(s => s.id)), [activeJadwalList]);
+
   const kpiData = useMemo(() => {
-    const totalSiswa = jadwalList.length;
+    const totalSiswa = activeJadwalList.length;
 
     // Student Attendance
-    const hadirSiswaIds = new Set(presensiList.filter(p => p.tipe_presensi === 'Siswa').map(p => p.id_siswa));
+    const hadirSiswaIds = new Set(
+      presensiList.filter(p => p.tipe_presensi === 'Siswa' && activeIds.has(p.id_siswa)).map(p => p.id_siswa)
+    );
     const hadirSiswaCount = hadirSiswaIds.size;
     const hadirSiswaPercent = totalSiswa ? Math.round((hadirSiswaCount / totalSiswa) * 100) : 0;
 
     // Walmur Attendance
-    const hadirWalmurIds = new Set(presensiList.filter(p => p.tipe_presensi === 'Walmur').map(p => p.id_siswa));
+    const hadirWalmurIds = new Set(
+      presensiList.filter(p => p.tipe_presensi === 'Walmur' && activeIds.has(p.id_siswa)).map(p => p.id_siswa)
+    );
     const hadirWalmurCount = hadirWalmurIds.size;
     const hadirWalmurPercent = totalSiswa ? Math.round((hadirWalmurCount / totalSiswa) * 100) : 0;
 
     // Grades completion
     const quranDoneIds = new Set(
-      nilaiList.filter(n => n.kategori_ujian === 'Al-Quran SD' || n.kategori_ujian === 'Al-Quran SMP/SMA').map(n => n.id_siswa)
+      nilaiList.filter(n => activeIds.has(n.id_siswa) && (n.kategori_ujian === 'Al-Quran SD' || n.kategori_ujian === 'Al-Quran SMP/SMA')).map(n => n.id_siswa)
     );
     const catungEngDoneIds = new Set(
-      nilaiList.filter(n => n.kategori_ujian === 'Calistung' || n.kategori_ujian === 'English').map(n => n.id_siswa)
+      nilaiList.filter(n => activeIds.has(n.id_siswa) && (n.kategori_ujian === 'Calistung' || n.kategori_ujian === 'English')).map(n => n.id_siswa)
     );
     const interviewDoneIds = new Set(
-      nilaiList.filter(n => n.kategori_ujian === 'Interview Walmur').map(n => n.id_siswa)
+      nilaiList.filter(n => activeIds.has(n.id_siswa) && n.kategori_ujian === 'Interview Walmur').map(n => n.id_siswa)
     );
 
     return {
@@ -129,7 +137,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       interviewDoneCount: interviewDoneIds.size,
       interviewDonePercent: totalSiswa ? Math.round((interviewDoneIds.size / totalSiswa) * 100) : 0,
     };
-  }, [jadwalList, presensiList, nilaiList]);
+  }, [activeJadwalList, presensiList, nilaiList, activeIds]);
 
   // Handle Save Student (Add or Edit)
   const handleSaveStudent = (e: React.FormEvent) => {
@@ -321,7 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     getTime: (s: SiswaJadwal) => string,
   ): { room: string; date: string; siswa: SiswaJadwal[] }[] => {
     const map = new Map<string, SiswaJadwal[]>();
-    jadwalList.forEach(s => {
+    activeJadwalList.forEach(s => {
       const key = getRoom(s) || 'Tanpa Ruangan';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
@@ -340,8 +348,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true, sensitivity: 'base' }));
   };
 
-  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa, s => s.waktu_all), [jadwalList]);
-  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur, s => s.waktu_interview), [jadwalList]);
+  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa, s => s.waktu_all), [activeJadwalList]);
+  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur, s => s.waktu_interview), [activeJadwalList]);
 
   const triggerPrint = (group: 'siswa' | 'walmur', room: string | null) => {
     setPrintTarget({ group, room });
@@ -695,13 +703,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             </div>
 
-            <button
-              onClick={openAddStudentModal}
-              className="px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[#D97706]" />
-              <span>Tambah Calon Siswa</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as SiswaJadwal['status'] | 'Semua')}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
+                title="Filter status siswa"
+              >
+                <option value="Aktif">Status: Aktif</option>
+                <option value="Reschedule">Status: Reschedule</option>
+                <option value="Selesai">Status: Selesai</option>
+                <option value="Semua">Status: Semua</option>
+              </select>
+
+              <button
+                onClick={openAddStudentModal}
+                className="px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#D97706]" />
+                <span>Tambah Calon Siswa</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -723,6 +745,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {jadwalList
+                    .filter(s => statusFilter === 'Semua' || s.status === statusFilter)
                     .filter(s => 
                       !searchFilter || 
                       s.nama_siswa.toLowerCase().includes(searchFilter.toLowerCase()) ||
