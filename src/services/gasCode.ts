@@ -19,6 +19,72 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
 
 var ADMIN_EMAIL = "kurikulum.alwildan29@gmail.com";
 
+// Skema terkunci header web_jadwal (kolom A s/d V) dan key kanoniknya
+var JADWAL_HEADERS = [
+  "id", "nama siswa", "kelas", "gender", "nomor walmur", "email walmur", "grade",
+  "ruangan_siswa", "ord_alq_arab", "ord_catung_eng", "waktu_all", "waktu_alq_arab",
+  "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
+  "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
+  "hari tanggal", "Status"
+];
+var JADWAL_KEYS = [
+  "id", "nama_siswa", "kelas", "gender", "nomor_walmur", "email_walmur", "grade",
+  "ruangan_siswa", "ord_alq_arab", "ord_catung_eng", "waktu_all", "waktu_alq_arab",
+  "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
+  "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
+  "hari_tanggal", "status"
+];
+
+// Baca web_jadwal dengan skema terkunci: header dicocokkan case/space-insensitive,
+// hasilnya selalu punya key kanonik sehingga nama siswa tidak pernah kosong.
+function jadwalSheetToObjects(sheet) {
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  var headers = data[0];
+
+  // Cocokkan tiap expected header ke posisi kolom aktual
+  var colIdx = [];
+  var matched = true;
+  for (var j = 0; j < JADWAL_HEADERS.length; j++) {
+    var expected = normHeader(JADWAL_HEADERS[j]);
+    var found = -1;
+    for (var c = 0; c < headers.length; c++) {
+      if (normHeader(headers[c]) === expected) {
+        found = c;
+        break;
+      }
+    }
+    if (found === -1) {
+      matched = false;
+      break;
+    }
+    colIdx.push(found);
+  }
+
+  var result = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var obj = {};
+    if (matched) {
+      for (var k = 0; k < JADWAL_KEYS.length; k++) {
+        obj[JADWAL_KEYS[k]] = row[colIdx[k]];
+      }
+    } else {
+      // Fallback: mapping dinamis sesuai header apa adanya
+      for (var jj = 0; jj < headers.length; jj++) {
+        obj[normHeader(headers[jj])] = row[jj];
+      }
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+function normHeader(h) {
+  return String(h || "").trim().replace(/\\s+/g, "_").toLowerCase();
+}
+
 // Inisialisasi Sheet jika belum ada
 function initSheets(ss) {
   var sheetNilai = ss.getSheetByName("web_nilai");
@@ -74,7 +140,7 @@ function doGet(e) {
       var nilaiSheet = ss.getSheetByName("web_nilai");
       var presensiSheet = ss.getSheetByName("web_presensi");
 
-      var jadwals = sheetToObjects(jadwalSheet);
+      var jadwals = jadwalSheetToObjects(jadwalSheet);
       var pengujis = sheetToObjects(pengujiSheet);
       var nilais = sheetToObjects(nilaiSheet);
       var presensis = sheetToObjects(presensiSheet);
