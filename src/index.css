@@ -91,13 +91,13 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .print-header-siswa {
+  .print-table .print-thead-siswa th {
     background-color: #1E3A8A !important;
     color: #ffffff !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .print-header-walmur {
+  .print-table .print-thead-walmur th {
     background-color: #D97706 !important;
     color: #ffffff !important;
     -webkit-print-color-adjust: exact;
