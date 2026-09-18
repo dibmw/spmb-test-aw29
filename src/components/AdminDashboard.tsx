@@ -23,10 +23,10 @@ import {
   Printer 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas } from '../types/spmb';
+import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../services/gasCode';
-import { SPREADSHEET_URL } from '../data/mockData';
+import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
 import { RubrikModal } from './RubrikModal';
 
 interface AdminDashboardProps {
@@ -316,7 +316,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // ====== CETAK RUANGAN ======
-  const buildRoomGroups = (getRoom: (s: SiswaJadwal) => string): { room: string; date: string; siswa: SiswaJadwal[] }[] => {
+  const buildRoomGroups = (
+    getRoom: (s: SiswaJadwal) => string,
+    getTime: (s: SiswaJadwal) => string,
+  ): { room: string; date: string; siswa: SiswaJadwal[] }[] => {
     const map = new Map<string, SiswaJadwal[]>();
     jadwalList.forEach(s => {
       const key = getRoom(s) || 'Tanpa Ruangan';
@@ -327,13 +330,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .map(([room, siswa]) => ({
         room,
         date: siswa[0]?.hari_tanggal || '',
-        siswa: [...siswa].sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa)),
+        siswa: [...siswa].sort((a, b) => {
+          const ta = parseStartTimeMinutes(getTime(a));
+          const tb = parseStartTimeMinutes(getTime(b));
+          if (ta !== tb) return ta - tb;
+          return a.nama_siswa.localeCompare(b.nama_siswa);
+        }),
       }))
       .sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true, sensitivity: 'base' }));
   };
 
-  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa), [jadwalList]);
-  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur), [jadwalList]);
+  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa, s => s.waktu_all), [jadwalList]);
+  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur, s => s.waktu_interview), [jadwalList]);
 
   const triggerPrint = (group: 'siswa' | 'walmur', room: string | null) => {
     setPrintTarget({ group, room });
@@ -350,7 +358,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const printRoomRows = (siswa: SiswaJadwal[], group: 'siswa' | 'walmur') =>
     siswa.map((s, idx) => (
-      <tr key={s.id}>
+      <tr key={s.id} className="even:bg-slate-50">
         <td className="p-2 font-mono">{idx + 1}</td>
         <td className="p-2 font-mono">{s.id}</td>
         <td className="p-2 font-bold">{s.nama_siswa}</td>
@@ -370,7 +378,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const first = g.siswa[0];
         return (
           <div key={group + g.room} className="print-block">
-            <div className="text-center mb-1">
+            <div className="text-center mb-2">
+              <img
+                src={SCHOOL_LOGO_URL}
+                alt="Al-Wildan 29"
+                className="w-14 h-14 mx-auto object-contain mb-1"
+              />
               <div className="text-sm font-black">SPMB AL-WILDAN 29 — Daftar {title} per Ruangan</div>
               <div className="text-xs font-bold">
                 {g.room} — {g.date || 'Tanggal tidak tercantum'}
@@ -724,10 +737,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </td>
                         <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="p-3">
-                          <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase mr-1.5">
+                          <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
                             {getJenjangFromKelas(s.kelas, s.grade)}
                           </span>
-                          <span className="font-bold text-[#1E3A8A]">
+                          <span className="block mt-1 font-bold text-[#1E3A8A]">
                             {formatKelas(s.kelas)}
                           </span>
                         </td>
@@ -739,15 +752,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="block text-[10px] text-slate-400 font-normal">{s.ruangan_walmur}</span>
                         </td>
                         <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase inline-block ${
-                            s.status === 'Selesai' ? 'bg-slate-200 text-slate-600' : s.status === 'Reschedule' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {s.status || 'Aktif'}
-                          </span>
                           <select
                             value={s.status || 'Aktif'}
                             onChange={(e) => handleChangeStudentStatus(s, e.target.value as SiswaJadwal['status'])}
-                            className="ml-1.5 px-1.5 py-1 rounded text-[10px] font-bold border border-slate-200 bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1E3A8A] cursor-pointer"
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/30 ${
+                              s.status === 'Selesai'
+                                ? 'bg-slate-200 text-slate-600 border-slate-300'
+                                : s.status === 'Reschedule'
+                                ? 'bg-amber-100 text-amber-700 border-amber-300'
+                                : 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            }`}
                             title="Ubah status siswa"
                           >
                             <option value="Aktif">Aktif</option>

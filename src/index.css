@@ -77,11 +77,18 @@
   .print-table th,
   .print-table td {
     border: 1px solid #334155;
-    padding: 4px 6px;
+    padding: 6px 8px;
     text-align: left;
   }
   .print-table th {
-    background-color: #e2e8f0 !important;
+    background-color: #1E3A8A !important;
+    color: #ffffff !important;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-table tbody tr:nth-child(even) {
+    background-color: #f1f5f9 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
