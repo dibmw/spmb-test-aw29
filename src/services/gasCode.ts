@@ -206,7 +206,8 @@ function doPost(e) {
         s.id, s.nama_siswa, s.kelas, s.gender, s.nomor_walmur, s.email_walmur, s.grade,
         s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
         s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
-        s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview
+        s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
+        s.hari_tanggal, s.status
       ]);
       return jsonResponse({ status: "success", message: "Jadwal siswa berhasil ditambahkan." });
     }
@@ -219,11 +220,12 @@ function doPost(e) {
       var found = false;
       for (var i = 1; i < vals.length; i++) {
         if (String(vals[i][0]) === String(s.id)) {
-          jSheet.getRange(i + 1, 1, 1, 20).setValues([[
+          jSheet.getRange(i + 1, 1, 1, 22).setValues([[
             s.id, s.nama_siswa, s.kelas, s.gender, s.nomor_walmur, s.email_walmur, s.grade,
             s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
             s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
-            s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview
+            s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
+            s.hari_tanggal, s.status
           ]]);
           found = true;
           break;

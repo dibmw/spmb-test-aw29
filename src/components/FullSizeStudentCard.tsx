@@ -189,8 +189,8 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                     </span>
                     <div className="font-semibold text-slate-800">
                       {siswa.gender === "L"
-                        ? "Laki-Laki (Ikhwan)"
-                        : "Perempuan (Akhwat)"}
+                        ? "Laki-laki"
+                        : "Perempuan"}
                     </div>
                   </div>
                   <div>
@@ -199,6 +199,14 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                     </span>
                     <div className="font-bold text-[#1E3A8A]">
                       {formatKelas(siswa.kelas)}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      Hari & Tanggal:
+                    </span>
+                    <div className="font-semibold text-slate-800">
+                      {siswa.hari_tanggal || "-"}
                     </div>
                   </div>
                 </div>

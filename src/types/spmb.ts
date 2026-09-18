@@ -21,6 +21,8 @@ export interface SiswaJadwal {
   interview_walmur: string;
   timekeeper_walmur: string;
   waktu_interview: string;
+  hari_tanggal: string;
+  status: 'Aktif' | 'Selesai';
 }
 
 export interface PengujiAccount {

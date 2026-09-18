@@ -101,11 +101,14 @@ class ApiService {
 
         if (Array.isArray(jadwal) && jadwal.length > 0) {
           // Normalize field names if needed
-          const normalizedJadwal: SiswaJadwal[] = jadwal.map((item: any) => ({
+          const normalizedJadwal: SiswaJadwal[] = jadwal.map((item: any) => {
+            const gv = String(item.gender ?? '').trim().toLowerCase();
+            const isPerempuan = gv === 'perempuan' || gv === 'p' || gv === 'wanita' || gv === 'female' || gv === 'pr';
+            return {
             id: String(item.id || item.id_siswa || '').trim(),
             nama_siswa: String(item.nama_siswa || '').trim(),
             kelas: String(item.kelas || 'SD 1').trim(),
-            gender: (item.gender === 'P' ? 'P' : 'L') as 'L' | 'P',
+            gender: (isPerempuan ? 'P' : 'L') as 'L' | 'P',
             nomor_walmur: String(item.nomor_walmur || '').trim(),
             email_walmur: String(item.email_walmur || '').trim(),
             grade: (item.grade || (String(item.kelas || '').startsWith('SMP') ? 'SMP' : String(item.kelas || '').startsWith('SMA') ? 'SMA' : 'SD')) as 'SD' | 'SMP' | 'SMA',
@@ -122,7 +125,10 @@ class ApiService {
             interview_walmur: String(item.interview_walmur || '').trim(),
             timekeeper_walmur: String(item.timekeeper_walmur || '').trim(),
             waktu_interview: String(item.waktu_interview || '').trim(),
-          }));
+            hari_tanggal: String(item.hari_tanggal || item['hari tanggal'] || '').trim(),
+            status: item.status === 'Selesai' ? 'Selesai' : 'Aktif',
+          } as SiswaJadwal;
+          });
           localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(normalizedJadwal));
           jCount = normalizedJadwal.length;
         }

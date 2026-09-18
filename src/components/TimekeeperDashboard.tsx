@@ -14,11 +14,10 @@ import {
   Sparkles,
   Check,
   ShieldCheck,
-  History,
   CalendarClock
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { SiswaJadwal, PresensiRecord, UserSession, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
+import { SiswaJadwal, PresensiRecord, UserSession, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, getSortedSiswaExamStations } from '../types/spmb';
 import { apiService } from '../services/apiService';
 
 interface TimekeeperDashboardProps {
@@ -112,6 +111,10 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
     const student = apiService.getSiswaById(clean);
     if (student) {
+      if (student.status === 'Selesai') {
+        showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} berstatus Selesai dan tidak dapat melakukan presensi.`, 'error');
+        return;
+      }
       setScannedStudent(student);
       // Play audio beep tone
       playAudioBeep();
@@ -151,6 +154,10 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
 
     const student = apiService.getSiswaById(clean);
     if (student) {
+      if (student.status === 'Selesai') {
+        showToast('Presensi Ditolak', `Siswa ${student.nama_siswa} berstatus Selesai dan tidak dapat melakukan presensi.`, 'error');
+        return;
+      }
       setScannedStudent(student);
       showToast('Data Ditemukan', `Calon siswa: ${student.nama_siswa}`, 'info');
     } else {
@@ -183,11 +190,6 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
     }
   };
 
-  // Recent attendance for this timekeeper officer
-  const myRecentAttendance = presensiList
-    .filter(p => p.petugas_timekeeper.toLowerCase() === session.nama.toLowerCase() || session.activeRole === 'ADMIN')
-    .slice(0, 8);
-
   // Schedule plot: students assigned to this timekeeper, sorted by session time
   const scheduleList = useMemo(() => {
     const isAdmin = session.activeRole === 'ADMIN';
@@ -198,7 +200,9 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
           s.timekeeper_siswa.trim().toLowerCase() === tkName ||
           s.timekeeper_walmur.trim().toLowerCase() === tkName
         );
-    return list.sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
+    return list
+      .filter(s => s.status !== 'Selesai')
+      .sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
   }, [jadwalList, session.nama, session.activeRole]);
 
   const isStudentPresent = (id: string) =>
@@ -244,74 +248,6 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
             <Users className="w-4 h-4" />
             <span>Presensi Orang Tua</span>
           </button>
-        </div>
-      </div>
-
-      {/* Plot Jadwal Ujian */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-[#1E3A8A]" />
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Plot Jadwal Ujian Hari Ini
-            </h2>
-          </div>
-          <span className="text-[11px] font-bold text-[#D97706]">
-            {scheduleList.length} Peserta
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
-              <tr>
-                <th className="p-3">Waktu Sesi</th>
-                <th className="p-3">Nama Siswa</th>
-                <th className="p-3">Jenjang</th>
-                <th className="p-3">Ruangan</th>
-                <th className="p-3">Status Presensi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {scheduleList.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-6 text-center text-slate-400">
-                    Tidak ada jadwal peserta yang ditugaskan kepada Anda.
-                  </td>
-                </tr>
-              ) : (
-                scheduleList.map((s) => {
-                  const present = isStudentPresent(s.id);
-                  return (
-                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all}</td>
-                      <td className="p-3 font-bold text-slate-900">
-                        {s.nama_siswa}
-                        <span className="block text-[10px] text-slate-400 font-normal font-mono">{s.id}</span>
-                      </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1E3A8A]">
-                          {getJenjangFromKelas(s.kelas, s.grade)}
-                        </span>
-                      </td>
-                      <td className="p-3 text-slate-600">{s.ruangan_siswa}</td>
-                      <td className="p-3">
-                        {present ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Hadir
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-700 font-bold">
-                            <AlertCircle className="w-3.5 h-3.5" /> Belum Hadir
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
 
@@ -415,7 +351,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Scanned Confirmation Card & History (5 cols) */}
+        {/* Right Column: Scanned Confirmation Card (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           {/* Scanned Verification Card */}
           {scannedStudent ? (
@@ -439,7 +375,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                     {scannedStudent.nama_siswa}
                   </h3>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    <span className="font-bold text-[#1E3A8A]">{scannedStudent.grade}</span> • <strong className="text-slate-800">{formatKelas(scannedStudent.kelas)}</strong> ({scannedStudent.gender === 'L' ? 'Ikhwan' : 'Akhwat'})
+                    <span className="font-bold text-[#1E3A8A]">{getJenjangFromKelas(scannedStudent.kelas, scannedStudent.grade)}</span> • <strong className="text-slate-800">{formatKelas(scannedStudent.kelas)}</strong> ({scannedStudent.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
                   </p>
                 </div>
 
@@ -455,6 +391,22 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Pewawancara Orang Tua:</span>
                     <strong className="text-[#1E3A8A]">{scannedStudent.interview_walmur}</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Hari & Tanggal:</span>
+                    <strong className="text-slate-800">{scannedStudent.hari_tanggal || '-'}</strong>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200 space-y-1.5">
+                    <span className="text-slate-500 block font-bold">Penguji Ujian (sesuai urutan waktu):</span>
+                    {getSortedSiswaExamStations(scannedStudent, scannedStudent.grade).map((st, idx) => (
+                      <div key={st.id} className="flex items-center justify-between gap-2">
+                        <span className="text-slate-600">
+                          <span className="inline-block w-4 font-bold text-[#1E3A8A]">{idx + 1}.</span>
+                          {st.title} <span className="text-slate-400 font-mono">({st.posBadge})</span>
+                        </span>
+                        <strong className="text-slate-800 text-right">{st.penguji}</strong>
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Waktu Sesi:</span>
@@ -497,56 +449,74 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
               </p>
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Recent Attendance Feed */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-[#1E3A8A]" />
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Log Kehadiran Terkini
-                </h3>
-              </div>
-              <span className="text-[11px] font-bold text-[#D97706]">
-                {presensiList.length} Total Hadir
-              </span>
-            </div>
-
-            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              {myRecentAttendance.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  Belum ada catatan presensi pada sesi ini.
-                </div>
-              ) : (
-                myRecentAttendance.map((item) => (
-                  <div key={item.id || item.timestamp} className="p-3.5 hover:bg-slate-50 transition-colors flex items-center justify-between text-xs">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                          item.tipe_presensi === 'Siswa' 
-                            ? 'bg-blue-100 text-[#1E3A8A]' 
-                            : 'bg-amber-100 text-amber-900'
-                        }`}>
-                          {item.tipe_presensi}
-                        </span>
-                        <strong className="text-slate-800">{item.nama_siswa}</strong>
-                      </div>
-                      <div className="text-[10px] text-slate-500 flex items-center gap-2">
-                        <span className="font-mono">{item.id_siswa}</span>
-                        <span>•</span>
-                        <span>{item.timestamp}</span>
-                      </div>
-                    </div>
-
-                    <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>{item.status}</span>
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+      {/* Plot Jadwal Ujian */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-[#1E3A8A]" />
+            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Plot Jadwal Ujian Hari Ini
+            </h2>
           </div>
+          <span className="text-[11px] font-bold text-[#D97706]">
+            {scheduleList.length} Peserta
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
+              <tr>
+                <th className="p-3">Waktu Sesi</th>
+                <th className="p-3">Nama Siswa</th>
+                <th className="p-3">Jenjang</th>
+                <th className="p-3">Ruangan</th>
+                <th className="p-3">Status Presensi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {scheduleList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-6 text-center text-slate-400">
+                    Tidak ada jadwal peserta yang ditugaskan kepada Anda.
+                  </td>
+                </tr>
+              ) : (
+                scheduleList.map((s) => {
+                  const present = isStudentPresent(s.id);
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all}</td>
+                      <td className="p-3 font-bold text-slate-900">
+                        {s.nama_siswa}
+                        <span className="block text-[10px] text-slate-400 font-normal font-mono">{s.id}</span>
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1E3A8A]">
+                          {getJenjangFromKelas(s.kelas, s.grade)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-600">{s.ruangan_siswa}</td>
+                      <td className="p-3">
+                        {present ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Hadir
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-amber-700 font-bold">
+                            <AlertCircle className="w-3.5 h-3.5" /> Belum Hadir
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

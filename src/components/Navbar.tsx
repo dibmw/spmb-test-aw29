@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Navigation Links (Internal Portals) */}
           <nav className="hidden md:flex items-center gap-1.5">
             {/* Timekeeper Tab */}
-            {(session?.activeRole === 'TIMEKEEPER' || session?.activeRole === 'ADMIN') && (
+            {(session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('timekeeper')}
                 title="Portal Timekeeper - Presensi Scanner"
@@ -80,7 +80,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
 
             {/* Penguji Tab */}
-            {(session?.activeRole === 'PENGUJI' || session?.activeRole === 'ADMIN') && (
+            {(session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('penguji')}
                 title="Portal Penguji - Input Nilai"
@@ -206,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {(session?.activeRole === 'PENGUJI' || session?.activeRole === 'ADMIN') && (
+            {(session?.activeRole === 'ADMIN') && (
               <button
                 onClick={() => onSelectTab('penguji')}
                 title="Portal Penguji - Input Nilai"

@@ -81,7 +81,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_siswa: 'Ustadz Bambang Hermanto',
     interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-    waktu_interview: '09.30 - 10.15 WIB'
+    waktu_interview: '09.30 - 10.15 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   },
   {
     id: 'SPMB-29-002',
@@ -103,7 +105,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_siswa: 'Ustadz Bambang Hermanto',
     interview_walmur: 'Ustadz Abdullah Said, S.Pd.I',
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-    waktu_interview: '08.45 - 09.30 WIB'
+    waktu_interview: '08.45 - 09.30 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   },
   {
     id: 'SPMB-29-003',
@@ -125,7 +129,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_siswa: 'Ustadzah Nurul Hidayah, M.Pd.',
     interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
     timekeeper_walmur: 'Ustadz Bambang Hermanto',
-    waktu_interview: '09.30 - 10.15 WIB'
+    waktu_interview: '09.30 - 10.15 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   },
   {
     id: 'SPMB-29-004',
@@ -147,7 +153,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_siswa: 'Ustadzah Nurul Hidayah, M.Pd.',
     interview_walmur: 'Ustadz Abdullah Said, S.Pd.I',
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-    waktu_interview: '08.30 - 09.15 WIB'
+    waktu_interview: '08.30 - 09.15 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   },
   {
     id: 'SPMB-29-005',
@@ -169,7 +177,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_siswa: 'Ustadz Bambang Hermanto',
     interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-    waktu_interview: '10.00 - 10.45 WIB'
+    waktu_interview: '10.00 - 10.45 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   },
   {
     id: 'SPMB-29-006',
@@ -191,7 +201,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_siswa: 'Ustadzah Fatimah Zahra',
     interview_walmur: 'Ustadz Abdullah Said, S.Pd.I',
     timekeeper_walmur: 'Ustadz Bambang Hermanto',
-    waktu_interview: '10.30 - 11.15 WIB'
+    waktu_interview: '10.30 - 11.15 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   }
 ];
 

@@ -552,7 +552,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji English (Textarea)
+                  Catatan Penguji English
                 </label>
                 <textarea
                   rows={3}
@@ -590,7 +590,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji Al-Qur'an SD (Textarea)
+                  Catatan Penguji Al-Qur'an SD
                 </label>
                 <textarea
                   rows={3}
@@ -641,7 +641,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji Al-Qur'an SMP/SMA (Textarea)
+                  Catatan Penguji Al-Qur'an SMP/SMA
                 </label>
                 <textarea
                   rows={3}
@@ -693,7 +693,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Penguji Bahasa Arab (Textarea)
+                  Catatan Penguji Bahasa Arab
                 </label>
                 <textarea
                   rows={3}
@@ -793,7 +793,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
               <div>
                 <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Umum / Rekomendasi Akhir Walmur (Textarea)
+                  Catatan Umum / Rekomendasi Akhir Walmur
                 </label>
                 <textarea
                   rows={3}

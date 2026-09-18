@@ -77,7 +77,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     timekeeper_siswa: 'Ustadz Bambang Hermanto',
     interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-    waktu_interview: '09.30 - 10.15 WIB'
+    waktu_interview: '09.30 - 10.15 WIB',
+    hari_tanggal: 'Minggu, 20 September 2026',
+    status: 'Aktif'
   });
 
   // Admin Grade Edit Modal
@@ -155,6 +157,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleToggleStudentStatus = (siswa: SiswaJadwal) => {
+    const nextStatus = siswa.status === 'Selesai' ? 'Aktif' : 'Selesai';
+    const verb = nextStatus === 'Selesai' ? 'menandai Selesai' : 'mengaktifkan kembali';
+    if (window.confirm(`Yakin ingin ${verb} "${siswa.nama_siswa}" (${siswa.id})?`)) {
+      const res = apiService.saveJadwal({ ...siswa, status: nextStatus }, true);
+      if (res.success) {
+        showToast(nextStatus === 'Selesai' ? 'Ditandai Selesai' : 'Diaktifkan', res.message, 'success');
+        onDataChanged();
+      } else {
+        showToast('Gagal', res.message, 'error');
+      }
+    }
+  };
+
   const openAddStudentModal = () => {
     const nextNum = (jadwalList.length + 1).toString().padStart(3, '0');
     setStudentFormData({
@@ -177,7 +193,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       timekeeper_siswa: 'Ustadz Bambang Hermanto',
       interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
       timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-      waktu_interview: '09.30 - 10.15 WIB'
+      waktu_interview: '09.30 - 10.15 WIB',
+      hari_tanggal: 'Minggu, 20 September 2026',
+      status: 'Aktif'
     });
     setIsEditMode(false);
     setIsStudentModalOpen(true);
@@ -569,6 +587,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="p-3">Penguji Qur'an/Arab</th>
                     <th className="p-3">Penguji Catung/Eng</th>
                     <th className="p-3">Wawancara Orang Tua</th>
+                    <th className="p-3">Status</th>
                     <th className="p-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -603,6 +622,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-3 text-slate-700 truncate max-w-[160px]">
                           <strong>{s.interview_walmur}</strong>
                           <span className="block text-[10px] text-slate-400 font-normal">{s.ruangan_walmur}</span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase inline-block ${
+                            s.status === 'Selesai' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {s.status || 'Aktif'}
+                          </span>
+                          <button
+                            onClick={() => handleToggleStudentStatus(s)}
+                            className={`ml-1.5 px-2 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
+                              s.status === 'Selesai'
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-amber-50 hover:text-amber-700'
+                            }`}
+                            title={s.status === 'Selesai' ? 'Aktifkan kembali' : 'Tandai Selesai'}
+                          >
+                            {s.status === 'Selesai' ? 'Aktifkan' : 'Selesai'}
+                          </button>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
                           <button
@@ -976,8 +1013,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onChange={(e) => setStudentFormData({ ...studentFormData, gender: e.target.value as 'L' | 'P' })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   >
-                    <option value="L">Laki-Laki (Ikhwan)</option>
-                    <option value="P">Perempuan (Akhwat)</option>
+                    <option value="L">Laki-laki</option>
+                    <option value="P">Perempuan</option>
                   </select>
                 </div>
 
@@ -1038,6 +1075,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="text"
                     value={studentFormData.ruangan_walmur}
                     onChange={(e) => setStudentFormData({ ...studentFormData, ruangan_walmur: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">Hari & Tanggal Ujian</label>
+                  <input
+                    type="text"
+                    value={studentFormData.hari_tanggal}
+                    onChange={(e) => setStudentFormData({ ...studentFormData, hari_tanggal: e.target.value })}
+                    placeholder="Contoh: Minggu, 20 September 2026"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   />
                 </div>

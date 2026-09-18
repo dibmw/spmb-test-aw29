@@ -52,6 +52,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
 
   const myStudents = useMemo(() => {
     return jadwalList.filter((s) => {
+      if (s.status === 'Selesai') return false;
       if (isSuperAdmin) return true;
       const examinerName = session.nama.trim().toLowerCase();
       return (

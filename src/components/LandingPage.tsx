@@ -47,6 +47,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
     return jadwalList.filter((item) => {
+      if (item.status === 'Selesai') return false;
       return (
         item.nama_siswa.toLowerCase().includes(q) ||
         item.id.toLowerCase().includes(q) ||
@@ -196,7 +197,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                           <div className="text-right shrink-0 flex items-center gap-2">
                             <div className="hidden sm:block">
-                              <span className="text-[10px] text-slate-400 block">Sesi Ujian</span>
+                              <span className="text-[10px] text-slate-400 block truncate max-w-[130px]">{item.hari_tanggal || 'Hari & Tanggal'}</span>
                               <span className="text-xs font-bold text-[#1E3A8A]">{item.waktu_all}</span>
                             </div>
                             <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#1E3A8A] group-hover:translate-x-0.5 transition-all" />
