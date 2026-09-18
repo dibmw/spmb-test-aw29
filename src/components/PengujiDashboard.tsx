@@ -269,6 +269,9 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
                       {siswa.nama_siswa}
                     </h3>
                     <p className="text-xs text-slate-500">
+                      <span className={`inline-block px-1.5 py-0.5 rounded font-bold text-[10px] ${siswa.gender === 'L' ? 'bg-sky-100 text-sky-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {siswa.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+                      </span>{' '}
                       <strong className="text-[#1E3A8A] font-semibold">{formatKelas(siswa.kelas)}</strong> • Ruangan Siswa: <strong>{siswa.ruangan_siswa}</strong>
                     </p>
                   </div>
@@ -281,10 +284,6 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
 
                 {/* Categories & Actions */}
                 <div className="p-4 space-y-3 flex-1">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Penugasan Penilaian Anda:
-                  </span>
-
                   <div className="space-y-2">
                     {categories.map((cat) => {
                       const gradeRecord = studentGrades.find(g => g.kategori_ujian === cat);
