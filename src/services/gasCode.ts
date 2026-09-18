@@ -215,7 +215,22 @@ function doPost(e) {
     if (action === "submitAttendance") {
       var sheetPresensi = ss.getSheetByName("web_presensi");
       var timestamp = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
-      
+      var day = timestamp.split(" ")[0];
+
+      // Dedupe: tolak duplikat id_siswa + tipe yang sudah tercatat hari ini (cegah dobel antar perangkat)
+      var pValues = sheetPresensi.getDataRange().getValues();
+      for (var p = 1; p < pValues.length; p++) {
+        var rowTime = String(pValues[p][0] || "");
+        if (rowTime.indexOf(day) === 0 &&
+            String(pValues[p][1]) === String(postData.id_siswa) &&
+            String(pValues[p][3]) === String(postData.tipe_presensi)) {
+          return jsonResponse({
+            status: "already",
+            message: "Presensi " + postData.nama_siswa + " (" + postData.tipe_presensi + ") sudah tercatat hari ini."
+          });
+        }
+      }
+
       sheetPresensi.appendRow([
         timestamp,
         postData.id_siswa,

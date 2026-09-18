@@ -69,6 +69,26 @@ class ApiService {
     localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(INITIAL_NILAI_LIST));
   }
 
+  // Kirim POST ke GAS dengan retry (background, fire-and-forget agar tidak menahan UI)
+  private async pushWithRetry(body: unknown, attempts = 3): Promise<void> {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await fetch(this.gasUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        return;
+      } catch (err) {
+        console.warn(`GAS push gagal (percobaan ${i + 1}/${attempts}):`, err);
+        if (i < attempts - 1) {
+          await new Promise((res) => setTimeout(res, 1500 * (i + 1)));
+        }
+      }
+    }
+  }
+
   // Sync all sheets from live Google Apps Script endpoint
   public async syncFromGas(): Promise<{ 
     success: boolean; 
@@ -376,24 +396,15 @@ class ApiService {
     currentPresensi.unshift(newRecord);
     localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(currentPresensi));
 
-    // Async push to GAS if configured
+    // Async push to GAS if configured (dengan retry)
     if (this.gasUrl) {
-      try {
-        fetch(this.gasUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'submitAttendance',
-            id_siswa: siswa.id,
-            nama_siswa: siswa.nama_siswa,
-            tipe_presensi,
-            petugas_timekeeper
-          })
-        }).catch(err => console.warn('GAS attendance push background notice:', err));
-      } catch (err) {
-        console.warn('GAS attendance push error:', err);
-      }
+      void this.pushWithRetry({
+        action: 'submitAttendance',
+        id_siswa: siswa.id,
+        nama_siswa: siswa.nama_siswa,
+        tipe_presensi,
+        petugas_timekeeper
+      });
     }
 
     return {
@@ -448,28 +459,19 @@ class ApiService {
 
     localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(currentNilai));
 
-    // Push to GAS if configured
+    // Push to GAS if configured (dengan retry)
     if (this.gasUrl) {
-      try {
-        fetch(this.gasUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'submitGrade',
-            id_siswa: siswa.id,
-            nama_siswa: siswa.nama_siswa,
-            kategori_ujian,
-            nama_penguji,
-            email_penguji,
-            detail_skor_json,
-            skor_akhir_rata2,
-            catatan_umum
-          })
-        }).catch(err => console.warn('GAS grade push background notice:', err));
-      } catch (err) {
-        console.warn('GAS grade push error:', err);
-      }
+      void this.pushWithRetry({
+        action: 'submitGrade',
+        id_siswa: siswa.id,
+        nama_siswa: siswa.nama_siswa,
+        kategori_ujian,
+        nama_penguji,
+        email_penguji,
+        detail_skor_json,
+        skor_akhir_rata2,
+        catatan_umum
+      });
     }
 
     return {
