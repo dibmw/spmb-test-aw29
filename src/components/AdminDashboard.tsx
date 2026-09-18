@@ -157,13 +157,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleToggleStudentStatus = (siswa: SiswaJadwal) => {
-    const nextStatus = siswa.status === 'Selesai' ? 'Aktif' : 'Selesai';
-    const verb = nextStatus === 'Selesai' ? 'menandai Selesai' : 'mengaktifkan kembali';
-    if (window.confirm(`Yakin ingin ${verb} "${siswa.nama_siswa}" (${siswa.id})?`)) {
+  const handleChangeStudentStatus = (siswa: SiswaJadwal, nextStatus: SiswaJadwal['status']) => {
+    if (nextStatus === siswa.status) return;
+    const label: Record<SiswaJadwal['status'], string> = {
+      Aktif: 'mengaktifkan kembali',
+      Reschedule: 'menandai Reschedule',
+      Selesai: 'menandai Selesai',
+    };
+    if (window.confirm(`Yakin ingin ${label[nextStatus]} "${siswa.nama_siswa}" (${siswa.id})?`)) {
       const res = apiService.saveJadwal({ ...siswa, status: nextStatus }, true);
       if (res.success) {
-        showToast(nextStatus === 'Selesai' ? 'Ditandai Selesai' : 'Diaktifkan', res.message, 'success');
+        showToast(nextStatus === 'Selesai' ? 'Ditandai Selesai' : nextStatus === 'Reschedule' ? 'Diubah ke Reschedule' : 'Diaktifkan', res.message, 'success');
         onDataChanged();
       } else {
         showToast('Gagal', res.message, 'error');
@@ -625,21 +629,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </td>
                         <td className="p-3">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase inline-block ${
-                            s.status === 'Selesai' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'
+                            s.status === 'Selesai' ? 'bg-slate-200 text-slate-600' : s.status === 'Reschedule' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                           }`}>
                             {s.status || 'Aktif'}
                           </span>
-                          <button
-                            onClick={() => handleToggleStudentStatus(s)}
-                            className={`ml-1.5 px-2 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
-                              s.status === 'Selesai'
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-amber-50 hover:text-amber-700'
-                            }`}
-                            title={s.status === 'Selesai' ? 'Aktifkan kembali' : 'Tandai Selesai'}
+                          <select
+                            value={s.status || 'Aktif'}
+                            onChange={(e) => handleChangeStudentStatus(s, e.target.value as SiswaJadwal['status'])}
+                            className="ml-1.5 px-1.5 py-1 rounded text-[10px] font-bold border border-slate-200 bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1E3A8A] cursor-pointer"
+                            title="Ubah status siswa"
                           >
-                            {s.status === 'Selesai' ? 'Aktifkan' : 'Selesai'}
-                          </button>
+                            <option value="Aktif">Aktif</option>
+                            <option value="Reschedule">Reschedule</option>
+                            <option value="Selesai">Selesai</option>
+                          </select>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
                           <button

@@ -126,7 +126,7 @@ class ApiService {
             timekeeper_walmur: String(item.timekeeper_walmur || '').trim(),
             waktu_interview: String(item.waktu_interview || '').trim(),
             hari_tanggal: String(item.hari_tanggal || item['hari tanggal'] || '').trim(),
-            status: item.status === 'Selesai' ? 'Selesai' : 'Aktif',
+            status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : 'Aktif',
           } as SiswaJadwal;
           });
           localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(normalizedJadwal));

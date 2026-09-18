@@ -22,7 +22,7 @@ export interface SiswaJadwal {
   timekeeper_walmur: string;
   waktu_interview: string;
   hari_tanggal: string;
-  status: 'Aktif' | 'Selesai';
+  status: 'Aktif' | 'Reschedule' | 'Selesai';
 }
 
 export interface PengujiAccount {
