@@ -51,8 +51,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       return (
         item.nama_siswa.toLowerCase().includes(q) ||
         item.id.toLowerCase().includes(q) ||
-        item.kelas.toLowerCase().includes(q) ||
-        String(item.nomor_walmur || '').includes(q)
+        item.kelas.toLowerCase().includes(q)
       );
     }).slice(0, 8); // Top 8 suggestions
   }, [jadwalList, searchQuery]);

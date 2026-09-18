@@ -80,7 +80,9 @@ class ApiService {
     }
 
     try {
-      const res = await fetch(`${this.gasUrl}?action=getAllData`, {
+      const session = this.getCurrentSession();
+      const emailParam = session && session.email ? `&email=${encodeURIComponent(session.email)}` : '';
+      const res = await fetch(`${this.gasUrl}?action=getAllData${emailParam}`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
         redirect: 'follow'
@@ -109,8 +111,6 @@ class ApiService {
             nama_siswa: String(item.nama_siswa || '').trim(),
             kelas: String(item.kelas || 'SD 1').trim(),
             gender: (isPerempuan ? 'P' : 'L') as 'L' | 'P',
-            nomor_walmur: String(item.nomor_walmur || '').trim(),
-            email_walmur: String(item.email_walmur || '').trim(),
             grade: (item.grade || (String(item.kelas || '').startsWith('SMP') ? 'SMP' : String(item.kelas || '').startsWith('SMA') ? 'SMA' : 'SD')) as 'SD' | 'SMP' | 'SMA',
             ruangan_siswa: String(item.ruangan_siswa || 'R. 101').trim(),
             ord_alq_arab: String(item.ord_alq_arab || '').trim(),
@@ -331,8 +331,7 @@ class ApiService {
     return list.filter(s => 
       s.nama_siswa.toLowerCase().includes(q) || 
       s.id.toLowerCase().includes(q) ||
-      s.kelas.toLowerCase().includes(q) ||
-      s.nomor_walmur.includes(q)
+      s.kelas.toLowerCase().includes(q)
     );
   }
 

@@ -5,8 +5,6 @@ export interface SiswaJadwal {
   nama_siswa: string;
   kelas: string; // e.g. "SD 1", "SMP 7", "SMA 10"
   gender: 'L' | 'P';
-  nomor_walmur: string;
-  email_walmur: string;
   grade: 'SD' | 'SMP' | 'SMA';
   ruangan_siswa: string;
   ord_alq_arab: string; // e.g. "Pos 1 (08.00 - 08.45)"

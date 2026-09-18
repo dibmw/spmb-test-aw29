@@ -140,10 +140,29 @@ function doGet(e) {
       var nilaiSheet = ss.getSheetByName("web_nilai");
       var presensiSheet = ss.getSheetByName("web_presensi");
 
+      // Privasi: nomor & email walmur TIDAK PERNAH dikirim ke klien.
+      // email_penguji hanya dikirim bila request terverifikasi sebagai petugas.
+      var reqEmail = ((e && e.parameter && e.parameter.email) || "").trim().toLowerCase();
+      var verified = reqEmail ? (verifyPetugas(ss, reqEmail).status === "success") : false;
+
       var jadwals = jadwalSheetToObjects(jadwalSheet);
       var pengujis = sheetToObjects(pengujiSheet);
       var nilais = sheetToObjects(nilaiSheet);
       var presensis = sheetToObjects(presensiSheet);
+
+      for (var pi = 0; pi < jadwals.length; pi++) {
+        delete jadwals[pi]["nomor_walmur"];
+        delete jadwals[pi]["email_walmur"];
+      }
+
+      if (!verified) {
+        for (var pj = 0; pj < pengujis.length; pj++) {
+          delete pengujis[pj]["email_penguji"];
+        }
+        for (var pk = 0; pk < nilais.length; pk++) {
+          delete nilais[pk]["email_penguji"];
+        }
+      }
 
       return jsonResponse({
         status: "success",
@@ -269,7 +288,7 @@ function doPost(e) {
       var jSheet = ss.getSheetByName("web_jadwal");
       var s = postData.siswa;
       jSheet.appendRow([
-        s.id, s.nama_siswa, s.kelas, s.gender, s.nomor_walmur, s.email_walmur, s.grade,
+        s.id, s.nama_siswa, s.kelas, s.gender, "", "", s.grade,
         s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
         s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
         s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
@@ -287,7 +306,7 @@ function doPost(e) {
       for (var i = 1; i < vals.length; i++) {
         if (String(vals[i][0]) === String(s.id)) {
           jSheet.getRange(i + 1, 1, 1, 22).setValues([[
-            s.id, s.nama_siswa, s.kelas, s.gender, s.nomor_walmur, s.email_walmur, s.grade,
+            s.id, s.nama_siswa, s.kelas, s.gender, vals[i][4], vals[i][5], s.grade,
             s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
             s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
             s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,

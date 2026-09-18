@@ -67,8 +67,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     nama_siswa: '',
     kelas: 'SD 1',
     gender: 'L',
-    nomor_walmur: '',
-    email_walmur: '',
     grade: 'SD',
     ruangan_siswa: 'R. 101',
     ord_alq_arab: 'Pos 1 (08.00 - 08.45)',
@@ -194,8 +192,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       nama_siswa: '',
       kelas: 'SD 1',
       gender: 'L',
-      nomor_walmur: '',
-      email_walmur: '',
       grade: 'SD',
       ruangan_siswa: 'R. 101',
       ord_alq_arab: 'Pos 1 (08.00 - 08.45)',
@@ -755,12 +751,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     .map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-3 font-mono font-bold text-[#1E3A8A]">{s.id}</td>
-                        <td className="p-3 font-bold text-slate-900">
-                          {s.nama_siswa}
-                          <span className="block text-[10px] text-slate-400 font-normal">
-                            Kontak: {s.nomor_walmur}
-                          </span>
-                        </td>
+<td className="p-3 font-bold text-slate-900">{s.nama_siswa}</td>
                         <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
@@ -1312,17 +1303,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <option value="L">Laki-laki</option>
                     <option value="P">Perempuan</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-800 block mb-1">Nomor Kontak Walmur</label>
-                  <input
-                    type="text"
-                    value={studentFormData.nomor_walmur}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, nomor_walmur: e.target.value })}
-                    placeholder="0812xxxxxxxx"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
                 </div>
 
                 <div>
