@@ -109,17 +109,26 @@ export interface SkorBahasaArabSMP_SMA {
 }
 
 export interface SkorInterviewWalmur {
-  ibadah_skor: number; // 1 - 5
-  ibadah_catatan: string;
-  akhlak_skor: number; // 1 - 5
-  akhlak_catatan: string;
-  pola_asuh_skor: number; // 1 - 5
-  pola_asuh_catatan: string;
-  kebiasaan_belajar_skor: number; // 1 - 5
-  kebiasaan_belajar_catatan: string;
-  gadget_skor: number; // 1 - 5
-  gadget_catatan: string;
-  catatan_umum: string;
+  kelekatan_skor: number; // 1 - 10
+  kelekatan_catatan: string;
+  asertif_skor: number; // 1 - 10
+  asertif_catatan: string;
+  kognitif_skor: number; // 1 - 10
+  kognitif_catatan: string;
+  peran_skor: number; // 1 - 10
+  peran_catatan: string;
+  sentuhan_skor: number; // 1 - 10
+  sentuhan_catatan: string;
+  kebutuhan_khusus_skor: number; // 1 - 10
+  kebutuhan_khusus_catatan: string;
+  pantauan_ibadah_skor: number; // 1 - 10
+  pantauan_ibadah_catatan: string;
+  pertemanan_skor: number; // 1 - 10
+  pertemanan_catatan: string;
+  nilai_karakter_skor: number; // 1 - 10
+  nilai_karakter_catatan: string;
+  kesulitan_skor: number; // 1 - 10
+  kesulitan_catatan: string;
 }
 
 /**

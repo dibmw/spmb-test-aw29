@@ -68,34 +68,106 @@ function getExamLinks(
   return links;
 }
 
-// Pertanyaan panduan wawancara orang tua per aspek
-const INTERVIEW_QUESTIONS: Record<string, string[]> = {
-  ibadah_skor: [
-    'Bagaimana kebiasaan sholat anak di rumah?',
-    'Apakah anak biasa sholat di masjid atau di rumah?',
-    'Bagaimana kebiasaan anak dalam berdoa/dzikir?'
-  ],
-  akhlak_skor: [
-    'Bagaimana sikap anak terhadap orang tua dan saudara?',
-    'Jika anak marah, bagaimana cara ia mengekspresikannya?',
-    'Karakter utama apa yang menonjol dari anak?'
-  ],
-  pola_asuh_skor: [
-    'Siapa teman dekat anak dan bagaimana interaksinya?',
-    'Bagaimana orang tua mengarahkan atau membatasi pergaulan anak?',
-    'Bagaimana respon anak saat dinasihati terkait teman?'
-  ],
-  kebiasaan_belajar_skor: [
-    'Anak biasanya belajar jam berapa di rumah?',
-    'Jika kesulitan pelajaran, apa yang biasanya dilakukan?',
-    'Anak lebih suka belajar sendiri atau ditemani orang tua?'
-  ],
-  gadget_skor: [
-    'Berapa lama anak menggunakan gadget per hari?',
-    'Biasanya digunakan untuk apa (belajar/game/sosmed)?',
-    'Bagaimana orang tua mengatur penggunaannya?'
-  ]
-};
+// Pertanyaan panduan wawancara orang tua (10 pertanyaan, skor 1-10)
+interface InterviewQuestionItem {
+  skorKey: string;
+  catatanKey: string;
+  fokus: string;
+  text: string;
+}
+
+interface InterviewSectionItem {
+  title: string;
+  questions: InterviewQuestionItem[];
+}
+
+const INTERVIEW_SECTIONS: InterviewSectionItem[] = [
+  {
+    title: 'Aspek Psikologis, Kelekatan, dan Perkembangan',
+    questions: [
+      {
+        skorKey: 'kelekatan_skor',
+        catatanKey: 'kelekatan_catatan',
+        fokus: 'Kelekatan anak & orang tua, aspek psikologis, respons emosional',
+        text: 'Bagaimana cara Ayah/Bunda mengenali dan merespons ketika anak menunjukkan emosi kuat (seperti sedih, marah, atau frustrasi)? Bisakah Ayah/Bunda ceritakan contoh interaksi yang mencerminkan kualitas kelekatan anak dengan Ayah/Bunda?'
+      },
+      {
+        skorKey: 'asertif_skor',
+        catatanKey: 'asertif_catatan',
+        fokus: 'Asertif anak, aspek psikologis',
+        text: 'Dalam situasi yang membutuhkan anak untuk berani menyampaikan pendapat atau menolak ajakan negatif (seperti ajakan membolos), bagaimana Ayah/Bunda membimbing dan melihat tingkat keasertifan anak saat ini? Berikan contohnya'
+      },
+      {
+        skorKey: 'kognitif_skor',
+        catatanKey: 'kognitif_catatan',
+        fokus: 'Perkembangan kognitif anak',
+        text: 'Bagaimana cara Ayah/Bunda menstimulasi dan mendukung perkembangan kognitif anak di rumah (selain dari tugas sekolah)? Misalnya, dalam hal pemecahan masalah, berpikir kritis, atau kreativitas'
+      }
+    ]
+  },
+  {
+    title: 'Keterlibatan Peran Ayah dan Bunda',
+    questions: [
+      {
+        skorKey: 'peran_skor',
+        catatanKey: 'peran_catatan',
+        fokus: 'Keterlibatan peran Ayah dan Bunda',
+        text: 'Jelaskan peran spesifik dan nyata yang diambil oleh Ayah dan Bunda dalam mendampingi anak dalam proses belajarnya, mengembangkan minat bakatnya, serta membentuk karakternya. Apakah peran tersebut sudah seimbang dan saling melengkapi?'
+      },
+      {
+        skorKey: 'sentuhan_skor',
+        catatanKey: 'sentuhan_catatan',
+        fokus: 'Keterlibatan peran Ayah dan Bunda, sentuhan perkembangan',
+        text: 'Menurut Ayah/Bunda, apa sentuhan perkembangan paling berharga yang sudah Ayah/Bunda berikan kepada anak, baik dari segi spiritual, mental, maupun keterampilan hidup, yang berbeda dari peran pasangan Ayah/Bunda?'
+      }
+    ]
+  },
+  {
+    title: 'Perilaku Khusus dan Kebutuhan Anak',
+    questions: [
+      {
+        skorKey: 'kebutuhan_khusus_skor',
+        catatanKey: 'kebutuhan_khusus_catatan',
+        fokus: 'Anak berkebutuhan khusus/ABK, perilaku spesial',
+        text: 'Apakah Ayah/Bunda pernah mendapati atau mencurigai anak memiliki pola perilaku yang spesial atau membutuhkan penanganan khusus dalam belajar/sosialisasi? Jika ya, langkah intervensi atau dukungan apa yang sudah diberikan sejauh ini?'
+      }
+    ]
+  },
+  {
+    title: 'Pantauan Spiritual (Ibadah) dan Sosial',
+    questions: [
+      {
+        skorKey: 'pantauan_ibadah_skor',
+        catatanKey: 'pantauan_ibadah_catatan',
+        fokus: "Pantauan ibadah sholat dan hafalan Al-Qur'a",
+        text: "Bagaimana rutinitas dan sistem pantauan yang Ayah/Bunda terapkan di rumah terkait pelaksanaan ibadah sholat (khususnya sholat wajib) dan capaian hafalan Al-Qur'an anak? Jelaskan target jangka pendek/panjang Ayah/Bunda"
+      },
+      {
+        skorKey: 'pertemanan_skor',
+        catatanKey: 'pertemanan_catatan',
+        fokus: 'Pantauan pertemanan anak',
+        text: 'Ceritakan bagaimana cara Ayah/Bunda mengawasi, mendiskusikan, dan memfilter pertemanan anak. Kriteria pertemanan seperti apa yang menurut Ayah/Bunda ideal, dan bagaimana anak merespons panduan ini?'
+      }
+    ]
+  },
+  {
+    title: 'Pandangan Masa Depan dan Harapan Sekolah',
+    questions: [
+      {
+        skorKey: 'nilai_karakter_skor',
+        catatanKey: 'nilai_karakter_catatan',
+        fokus: 'Visi pendidikan orang tua, kolaborasi, aspek psikologis',
+        text: 'Apa tiga nilai karakter utama yang paling Ayah/Bunda ingin tanamkan pada anak selama menempuh pendidikan di Al-Wildan Islamic School 29 Depok, dan bagaimana cara Ayah/Bunda dan sekolah dapat bekerja sama untuk mewujudkan hal tersebut?'
+      },
+      {
+        skorKey: 'kesulitan_skor',
+        catatanKey: 'kesulitan_catatan',
+        fokus: 'Pola asuh, aspek psikologis, respons orang tua terhadap kesulitan',
+        text: 'Seandainya anak mengalami kegagalan besar di sekolah (misalnya nilai turun drastis, atau konflik serius dengan teman), bagaimana pendekatan yang akan Ayah/Bunda ambil untuk membantunya bangkit dan mengambil pelajaran dari situasi tersebut?'
+      }
+    ]
+  }
+];
 
 const toNum = (v: ScoreInput): number => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const isBlank = (v: ScoreInput): boolean => v === '' || v === null || v === undefined || Number.isNaN(Number(v));
@@ -156,19 +228,28 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
     catatan: ''
   });
 
-  // Interview Walmur State (1-5 with per-item notes)
+  // Interview Walmur State (1-10 with per-question notes)
   const [interviewState, setInterviewState] = useState({
-    ibadah_skor: '' as ScoreInput,
-    ibadah_catatan: '',
-    akhlak_skor: '' as ScoreInput,
-    akhlak_catatan: '',
-    pola_asuh_skor: '' as ScoreInput,
-    pola_asuh_catatan: '',
-    kebiasaan_belajar_skor: '' as ScoreInput,
-    kebiasaan_belajar_catatan: '',
-    gadget_skor: '' as ScoreInput,
-    gadget_catatan: '',
-    catatan_umum: ''
+    kelekatan_skor: '' as ScoreInput,
+    kelekatan_catatan: '',
+    asertif_skor: '' as ScoreInput,
+    asertif_catatan: '',
+    kognitif_skor: '' as ScoreInput,
+    kognitif_catatan: '',
+    peran_skor: '' as ScoreInput,
+    peran_catatan: '',
+    sentuhan_skor: '' as ScoreInput,
+    sentuhan_catatan: '',
+    kebutuhan_khusus_skor: '' as ScoreInput,
+    kebutuhan_khusus_catatan: '',
+    pantauan_ibadah_skor: '' as ScoreInput,
+    pantauan_ibadah_catatan: '',
+    pertemanan_skor: '' as ScoreInput,
+    pertemanan_catatan: '',
+    nilai_karakter_skor: '' as ScoreInput,
+    nilai_karakter_catatan: '',
+    kesulitan_skor: '' as ScoreInput,
+    kesulitan_catatan: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -218,17 +299,26 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
         });
       } else if (kategori === 'Interview Walmur') {
         setInterviewState({
-          ibadah_skor: loadScore(d.ibadah_skor),
-          ibadah_catatan: d.ibadah_catatan || '',
-          akhlak_skor: loadScore(d.akhlak_skor),
-          akhlak_catatan: d.akhlak_catatan || '',
-          pola_asuh_skor: loadScore(d.pola_asuh_skor),
-          pola_asuh_catatan: d.pola_asuh_catatan || '',
-          kebiasaan_belajar_skor: loadScore(d.kebiasaan_belajar_skor),
-          kebiasaan_belajar_catatan: d.kebiasaan_belajar_catatan || '',
-          gadget_skor: loadScore(d.gadget_skor),
-          gadget_catatan: d.gadget_catatan || '',
-          catatan_umum: existingNilai.catatan_umum || ''
+          kelekatan_skor: loadScore(d.kelekatan_skor),
+          kelekatan_catatan: d.kelekatan_catatan || '',
+          asertif_skor: loadScore(d.asertif_skor),
+          asertif_catatan: d.asertif_catatan || '',
+          kognitif_skor: loadScore(d.kognitif_skor),
+          kognitif_catatan: d.kognitif_catatan || '',
+          peran_skor: loadScore(d.peran_skor),
+          peran_catatan: d.peran_catatan || '',
+          sentuhan_skor: loadScore(d.sentuhan_skor),
+          sentuhan_catatan: d.sentuhan_catatan || '',
+          kebutuhan_khusus_skor: loadScore(d.kebutuhan_khusus_skor),
+          kebutuhan_khusus_catatan: d.kebutuhan_khusus_catatan || '',
+          pantauan_ibadah_skor: loadScore(d.pantauan_ibadah_skor),
+          pantauan_ibadah_catatan: d.pantauan_ibadah_catatan || '',
+          pertemanan_skor: loadScore(d.pertemanan_skor),
+          pertemanan_catatan: d.pertemanan_catatan || '',
+          nilai_karakter_skor: loadScore(d.nilai_karakter_skor),
+          nilai_karakter_catatan: d.nilai_karakter_catatan || '',
+          kesulitan_skor: loadScore(d.kesulitan_skor),
+          kesulitan_catatan: d.kesulitan_catatan || ''
         });
       }
     }
@@ -253,7 +343,18 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
     } else if (kategori === 'Bahasa Arab') {
       vals = [arabState.percaya_diri, arabState.kelancaran, arabState.kejelasan, arabState.adab].map(toNum);
     } else if (kategori === 'Interview Walmur') {
-      vals = [interviewState.ibadah_skor, interviewState.akhlak_skor, interviewState.pola_asuh_skor, interviewState.kebiasaan_belajar_skor, interviewState.gadget_skor].map(toNum);
+      vals = [
+        interviewState.kelekatan_skor,
+        interviewState.asertif_skor,
+        interviewState.kognitif_skor,
+        interviewState.peran_skor,
+        interviewState.sentuhan_skor,
+        interviewState.kebutuhan_khusus_skor,
+        interviewState.pantauan_ibadah_skor,
+        interviewState.pertemanan_skor,
+        interviewState.nilai_karakter_skor,
+        interviewState.kesulitan_skor
+      ].map(toNum);
     }
     if (vals.length === 0 || vals.some(v => Number.isNaN(v))) return NaN;
     const sum = vals.reduce((a, b) => a + b, 0);
@@ -287,11 +388,13 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
       if (isBlank(arabState.kejelasan)) missing.push('Kejelasan');
       if (isBlank(arabState.adab)) missing.push('Adab');
     } else if (kategori === 'Interview Walmur') {
-      if (isBlank(interviewState.ibadah_skor)) missing.push('Ibadah');
-      if (isBlank(interviewState.akhlak_skor)) missing.push('Akhlak & Karakter');
-      if (isBlank(interviewState.pola_asuh_skor)) missing.push('Pola Asuh & Pergaulan');
-      if (isBlank(interviewState.kebiasaan_belajar_skor)) missing.push('Kebiasaan Belajar');
-      if (isBlank(interviewState.gadget_skor)) missing.push('Penggunaan Gadget');
+      let no = 1;
+      INTERVIEW_SECTIONS.forEach((sec) => {
+        sec.questions.forEach((q) => {
+          if (isBlank((interviewState as any)[q.skorKey])) missing.push(`Pertanyaan ${no}`);
+          no++;
+        });
+      });
     }
     return missing;
   };
@@ -360,18 +463,28 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
         catatanUmum = arabState.catatan;
       } else if (kategori === 'Interview Walmur') {
         detailPayload = {
-          ibadah_skor: toNum(interviewState.ibadah_skor),
-          ibadah_catatan: interviewState.ibadah_catatan,
-          akhlak_skor: toNum(interviewState.akhlak_skor),
-          akhlak_catatan: interviewState.akhlak_catatan,
-          pola_asuh_skor: toNum(interviewState.pola_asuh_skor),
-          pola_asuh_catatan: interviewState.pola_asuh_catatan,
-          kebiasaan_belajar_skor: toNum(interviewState.kebiasaan_belajar_skor),
-          kebiasaan_belajar_catatan: interviewState.kebiasaan_belajar_catatan,
-          gadget_skor: toNum(interviewState.gadget_skor),
-          gadget_catatan: interviewState.gadget_catatan
+          kelekatan_skor: toNum(interviewState.kelekatan_skor),
+          kelekatan_catatan: interviewState.kelekatan_catatan,
+          asertif_skor: toNum(interviewState.asertif_skor),
+          asertif_catatan: interviewState.asertif_catatan,
+          kognitif_skor: toNum(interviewState.kognitif_skor),
+          kognitif_catatan: interviewState.kognitif_catatan,
+          peran_skor: toNum(interviewState.peran_skor),
+          peran_catatan: interviewState.peran_catatan,
+          sentuhan_skor: toNum(interviewState.sentuhan_skor),
+          sentuhan_catatan: interviewState.sentuhan_catatan,
+          kebutuhan_khusus_skor: toNum(interviewState.kebutuhan_khusus_skor),
+          kebutuhan_khusus_catatan: interviewState.kebutuhan_khusus_catatan,
+          pantauan_ibadah_skor: toNum(interviewState.pantauan_ibadah_skor),
+          pantauan_ibadah_catatan: interviewState.pantauan_ibadah_catatan,
+          pertemanan_skor: toNum(interviewState.pertemanan_skor),
+          pertemanan_catatan: interviewState.pertemanan_catatan,
+          nilai_karakter_skor: toNum(interviewState.nilai_karakter_skor),
+          nilai_karakter_catatan: interviewState.nilai_karakter_catatan,
+          kesulitan_skor: toNum(interviewState.kesulitan_skor),
+          kesulitan_catatan: interviewState.kesulitan_catatan
         };
-        catatanUmum = interviewState.catatan_umum;
+        catatanUmum = '';
       }
 
       const res = await apiService.submitGrade(
@@ -706,103 +819,63 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
             </div>
           )}
 
-          {/* 6. WAWANCARA ORANG TUA (1-5 with per-item notes) */}
+          {/* 6. WAWANCARA ORANG TUA (1-10 dengan catatan per pertanyaan) */}
           {kategori === 'Interview Walmur' && (
             <div className="space-y-5">
               <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 font-medium flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  Wawancara Orang Tua. Rentang skor: <strong>1 s/d 5</strong>. Seluruh skor wajib diisi; catatan per aspek bersifat opsional.
+                  Wawancara Orang Tua. Rentang skor: <strong>1 s/d 10</strong>. Seluruh skor wajib diisi; catatan per pertanyaan bersifat opsional.
                 </div>
                 <div className="text-xs font-bold text-[#1E3A8A] bg-white px-2.5 py-1 rounded-lg border border-amber-200">
                   Pewawancara: {siswa.interview_walmur}
                 </div>
               </div>
 
-              {/* 5 Aspect Rows */}
-              {[
-                {
-                  skorKey: 'ibadah_skor',
-                  catatanKey: 'ibadah_catatan',
-                  label: '1. Aspek Ibadah (Sholat berjamaah, tilawah keluarga)',
-                  placeholder: 'Catatan komitmen sholat 5 waktu di rumah, pembiasaan puasa...'
-                },
-                {
-                  skorKey: 'akhlak_skor',
-                  catatanKey: 'akhlak_catatan',
-                  label: '2. Aspek Akhlak & Karakter (Sopan santun, kejujuran)',
-                  placeholder: 'Catatan keteladanan orang tua, adab anak terhadap orang yang lebih tua...'
-                },
-                {
-                  skorKey: 'pola_asuh_skor',
-                  catatanKey: 'pola_asuh_catatan',
-                  label: '3. Aspek Pola Asuh & Pergaulan Lingkungan',
-                  placeholder: 'Catatan lingkungan tempat tinggal, pembatasan pergaulan luar...'
-                },
-                {
-                  skorKey: 'kebiasaan_belajar_skor',
-                  catatanKey: 'kebiasaan_belajar_catatan',
-                  label: '4. Aspek Kebiasaan Belajar Anak',
-                  placeholder: 'Catatan pendampingan belajar, kemandirian menyelesaikan tugas...'
-                },
-                {
-                  skorKey: 'gadget_skor',
-                  catatanKey: 'gadget_catatan',
-                  label: '5. Aspek Penggunaan Gadget / Screen Time',
-                  placeholder: 'Catatan aturan durasi gadget harian, kontrol konten yang diakses...'
-                },
-              ].map((row) => (
-                <div key={row.skorKey} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <label className="font-bold text-slate-900">{row.label}</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-500 text-[11px]">Skor (1-5):</span>
-                      <select
-                        value={(interviewState as any)[row.skorKey]}
-                        onChange={(e) => setInterviewState({ ...interviewState, [row.skorKey]: e.target.value === '' ? '' : Number(e.target.value) })}
-                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg font-bold text-slate-900 text-xs focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
-                        required
-                      >
-                        <option value="" disabled>-- Pilih --</option>
-                        <option value={5}>5 - Sangat Selaras / Ideal</option>
-                        <option value={4}>4 - Baik / Positif</option>
-                        <option value={3}>3 - Cukup / Moderat</option>
-                        <option value={2}>2 - Kurang / Butuh Perhatian</option>
-                        <option value={1}>1 - Sangat Berisiko</option>
-                      </select>
+              {INTERVIEW_SECTIONS.map((section, sectionIndex) => (
+                <div key={section.title} className="space-y-3">
+                  <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                    <span className="w-1.5 h-5 bg-[#D97706] rounded-full inline-block" />
+                    {section.title}
+                  </h4>
+
+                  {section.questions.map((q, qi) => (
+                    <div key={q.skorKey} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                        <div className="space-y-1 flex-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#D97706] block">
+                            Fokus: {q.fokus}
+                          </span>
+                          <p className="text-xs font-semibold text-slate-900 leading-relaxed">
+                            {sectionIndex + 1}.{qi + 1}. {q.text}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-slate-500 text-[11px]">Skor (1-10):</span>
+                          <select
+                            value={(interviewState as any)[q.skorKey]}
+                            onChange={(e) => setInterviewState({ ...interviewState, [q.skorKey]: e.target.value === '' ? '' : Number(e.target.value) })}
+                            className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg font-bold text-slate-900 text-xs focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
+                            required
+                          >
+                            <option value="" disabled>-- Pilih --</option>
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={(interviewState as any)[q.catatanKey]}
+                        onChange={(e) => setInterviewState({ ...interviewState, [q.catatanKey]: e.target.value })}
+                        placeholder="Catatan penguji untuk pertanyaan ini (opsional)..."
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
+                      />
                     </div>
-                  </div>
-
-                  {/* Panduan pertanyaan wawancara */}
-                  {INTERVIEW_QUESTIONS[row.skorKey] && (
-                    <ul className="list-disc pl-5 text-[11px] text-slate-500 space-y-0.5">
-                      {INTERVIEW_QUESTIONS[row.skorKey].map((q, i) => (
-                        <li key={i}>{q}</li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <input
-                    type="text"
-                    value={(interviewState as any)[row.catatanKey]}
-                    onChange={(e) => setInterviewState({ ...interviewState, [row.catatanKey]: e.target.value })}
-                    placeholder={row.placeholder}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
-                  />
+                  ))}
                 </div>
               ))}
-
-              <div>
-                <label className="font-bold text-slate-800 block mb-1">
-                  Catatan Umum / Rekomendasi Akhir Walmur (Opsional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={interviewState.catatan_umum}
-                  onChange={(e) => setInterviewState({ ...interviewState, catatan_umum: e.target.value })}
-                  placeholder="Rekomendasi penerimaan, keselarasan visi dengan sekolah, komitmen finansial & kerjasama..."
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
-                />
-              </div>
             </div>
           )}
 
