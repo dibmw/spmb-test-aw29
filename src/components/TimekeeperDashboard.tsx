@@ -262,8 +262,8 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
         </div>
 
         {/* Tipe Presensi Switcher */}
-        <div className="bg-blue-950/70 p-1.5 rounded-xl flex items-center gap-1 border border-blue-700/60 shrink-0">
-          {timekeeperRoles.siswa && (
+        {timekeeperRoles.siswa && timekeeperRoles.walmur ? (
+          <div className="bg-blue-950/70 p-1.5 rounded-xl flex items-center gap-1 border border-blue-700/60 shrink-0">
             <button
               onClick={() => setAttendanceType('Siswa')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
@@ -275,8 +275,6 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
               <User className="w-4 h-4" />
               <span>Presensi Siswa</span>
             </button>
-          )}
-          {timekeeperRoles.walmur && (
             <button
               onClick={() => setAttendanceType('Walmur')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
@@ -288,8 +286,18 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
               <Users className="w-4 h-4" />
               <span>Presensi Orang Tua</span>
             </button>
-          )}
-        </div>
+          </div>
+        ) : timekeeperRoles.siswa ? (
+          <div className="bg-blue-950/70 px-4 py-2.5 rounded-xl flex items-center gap-2 border border-blue-700/60 shrink-0 text-xs font-bold text-white">
+            <User className="w-4 h-4 text-[#D97706]" />
+            <span>Mode Presensi Siswa</span>
+          </div>
+        ) : timekeeperRoles.walmur ? (
+          <div className="bg-blue-950/70 px-4 py-2.5 rounded-xl flex items-center gap-2 border border-blue-700/60 shrink-0 text-xs font-bold text-white">
+            <Users className="w-4 h-4 text-[#D97706]" />
+            <span>Mode Presensi Orang Tua</span>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
