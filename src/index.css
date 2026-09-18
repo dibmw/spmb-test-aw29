@@ -91,6 +91,18 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  .print-header-siswa {
+    background-color: #1E3A8A !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-header-walmur {
+    background-color: #D97706 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .print-table tbody tr:nth-child(even) {
     background-color: #f1f5f9 !important;
     -webkit-print-color-adjust: exact;
