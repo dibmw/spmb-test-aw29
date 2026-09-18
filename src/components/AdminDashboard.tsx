@@ -384,7 +384,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 alt="Al-Wildan 29"
                 className="w-14 h-14 mx-auto object-contain mb-1"
               />
-              <div className="text-sm font-black">SPMB AL-WILDAN 29 — Daftar {title} per Ruangan</div>
+              <div className="text-sm font-black">TES SPMB AL-WILDAN ISLAMIC SCHOOL 29 DEPOK</div>
+              <div className="text-xs font-bold mt-0.5">Daftar {title} per Ruangan</div>
               <div className="text-xs font-bold">
                 {g.room} — {g.date || 'Tanggal tidak tercantum'}
               </div>
