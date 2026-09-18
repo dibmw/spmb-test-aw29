@@ -257,7 +257,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
             Presensi Barcode / QR Peserta SPMB
           </h1>
           <p className="text-xs text-blue-100">
-            Petugas Aktif: <strong className="text-amber-300">{session.nama}</strong> ({session.email})
+            Petugas Aktif: <strong className="text-amber-300">{session.nama}</strong>
           </p>
         </div>
 

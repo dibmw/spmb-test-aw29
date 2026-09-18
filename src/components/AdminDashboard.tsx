@@ -319,7 +319,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             Controlling Center SPMB Al-Wildan 29
           </h1>
           <p className="text-xs text-blue-100">
-            Akses Penuh: <strong className="text-amber-300">{session.email}</strong> • Manajemen CRUD & Live Monitoring
+            Akses Penuh: <strong className="text-amber-300">Admin</strong> • Manajemen CRUD & Live Monitoring
           </p>
         </div>
 

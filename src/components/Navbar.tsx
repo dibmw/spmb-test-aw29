@@ -165,9 +165,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="text-xs font-bold text-slate-800 leading-tight max-w-[140px] truncate">
                       {session.nama}
                     </div>
-                    <div className="text-[10px] text-slate-500 truncate max-w-[140px]">
-                      {session.email}
-                    </div>
                   </div>
 
                   <button
