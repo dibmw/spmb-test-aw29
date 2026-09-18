@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Shield, 
   Users, 
@@ -19,10 +19,11 @@ import {
   RefreshCw, 
   Filter, 
   X, 
-  Save 
+  Save,
+  Printer 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, KategoriUjian, formatKelas } from '../types/spmb';
+import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas } from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../services/gasCode';
 import { SPREADSHEET_URL } from '../data/mockData';
@@ -45,8 +46,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataChanged,
   showToast
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'export' | 'gas'>('kpi');
+  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'export' | 'gas' | 'cetak'>('kpi');
   const [searchFilter, setSearchFilter] = useState('');
+
+  // Print target state untuk cetak jadwal per ruangan
+  const [printTarget, setPrintTarget] = useState<null | { group: 'siswa' | 'walmur'; room: string | null }>(null);
   
   // GAS Web App URL state
   const [gasUrl, setGasUrl] = useState(apiService.getGasUrl());
@@ -311,6 +315,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // ====== CETAK RUANGAN ======
+  const buildRoomGroups = (getRoom: (s: SiswaJadwal) => string): { room: string; date: string; siswa: SiswaJadwal[] }[] => {
+    const map = new Map<string, SiswaJadwal[]>();
+    jadwalList.forEach(s => {
+      const key = getRoom(s) || 'Tanpa Ruangan';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(s);
+    });
+    return Array.from(map.entries())
+      .map(([room, siswa]) => ({
+        room,
+        date: siswa[0]?.hari_tanggal || '',
+        siswa: [...siswa].sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa)),
+      }))
+      .sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true, sensitivity: 'base' }));
+  };
+
+  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa), [jadwalList]);
+  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur), [jadwalList]);
+
+  const triggerPrint = (group: 'siswa' | 'walmur', room: string | null) => {
+    setPrintTarget({ group, room });
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  useEffect(() => {
+    const clearTarget = () => setPrintTarget(null);
+    window.addEventListener('afterprint', clearTarget);
+    return () => window.removeEventListener('afterprint', clearTarget);
+  }, []);
+
+  const printRoomRows = (siswa: SiswaJadwal[], group: 'siswa' | 'walmur') =>
+    siswa.map((s, idx) => (
+      <tr key={s.id}>
+        <td className="p-2 font-mono">{idx + 1}</td>
+        <td className="p-2 font-mono">{s.id}</td>
+        <td className="p-2 font-bold">{s.nama_siswa}</td>
+        <td className="p-2">{getJenjangFromKelas(s.kelas, s.grade)} • {formatKelas(s.kelas)}</td>
+        <td className="p-2">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+        <td className="p-2 font-mono">{group === 'siswa' ? s.waktu_all : s.waktu_interview}</td>
+      </tr>
+    ));
+
+  const renderPrintBlocks = (group: 'siswa' | 'walmur') => {
+    const groups = group === 'siswa' ? siswaRoomGroups : walmurRoomGroups;
+    const roomFilter = printTarget && printTarget.group === group ? printTarget.room : null;
+    const title = group === 'siswa' ? 'Ruang Ujian Siswa' : 'Ruang Wawancara Orang Tua';
+    return groups
+      .filter(g => !roomFilter || g.room === roomFilter)
+      .map(g => {
+        const first = g.siswa[0];
+        return (
+          <div key={group + g.room} className="print-block">
+            <div className="text-center mb-1">
+              <div className="text-sm font-black">SPMB AL-WILDAN 29 — Daftar {title} per Ruangan</div>
+              <div className="text-xs font-bold">
+                {g.room} — {g.date || 'Tanggal tidak tercantum'}
+              </div>
+            </div>
+            <table className="print-table mt-2">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>ID Siswa</th>
+                  <th>Nama Siswa</th>
+                  <th>Unit & Kelas</th>
+                  <th>Gender</th>
+                  <th>Waktu</th>
+                </tr>
+              </thead>
+              <tbody>{printRoomRows(g.siswa, group)}</tbody>
+            </table>
+            <div className="mt-3 text-[11px] space-y-1">
+              {group === 'siswa' ? (
+                <>
+                  <div>Penguji Al-Qur'an/Arab: <strong>{first?.penguji_alq_arab || '-'}</strong></div>
+                  <div>Penguji Calistung/English: <strong>{first?.penguji_catung_eng || '-'}</strong></div>
+                  <div>Timekeeper Siswa: <strong>{first?.timekeeper_siswa || '-'}</strong></div>
+                </>
+              ) : (
+                <>
+                  <div>Pewawancara Orang Tua: <strong>{first?.interview_walmur || '-'}</strong></div>
+                  <div>Timekeeper Orang Tua: <strong>{first?.timekeeper_walmur || '-'}</strong></div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      });
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Admin Title Banner */}
@@ -411,6 +508,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <Download className="w-4 h-4 text-[#D97706]" />
           <span>Ekspor Excel / CSV</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('cetak')}
+          className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+            activeSubTab === 'cetak'
+              ? 'bg-[#1E3A8A] text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Printer className="w-4 h-4 text-[#D97706]" />
+          <span>Cetak Ruangan</span>
         </button>
 
         <button
@@ -586,6 +695,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <tr>
                     <th className="p-3">ID Siswa</th>
                     <th className="p-3">Nama Siswa</th>
+                    <th className="p-3">Gender</th>
                     <th className="p-3">Unit & Kelas</th>
                     <th className="p-3">Ruang Siswa</th>
                     <th className="p-3">Penguji Qur'an/Arab</th>
@@ -612,9 +722,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             Kontak: {s.nomor_walmur}
                           </span>
                         </td>
+                        <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase mr-1.5">
-                            {s.grade}
+                            {getJenjangFromKelas(s.kelas, s.grade)}
                           </span>
                           <span className="font-bold text-[#1E3A8A]">
                             {formatKelas(s.kelas)}
@@ -945,6 +1056,148 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* TAB 7: CETAK RUANGAN */}
+      {activeSubTab === 'cetak' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-amber-50 text-[#D97706] flex items-center justify-center">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Cetak Daftar Siswa per Ruangan</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Tampilkan daftar siswa lengkap dengan penguji dan timekeeper; cetak semua sekaligus (halaman per ruangan) atau per ruangan.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => triggerPrint('siswa', null)}
+                  className="px-3.5 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4 text-[#D97706]" />
+                  <span>Cetak Semua Ruang Ujian</span>
+                </button>
+                <button
+                  onClick={() => triggerPrint('walmur', null)}
+                  className="px-3.5 py-2 bg-[#D97706] hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Cetak Semua Ruang Wawancara</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ruang Ujian Siswa ({siswaRoomGroups.length})</h4>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {siswaRoomGroups.length === 0 && (
+                  <div className="bg-white rounded-2xl p-6 border border-dashed border-slate-300 text-center text-xs text-slate-400">
+                    Tidak ada data ruangan ujian siswa.
+                  </div>
+                )}
+                {siswaRoomGroups.map(g => (
+                  <div key={'s-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="bg-[#1E3A8A] text-white px-4 py-2.5 flex items-center justify-between">
+                      <div>
+                        <div className="font-extrabold text-sm">{g.room}</div>
+                        <div className="text-[10px] text-blue-200">{g.date || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
+                      </div>
+                      <button
+                        onClick={() => triggerPrint('siswa', g.room)}
+                        className="px-2.5 py-1.5 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Cetak
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[9px] tracking-wider">
+                          <tr>
+                            <th className="p-2">No</th>
+                            <th className="p-2">Nama Siswa</th>
+                            <th className="p-2">ID</th>
+                            <th className="p-2">Unit & Kelas</th>
+                            <th className="p-2">Gender</th>
+                            <th className="p-2">Waktu</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">{printRoomRows(g.siswa, 'siswa')}</tbody>
+                      </table>
+                    </div>
+                    <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-[10px] text-slate-600 space-y-0.5">
+                      <div>Penguji Al-Qur'an/Arab: <strong className="text-slate-800">{g.siswa[0]?.penguji_alq_arab || '-'}</strong></div>
+                      <div>Penguji Calistung/English: <strong className="text-slate-800">{g.siswa[0]?.penguji_catung_eng || '-'}</strong></div>
+                      <div>Timekeeper Siswa: <strong className="text-slate-800">{g.siswa[0]?.timekeeper_siswa || '-'}</strong></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ruang Wawancara Orang Tua ({walmurRoomGroups.length})</h4>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {walmurRoomGroups.length === 0 && (
+                  <div className="bg-white rounded-2xl p-6 border border-dashed border-slate-300 text-center text-xs text-slate-400">
+                    Tidak ada data ruang wawancara orang tua.
+                  </div>
+                )}
+                {walmurRoomGroups.map(g => (
+                  <div key={'w-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="bg-[#D97706] text-white px-4 py-2.5 flex items-center justify-between">
+                      <div>
+                        <div className="font-extrabold text-sm">{g.room}</div>
+                        <div className="text-[10px] text-amber-100">{g.date || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
+                      </div>
+                      <button
+                        onClick={() => triggerPrint('walmur', g.room)}
+                        className="px-2.5 py-1.5 bg-white text-[#D97706] hover:bg-amber-50 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Cetak
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[9px] tracking-wider">
+                          <tr>
+                            <th className="p-2">No</th>
+                            <th className="p-2">Nama Siswa</th>
+                            <th className="p-2">ID</th>
+                            <th className="p-2">Unit & Kelas</th>
+                            <th className="p-2">Gender</th>
+                            <th className="p-2">Waktu</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">{printRoomRows(g.siswa, 'walmur')}</tbody>
+                      </table>
+                    </div>
+                    <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-[10px] text-slate-600 space-y-0.5">
+                      <div>Pewawancara Orang Tua: <strong className="text-slate-800">{g.siswa[0]?.interview_walmur || '-'}</strong></div>
+                      <div>Timekeeper Orang Tua: <strong className="text-slate-800">{g.siswa[0]?.timekeeper_walmur || '-'}</strong></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRINT LAYER */}
+      <div id="print-area">
+        {printTarget?.group === 'siswa' && renderPrintBlocks('siswa')}
+        {printTarget?.group === 'walmur' && renderPrintBlocks('walmur')}
+      </div>
 
       {/* MODAL: Tambah/Edit Siswa Jadwal */}
       {isStudentModalOpen && (

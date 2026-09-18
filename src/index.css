@@ -41,3 +41,48 @@
 .capture-fixed .sm\:p-5 {
   padding: 1.25rem !important;
 }
+
+/* Print-only layer for "Cetak Ruangan" */
+#print-area {
+  display: none;
+}
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible !important;
+  }
+  #print-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .print-block {
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-block:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .print-table th,
+  .print-table td {
+    border: 1px solid #334155;
+    padding: 4px 6px;
+    text-align: left;
+  }
+  .print-table th {
+    background-color: #e2e8f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
