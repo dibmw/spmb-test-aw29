@@ -535,9 +535,22 @@ class ApiService {
 
   // Admin Update/Delete Grades
   public deleteNilai(id: string): { success: boolean; message: string } {
-    let current = this.getNilaiList();
-    current = current.filter(n => n.id !== id);
-    localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(current));
+    const current = this.getNilaiList();
+    const target = current.find(n => n.id === id);
+    const next = current.filter(n => n.id !== id);
+    localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(next));
+
+    // Sinkron hapus ke GAS agar entri tidak muncul lagi setelah sync ulang.
+    // Sheet web_nilai tidak punya kolom id stabil, jadi hapus by composite key
+    // id_siswa + kategori_ujian (konsisten dgn pencocokan submitGrade).
+    if (target && this.gasUrl) {
+      void this.pushWithRetry({
+        action: 'deleteGrade',
+        id_siswa: target.id_siswa,
+        kategori_ujian: target.kategori_ujian
+      });
+    }
+
     return { success: true, message: 'Data penilaian berhasil dihapus.' };
   }
 

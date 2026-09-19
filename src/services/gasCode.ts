@@ -347,6 +347,20 @@ function doPost(e) {
       return jsonResponse({ status: "error", message: "ID siswa tidak ditemukan." });
     }
 
+    // 7. ADMIN - DELETE NILAI (by id_siswa + kategori_ujian, konsisten dgn submitGrade)
+    if (action === "deleteGrade") {
+      var nSheet = ss.getSheetByName("web_nilai");
+      var nVals = nSheet.getDataRange().getValues();
+      var deleted = 0;
+      for (var d = nVals.length - 1; d >= 1; d--) {
+        if (String(nVals[d][1]) === String(postData.id_siswa) && String(nVals[d][3]) === String(postData.kategori_ujian)) {
+          nSheet.deleteRow(d + 1);
+          deleted++;
+        }
+      }
+      return jsonResponse({ status: deleted > 0 ? "success" : "error", message: deleted > 0 ? "Entri nilai berhasil dihapus." : "Entri nilai tidak ditemukan." });
+    }
+
     return jsonResponse({ status: "error", message: "Aksi tidak dikenali: " + action });
 
   } catch (err) {
