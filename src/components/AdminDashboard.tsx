@@ -20,12 +20,23 @@ import {
   Filter, 
   X, 
   Save,
-  Printer 
+  Printer,
+  Send,
+  MessageCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../services/gasCode';
+import {
+  buildPresentIncompleteRows,
+  buildGradedButAbsentRows,
+  groupBroadcastByPenguji,
+  groupBroadcastByTimekeeper,
+  buildPesanPenguji,
+  buildPesanTimekeeper,
+  displayKategori,
+} from '../utils/broadcast';
 import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
 import { RubrikModal } from './RubrikModal';
 
@@ -46,7 +57,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataChanged,
   showToast
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'export' | 'gas' | 'cetak'>('kpi');
+  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
 
@@ -319,6 +330,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // ====== MONITORING & BROADCAST WA (cek silang presensi <-> nilai) ======
+  const [broadcastSearch, setBroadcastSearch] = useState('');
+  const [broadcastJenjang, setBroadcastJenjang] = useState<'Semua' | 'SD' | 'SMP' | 'SMA'>('Semua');
+  const [broadcastKelas, setBroadcastKelas] = useState<string>('Semua');
+
+  const broadcastBaseA = useMemo(
+    () => buildPresentIncompleteRows(jadwalList, presensiList, nilaiList),
+    [jadwalList, presensiList, nilaiList]
+  );
+  const broadcastBaseB = useMemo(
+    () => buildGradedButAbsentRows(jadwalList, presensiList, nilaiList),
+    [jadwalList, presensiList, nilaiList]
+  );
+
+  const broadcastKelasOptions = useMemo(() => {
+    const set = new Set<string>();
+    jadwalList.forEach((s) => { if (s.kelas) set.add(s.kelas); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [jadwalList]);
+
+  const broadcastRowsA = useMemo(() => {
+    const q = broadcastSearch.trim().toLowerCase();
+    return broadcastBaseA.filter((r) => {
+      const s = r.siswa;
+      const okQ = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas, s.grade) === broadcastJenjang;
+      const okK = broadcastKelas === 'Semua' || s.kelas === broadcastKelas;
+      return okQ && okJ && okK;
+    });
+  }, [broadcastBaseA, broadcastSearch, broadcastJenjang, broadcastKelas]);
+
+  const broadcastRowsB = useMemo(() => {
+    const q = broadcastSearch.trim().toLowerCase();
+    return broadcastBaseB.filter((r) => {
+      const s = r.siswa;
+      const okQ = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas, s.grade) === broadcastJenjang;
+      const okK = broadcastKelas === 'Semua' || s.kelas === broadcastKelas;
+      return okQ && okJ && okK;
+    });
+  }, [broadcastBaseB, broadcastSearch, broadcastJenjang, broadcastKelas]);
+
+  const broadcastPengujiGroups = useMemo(() => groupBroadcastByPenguji(broadcastRowsA), [broadcastRowsA]);
+  const broadcastTimekeeperGroups = useMemo(() => groupBroadcastByTimekeeper(broadcastRowsB), [broadcastRowsB]);
+
+  const handleCopyText = (text: string, label: string) => {
+    if (!text.trim()) return;
+    navigator.clipboard
+      .writeText(text)
+      .then(() => showToast('Disalin!', `${label} berhasil disalin. Tempel (paste) ke WhatsApp.`, 'success'))
+      .catch(() => showToast('Gagal Menyalin', 'Clipboard tidak tersedia di browser ini. Salin manual dari kolom preview.', 'error'));
+  };
+
+  const handleCopyAllPenguji = () => {
+    const all = broadcastPengujiGroups.map((g) => buildPesanPenguji(g.penguji, g.items)).join('\n\n———————————\n\n');
+    handleCopyText(all, `Semua pesan penguji (${broadcastPengujiGroups.length} orang)`);
+  };
+
+  const handleCopyAllTimekeeper = () => {
+    const all = broadcastTimekeeperGroups.map((g) => buildPesanTimekeeper(g.timekeeper, g.items)).join('\n\n———————————\n\n');
+    handleCopyText(all, `Semua pesan timekeeper (${broadcastTimekeeperGroups.length} orang)`);
+  };
+
   // ====== CETAK RUANGAN ======
   const buildRoomGroups = (
     getRoom: (s: SiswaJadwal) => string,
@@ -516,6 +590,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <FileSpreadsheet className="w-4 h-4 text-blue-300" />
           <span>Rekapitulasi Nilai ({nilaiList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('broadcast')}
+          className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+            activeSubTab === 'broadcast'
+              ? 'bg-[#1E3A8A] text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Send className="w-4 h-4 text-emerald-300" />
+          <span>Monitoring & Broadcast WA</span>
         </button>
 
         <button
@@ -991,6 +1077,339 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4B: MONITORING & BROADCAST WA (cek silang presensi <-> nilai) */}
+      {activeSubTab === 'broadcast' && (
+        <div className="space-y-6">
+          {/* Filter bar */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={broadcastSearch}
+                onChange={(e) => setBroadcastSearch(e.target.value)}
+                placeholder="Cari nama / ID siswa..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <select
+                value={broadcastJenjang}
+                onChange={(e) => setBroadcastJenjang(e.target.value as 'Semua' | 'SD' | 'SMP' | 'SMA')}
+                className="flex-1 md:flex-none px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
+                title="Filter jenjang"
+              >
+                <option value="Semua">Jenjang: Semua</option>
+                <option value="SD">Jenjang: SD</option>
+                <option value="SMP">Jenjang: SMP</option>
+                <option value="SMA">Jenjang: SMA</option>
+              </select>
+              <select
+                value={broadcastKelas}
+                onChange={(e) => setBroadcastKelas(e.target.value)}
+                className="flex-1 md:flex-none px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
+                title="Filter kelas"
+              >
+                <option value="Semua">Kelas: Semua</option>
+                {broadcastKelasOptions.map((k) => (
+                  <option key={k} value={k}>Kelas: {k}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Ringkasan */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-white rounded-2xl p-4 border border-rose-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kelompok A — Sudah Presensi, Nilai Belum Lengkap</span>
+                <Clock className="w-4 h-4 text-rose-500" />
+              </div>
+              <span className="text-2xl font-extrabold text-rose-700 font-mono">{broadcastRowsA.length}</span>
+              <p className="text-[10px] text-slate-400">siswa • pesan ke {broadcastPengujiGroups.length} penguji</p>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kelompok B — Ada Nilai, Belum Presensi</span>
+                <Clock className="w-4 h-4 text-amber-500" />
+              </div>
+              <span className="text-2xl font-extrabold text-amber-700 font-mono">{broadcastRowsB.length}</span>
+              <p className="text-[10px] text-slate-400">siswa • pesan ke {broadcastTimekeeperGroups.length} timekeeper</p>
+            </div>
+          </div>
+
+          {/* Tabel Kelompok A */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 bg-rose-50 border-b border-rose-200 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-rose-900 text-xs uppercase tracking-wider">
+                  Kelompok A — Sudah Presensi, Nilai Belum Lengkap
+                </h3>
+                <p className="text-[11px] text-rose-700 mt-0.5">
+                  Siswa sudah hadir tapi nilai belum diinput • tindak lanjut ke penguji penanggung jawab.
+                </p>
+              </div>
+              <span className="text-xs text-rose-700 font-mono font-bold shrink-0">{broadcastRowsA.length} siswa</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#1E3A8A] text-white uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">ID</th>
+                    <th className="p-3">Nama Siswa</th>
+                    <th className="p-3">Jenjang & Kelas</th>
+                    <th className="p-3">Presensi Siswa</th>
+                    <th className="p-3">Presensi Walmur</th>
+                    <th className="p-3">Pos Belum Diisi + Penguji</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {broadcastRowsA.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                        <CheckCircle2 className="w-5 h-5 mx-auto mb-1.5 text-emerald-500" />
+                        <span className="block text-xs font-bold text-slate-600">Semua siswa yang hadir sudah lengkap nilainya.</span>
+                        <span className="block text-[11px] mt-0.5">Tidak ada yang perlu dibroadcast ke penguji.</span>
+                      </td>
+                    </tr>
+                  ) : (
+                    broadcastRowsA.map((r) => {
+                      const jenjang = getJenjangFromKelas(r.siswa.kelas, r.siswa.grade);
+                      return (
+                        <tr key={r.siswa.id} className="hover:bg-slate-50">
+                          <td className="p-3 font-mono font-bold text-[#1E3A8A]">{r.siswa.id}</td>
+                          <td className="p-3 font-bold text-slate-800">{r.siswa.nama_siswa}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === 'SD' ? 'bg-sky-100 text-sky-700' : jenjang === 'SMP' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-purple-100 text-purple-800'}`}>
+                              {jenjang}
+                            </span>
+                            <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">{formatKelas(r.siswa.kelas)}</span>
+                          </td>
+                          <td className="p-3">
+                            {r.presensiSiswa ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                                <CheckCircle2 className="w-3 h-3" /> Hadir
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                                <Clock className="w-3 h-3" /> Belum
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {r.presensiWalmur ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                                <CheckCircle2 className="w-3 h-3" /> Hadir
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                                <Clock className="w-3 h-3" /> Belum
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              {r.missing.map((m) => (
+                                <div key={m.kategori} className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 font-bold text-[10px]">
+                                    {displayKategori(m.kategori)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-600">• {m.penguji}</span>
+                                </div>
+                              ))}
+                              <span className="block text-[10px] text-slate-400 font-mono mt-0.5">
+                                {r.filledCount}/{r.requiredCount} pos terisi
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Tabel Kelompok B */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 bg-amber-50 border-b border-amber-200 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-amber-900 text-xs uppercase tracking-wider">
+                  Kelompok B — Ada Nilai, Belum Presensi
+                </h3>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Siswa belum tercatat hadir sama sekali tapi sudah ada nilai • tindak lanjut ke timekeeper.
+                </p>
+              </div>
+              <span className="text-xs text-amber-800 font-mono font-bold shrink-0">{broadcastRowsB.length} siswa</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#D97706] text-white uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">ID</th>
+                    <th className="p-3">Nama Siswa</th>
+                    <th className="p-3">Jenjang & Kelas</th>
+                    <th className="p-3">Nilai Terisi</th>
+                    <th className="p-3">Timekeeper Penanggung Jawab</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {broadcastRowsB.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-slate-400">
+                        <CheckCircle2 className="w-5 h-5 mx-auto mb-1.5 text-emerald-500" />
+                        <span className="block text-xs font-bold text-slate-600">Tidak ada anomali.</span>
+                        <span className="block text-[11px] mt-0.5">Semua nilai yang terisi didukung catatan kehadiran.</span>
+                      </td>
+                    </tr>
+                  ) : (
+                    broadcastRowsB.map((r) => {
+                      const jenjang = getJenjangFromKelas(r.siswa.kelas, r.siswa.grade);
+                      return (
+                        <tr key={r.siswa.id} className="hover:bg-slate-50">
+                          <td className="p-3 font-mono font-bold text-[#1E3A8A]">{r.siswa.id}</td>
+                          <td className="p-3 font-bold text-slate-800">{r.siswa.nama_siswa}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === 'SD' ? 'bg-sky-100 text-sky-700' : jenjang === 'SMP' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-purple-100 text-purple-800'}`}>
+                              {jenjang}
+                            </span>
+                            <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">{formatKelas(r.siswa.kelas)}</span>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1">
+                              {r.filled.map((kat) => (
+                                <span key={kat} className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                  {displayKategori(kat)}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-3 text-slate-700 space-y-0.5">
+                            <div className="text-[11px]"><span className="font-bold text-slate-500">Siswa:</span> {r.timekeeperSiswa}</div>
+                            <div className="text-[11px]"><span className="font-bold text-slate-500">Walmur:</span> {r.timekeeperWalmur}</div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pesan Broadcast (siap salin ke WhatsApp) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Kartu pesan per penguji */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-[#1E3A8A]" />
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                      Pesan Broadcast — Penguji ({broadcastPengujiGroups.length} orang)
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Salin lalu tempel (paste) ke WhatsApp masing-masing penguji.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCopyAllPenguji}
+                  disabled={broadcastPengujiGroups.length === 0}
+                  className="px-3 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                  title="Salin semua pesan penguji sekaligus"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin Semua</span>
+                </button>
+              </div>
+              <div className="p-4 space-y-4 max-h-[560px] overflow-y-auto">
+                {broadcastPengujiGroups.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
+                    Tidak ada pesan. Semua nilai sudah terinput.
+                  </div>
+                ) : (
+                  broadcastPengujiGroups.map((g) => {
+                    const msg = buildPesanPenguji(g.penguji, g.items);
+                    return (
+                      <div key={g.penguji} className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 bg-blue-50/70 border-b border-slate-200 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <strong className="text-xs text-slate-900 block truncate">{g.penguji}</strong>
+                            <span className="text-[10px] text-slate-500">{g.items.length} pos belum terinput</span>
+                          </div>
+                          <button
+                            onClick={() => handleCopyText(msg, `Pesan untuk ${g.penguji}`)}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Salin</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">{msg}</pre>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Kartu pesan per timekeeper */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-[#D97706]" />
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                      Pesan Broadcast — Timekeeper ({broadcastTimekeeperGroups.length} orang)
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Salin lalu tempel (paste) ke WhatsApp masing-masing timekeeper.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCopyAllTimekeeper}
+                  disabled={broadcastTimekeeperGroups.length === 0}
+                  className="px-3 py-1.5 bg-[#D97706] hover:bg-amber-600 disabled:opacity-40 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                  title="Salin semua pesan timekeeper sekaligus"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin Semua</span>
+                </button>
+              </div>
+              <div className="p-4 space-y-4 max-h-[560px] overflow-y-auto">
+                {broadcastTimekeeperGroups.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
+                    Tidak ada pesan. Tidak ada anomali kehadiran.
+                  </div>
+                ) : (
+                  broadcastTimekeeperGroups.map((g) => {
+                    const msg = buildPesanTimekeeper(g.timekeeper, g.items);
+                    return (
+                      <div key={g.timekeeper} className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 bg-amber-50/70 border-b border-slate-200 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <strong className="text-xs text-slate-900 block truncate">{g.timekeeper}</strong>
+                            <span className="text-[10px] text-slate-500">{g.items.length} siswa belum tercatat hadir</span>
+                          </div>
+                          <button
+                            onClick={() => handleCopyText(msg, `Pesan untuk ${g.timekeeper}`)}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Salin</span>
+                          </button>
+                        </div>
+                        <pre className="p-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">{msg}</pre>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
