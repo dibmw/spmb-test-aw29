@@ -251,9 +251,11 @@ export function buildPesanPenguji(
     )
     .join('\n');
   return [
+    `Bismillah`,
+    ``,
     `Assalamu'alaikum warahmatullahi wabarakatuh`,
     ``,
-    `Yth. Bapak/Ibu ${penguji},`,
+    `Yth. ${penguji},`,
     ``,
     `Mohon izin mengingatkan. Berikut ${items.length} pos penilaian yang BELUM terinput untuk siswa yang SUDAH presensi:`,
     ``,
@@ -279,9 +281,11 @@ export function buildPesanTimekeeper(
     })
     .join('\n');
   return [
+    `Bismillah`,
+    ``,
     `Assalamu'alaikum warahmatullahi wabarakatuh`,
     ``,
-    `Yth. Bapak/Ibu ${timekeeper},`,
+    `Yth. ${timekeeper},`,
     ``,
     `Mohon izin. Ditemukan ${items.length} catatan nilai yang presensi pasangannya BELUM tercatat:`,
     ``,
