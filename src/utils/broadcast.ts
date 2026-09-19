@@ -110,13 +110,26 @@ export function buildPresentIncompleteRows(
 }
 
 // ----------------------------------------------------------------------------
-// KELOMPOK B: belum presensi sama sekali tapi SUDAH ada nilai (>= 1 kategori)
+// KELOMPOK B: ada nilai yang presensi PASANGANNYA belum tercatat.
+// - Nilai ujian siswa (Al-Quran/Bhs Arab/Calistung/English) dipasangkan dengan presensi Siswa.
+// - Nilai Interview Walmur dipasangkan dengan presensi Walmur.
 // ----------------------------------------------------------------------------
+export type JenisAnomaliPresensi = 'Siswa' | 'Walmur';
+
 export interface GradedAbsentRow {
   siswa: SiswaJadwal;
   filled: KategoriUjian[];
+  /** Nilai ujian siswa yang sudah terisi padahal presensi Siswa belum tercatat. */
+  masalahSiswa: KategoriUjian[];
+  /** Nilai interview yang sudah terisi padahal presensi Walmur belum tercatat. */
+  masalahWalmur: KategoriUjian[];
   timekeeperSiswa: string;
   timekeeperWalmur: string;
+}
+
+/** True bila kategori termasuk ujian siswa (bukan wawancara orang tua). */
+export function isKategoriUjianSiswa(kategori: KategoriUjian): boolean {
+  return kategori !== 'Interview Walmur';
 }
 
 export function buildGradedButAbsentRows(
@@ -126,7 +139,9 @@ export function buildGradedButAbsentRows(
 ): GradedAbsentRow[] {
   return jadwalList
     .filter((s) => s.status === 'Aktif')
-    .map((s): GradedAbsentRow & { presensiSiswa: boolean; presensiWalmur: boolean } => {
+    .map((s): GradedAbsentRow => {
+      const presensiSiswa = hasPresensi(presensiList, s.id, 'Siswa');
+      const presensiWalmur = hasPresensi(presensiList, s.id, 'Walmur');
       const filled: KategoriUjian[] = [];
       nilaiList.forEach((n) => {
         if (normId(n.id_siswa) === normId(s.id) && !filled.includes(n.kategori_ujian)) {
@@ -136,15 +151,18 @@ export function buildGradedButAbsentRows(
       return {
         siswa: s,
         filled,
+        masalahSiswa: presensiSiswa
+          ? []
+          : filled.filter((kat) => isKategoriUjianSiswa(kat)),
+        masalahWalmur: presensiWalmur
+          ? []
+          : filled.filter((kat) => !isKategoriUjianSiswa(kat)),
         timekeeperSiswa: (s.timekeeper_siswa || '').trim() || '-',
         timekeeperWalmur: (s.timekeeper_walmur || '').trim() || '-',
-        presensiSiswa: hasPresensi(presensiList, s.id, 'Siswa'),
-        presensiWalmur: hasPresensi(presensiList, s.id, 'Walmur'),
       };
     })
-    .filter((r) => !r.presensiSiswa && !r.presensiWalmur && r.filled.length > 0)
-    .sort((a, b) => a.siswa.nama_siswa.localeCompare(b.siswa.nama_siswa))
-    .map(({ presensiSiswa: _ps, presensiWalmur: _pw, ...rest }) => rest);
+    .filter((r) => r.masalahSiswa.length > 0 || r.masalahWalmur.length > 0)
+    .sort((a, b) => a.siswa.nama_siswa.localeCompare(b.siswa.nama_siswa));
 }
 
 // ----------------------------------------------------------------------------
@@ -180,6 +198,9 @@ export function groupBroadcastByPenguji(rows: PresentIncompleteRow[]): PengujiBr
 
 export interface TimekeeperBroadcastItem {
   siswa: SiswaJadwal;
+  /** Jenis presensi pasangan yang belum tercatat. */
+  jenis: JenisAnomaliPresensi;
+  /** Nilai pada jenis tsb yang sudah terisi. */
   filled: KategoriUjian[];
 }
 
@@ -188,15 +209,25 @@ export interface TimekeeperBroadcast {
   items: TimekeeperBroadcastItem[];
 }
 
-/** Kelompokkan Kelompok B per timekeeper (siswa & walmur; didedupe bila satu orang menangani keduanya). */
+/**
+ * Kelompokkan Kelompok B per timekeeper sesuai jenis masalahnya:
+ * masalah Siswa -> timekeeper_siswa, masalah Walmur -> timekeeper_walmur.
+ * Satu siswa bisa tampil di dua timekeeper berbeda bila dua-duanya bermasalah.
+ */
 export function groupBroadcastByTimekeeper(rows: GradedAbsentRow[]): TimekeeperBroadcast[] {
   const map = new Map<string, TimekeeperBroadcast>();
+  const push = (key: string, item: TimekeeperBroadcastItem) => {
+    const k = (key || '').trim() || '-';
+    if (!map.has(k)) map.set(k, { timekeeper: k, items: [] });
+    map.get(k)!.items.push(item);
+  };
   rows.forEach((r) => {
-    const uniqueTks = [...new Set([r.timekeeperSiswa, r.timekeeperWalmur])];
-    uniqueTks.forEach((key) => {
-      if (!map.has(key)) map.set(key, { timekeeper: key, items: [] });
-      map.get(key)!.items.push({ siswa: r.siswa, filled: r.filled });
-    });
+    if (r.masalahSiswa.length > 0) {
+      push(r.timekeeperSiswa, { siswa: r.siswa, jenis: 'Siswa', filled: r.masalahSiswa });
+    }
+    if (r.masalahWalmur.length > 0) {
+      push(r.timekeeperWalmur, { siswa: r.siswa, jenis: 'Walmur', filled: r.masalahWalmur });
+    }
   });
   return [...map.values()]
     .map((g) => ({
@@ -240,19 +271,19 @@ export function buildPesanTimekeeper(
   items: TimekeeperBroadcastItem[]
 ): string {
   const list = items
-    .map(
-      (it, i) =>
-        `${i + 1}. ${it.siswa.nama_siswa} (${it.siswa.id}) — Nilai terisi: ${it.filled
-          .map(displayKategori)
-          .join(', ')}`
-    )
+    .map((it, i) => {
+      const katStr = it.filled.map(displayKategori).join(', ');
+      return it.jenis === 'Walmur'
+        ? `${i + 1}. ${it.siswa.nama_siswa} (${it.siswa.id}) — Nilai ${katStr} sudah ada, presensi Walmur belum tercatat`
+        : `${i + 1}. ${it.siswa.nama_siswa} (${it.siswa.id}) — Nilai ujian siswa sudah ada (${katStr}), presensi Siswa belum tercatat`;
+    })
     .join('\n');
   return [
     `Assalamu'alaikum warahmatullahi wabarakatuh`,
     ``,
     `Yth. Bapak/Ibu ${timekeeper},`,
     ``,
-    `Mohon izin. Ditemukan ${items.length} siswa yang SUDAH ADA NILAI namun BELUM tercatat presensi (Siswa & Orang Tua):`,
+    `Mohon izin. Ditemukan ${items.length} catatan nilai yang presensi pasangannya BELUM tercatat:`,
     ``,
     list,
     ``,

@@ -1134,7 +1134,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kelompok B — Ada Nilai, Belum Presensi</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kelompok B — Nilai Ada, Presensi Pasangan Belum</span>
                 <Clock className="w-4 h-4 text-amber-500" />
               </div>
               <span className="text-2xl font-extrabold text-amber-700 font-mono">{broadcastRowsB.length}</span>
@@ -1240,10 +1240,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="p-4 bg-amber-50 border-b border-amber-200 flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-extrabold text-amber-900 text-xs uppercase tracking-wider">
-                  Kelompok B — Ada Nilai, Belum Presensi
+                  Kelompok B — Ada Nilai, Presensi Pasangannya Belum
                 </h3>
                 <p className="text-[11px] text-amber-800 mt-0.5">
-                  Siswa belum tercatat hadir sama sekali tapi sudah ada nilai • tindak lanjut ke timekeeper.
+                  Nilai ujian siswa harus dipasangkan presensi Siswa; nilai interview harus dipasangkan presensi Walmur • tindak lanjut ke timekeeper.
                 </p>
               </div>
               <span className="text-xs text-amber-800 font-mono font-bold shrink-0">{broadcastRowsB.length} siswa</span>
@@ -1256,16 +1256,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="p-3">Nama Siswa</th>
                     <th className="p-3">Jenjang & Kelas</th>
                     <th className="p-3">Nilai Terisi</th>
+                    <th className="p-3">Jenis Anomali</th>
                     <th className="p-3">Timekeeper Penanggung Jawab</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {broadcastRowsB.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-6 text-center text-slate-400">
+                      <td colSpan={6} className="p-6 text-center text-slate-400">
                         <CheckCircle2 className="w-5 h-5 mx-auto mb-1.5 text-emerald-500" />
                         <span className="block text-xs font-bold text-slate-600">Tidak ada anomali.</span>
-                        <span className="block text-[11px] mt-0.5">Semua nilai yang terisi didukung catatan kehadiran.</span>
+                        <span className="block text-[11px] mt-0.5">Semua nilai yang terisi didukung catatan kehadiran pasangannya.</span>
                       </td>
                     </tr>
                   ) : (
@@ -1288,6 +1289,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   {displayKategori(kat)}
                                 </span>
                               ))}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              {r.masalahSiswa.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 font-bold text-[10px]">
+                                    Presensi Siswa belum
+                                  </span>
+                                  <span className="text-[10px] text-slate-600">• {r.masalahSiswa.map(displayKategori).join(', ')}</span>
+                                </div>
+                              )}
+                              {r.masalahWalmur.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-lg bg-orange-100 text-orange-800 font-bold text-[10px]">
+                                    Presensi Walmur belum
+                                  </span>
+                                  <span className="text-[10px] text-slate-600">• {r.masalahWalmur.map(displayKategori).join(', ')}</span>
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="p-3 text-slate-700 space-y-0.5">
@@ -1393,7 +1414,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="px-3 py-2 bg-amber-50/70 border-b border-slate-200 flex items-center justify-between gap-2">
                           <div className="min-w-0">
                             <strong className="text-xs text-slate-900 block truncate">{g.timekeeper}</strong>
-                            <span className="text-[10px] text-slate-500">{g.items.length} siswa belum tercatat hadir</span>
+                            <span className="text-[10px] text-slate-500">{g.items.length} catatan perlu dicek</span>
                           </div>
                           <button
                             onClick={() => handleCopyText(msg, `Pesan untuk ${g.timekeeper}`)}
