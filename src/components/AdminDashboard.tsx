@@ -810,67 +810,121 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
-
-      {/* TAB 3: PRESENSI TABLE */}
+      {/* TAB 3: PRESENSI & NILAI PER SISWA TABLE */}
       {activeSubTab === 'presensi' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-              Rekapitulasi Sheet web_presensi
-            </h3>
-            <span className="text-xs text-slate-500 font-mono">
-              Total Entri: {presensiList.length}
-            </span>
+        <div className="space-y-4">
+          {/* Ringkasan cepat */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Siswa</span>
+                <Users className="w-4 h-4 text-rose-500" />
+              </div>
+              <span className="text-2xl font-extrabold text-rose-700 font-mono">
+                {activeJadwalList.filter((s) => !presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa')).length}
+              </span>
+              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Walmur</span>
+                <Users className="w-4 h-4 text-amber-500" />
+              </div>
+              <span className="text-2xl font-extrabold text-amber-700 font-mono">
+                {activeJadwalList.filter((s) => !presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur')).length}
+              </span>
+              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa Aktif</span>
+                <Users className="w-4 h-4 text-[#1E3A8A]" />
+              </div>
+              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">{activeJadwalList.length}</span>
+              <p className="text-[10px] text-slate-400">siswa terdaftar aktif</p>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#1E3A8A] text-white uppercase text-[10px]">
-                <tr>
-                  <th className="p-3">Waktu Presensi</th>
-                  <th className="p-3">ID Siswa</th>
-                  <th className="p-3">Nama Siswa</th>
-                  <th className="p-3">Tipe</th>
-                  <th className="p-3">Petugas Timekeeper</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {presensiList.map((p) => (
-                  <tr key={p.id || p.timestamp} className="hover:bg-slate-50">
-                    <td className="p-3 font-mono text-slate-500">{p.timestamp}</td>
-                    <td className="p-3 font-mono font-bold text-[#1E3A8A]">{p.id_siswa}</td>
-                    <td className="p-3 font-bold text-slate-800">{p.nama_siswa}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        p.tipe_presensi === 'Siswa' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-amber-100 text-amber-900'
-                      }`}>
-                        {p.tipe_presensi}
-                      </span>
-                    </td>
-                    <td className="p-3 text-slate-600">{p.petugas_timekeeper}</td>
-                    <td className="p-3">
-                      <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{p.status}</span>
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      {p.id && (
-                        <button
-                          onClick={() => handleDeletePresensi(p.id!)}
-                          className="p-1 text-rose-600 hover:bg-rose-50 rounded"
-                          title="Hapus Entri Presensi"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                Rekap Presensi & Nilai per Siswa
+              </h3>
+              <span className="text-xs text-slate-500 font-mono">Total: {activeJadwalList.length}</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#1E3A8A] text-white uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">ID</th>
+                    <th className="p-3">Nama Siswa</th>
+                    <th className="p-3">Jenjang & Kelas</th>
+                    <th className="p-3">Presensi Siswa</th>
+                    <th className="p-3">Presensi Walmur</th>
+                    <th className="p-3">Al-Qur'an / Arab</th>
+                    <th className="p-3">Calistung / English</th>
+                    <th className="p-3">Interview Walmur</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {activeJadwalList.map((s) => {
+                    const jenjang = getJenjangFromKelas(s.kelas, s.grade);
+                    const hadirSiswa = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa');
+                    const hadirWalmur = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur');
+                    const alqCat: KategoriUjian = jenjang === 'SD' ? 'Al-Quran SD' : 'Al-Quran SMP/SMA';
+                    const calCat: KategoriUjian = jenjang === 'SD' ? 'Calistung' : 'English';
+                    const ivCat: KategoriUjian = 'Interview Walmur';
+                    const alqNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === alqCat);
+                    const calNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === calCat);
+                    const ivNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === ivCat);
+                    const renderNilai = (rec?: NilaiRecord) => rec ? (
+                      <div className="space-y-0.5">
+                        <span className="block font-mono font-bold text-emerald-700">{rec.skor_akhir_rata2.toFixed(2)}</span>
+                        <span className="block text-[10px] text-slate-500 max-w-[140px] truncate">{rec.nama_penguji}</span>
+                      </div>
+                    ) : <span className="text-[10px] text-slate-400 italic">Belum Dinilai</span>;
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-mono font-bold text-[#1E3A8A]">{s.id}</td>
+                        <td className="p-3 font-bold text-slate-800">{s.nama_siswa}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === 'SD' ? 'bg-sky-100 text-sky-700' : jenjang === 'SMP' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-purple-100 text-purple-800'}`}>
+                            {jenjang}
+                          </span>
+                          <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">{formatKelas(s.kelas)}</span>
+                        </td>
+                        <td className="p-3">
+                          {hadirSiswa ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Hadir
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                              <Clock className="w-3 h-3" /> Belum
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {hadirWalmur ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Hadir
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                              <Clock className="w-3 h-3" /> Belum
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">{renderNilai(alqNilai)}</td>
+                        <td className="p-3">{renderNilai(calNilai)}</td>
+                        <td className="p-3">{renderNilai(ivNilai)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
