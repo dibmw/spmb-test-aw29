@@ -52,6 +52,14 @@ export default function App() {
     const existingSession = apiService.getCurrentSession();
     if (existingSession) {
       setSession(existingSession);
+      // Route back to the appropriate dashboard after a page refresh
+      if (existingSession.activeRole === 'ADMIN') {
+        setCurrentTab('admin');
+      } else if (existingSession.activeRole === 'TIMEKEEPER') {
+        setCurrentTab('timekeeper');
+      } else if (existingSession.activeRole === 'PENGUJI') {
+        setCurrentTab('penguji');
+      }
     }
 
     // Background sync with live Google Apps Script if available

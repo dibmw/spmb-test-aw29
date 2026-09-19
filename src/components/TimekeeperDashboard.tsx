@@ -43,6 +43,20 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
 
+  // Live presensi auto-refresh (sync from localStorage periodically)
+  const [livePresensi, setLivePresensi] = useState<PresensiRecord[]>(presensiList);
+
+  useEffect(() => {
+    setLivePresensi(presensiList);
+  }, [presensiList]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLivePresensi(apiService.getPresensiList());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const scannerElementId = 'timekeeper-reader';
 
@@ -242,8 +256,8 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
       .sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
   }, [jadwalList, tkName, isAdmin]);
 
-  const isStudentPresent = (id: string) =>
-    presensiList.some(p => p.id_siswa.toUpperCase() === id.toUpperCase() && p.tipe_presensi === 'Siswa');
+  const isPresent = (id: string, type: 'Siswa' | 'Walmur') =>
+    livePresensi.some(p => p.id_siswa.toUpperCase() === id.toUpperCase() && p.tipe_presensi === type);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -540,7 +554,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                 </tr>
               ) : (
                 scheduleList.map((s) => {
-                  const present = isStudentPresent(s.id);
+                  const present = isPresent(s.id, attendanceType);
                   return (
                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all}</td>
