@@ -240,6 +240,7 @@ export function groupBroadcastByTimekeeper(rows: GradedAbsentRow[]): TimekeeperB
 // ----------------------------------------------------------------------------
 // Template pesan WhatsApp (teks siap salin)
 // ----------------------------------------------------------------------------
+const APP_LINK = 'https://spmb-test-aw29.vercel.app/';
 export function buildPesanPenguji(
   penguji: string,
   items: PengujiBroadcastItem[]
@@ -261,7 +262,8 @@ export function buildPesanPenguji(
     ``,
     list,
     ``,
-    `Mohon segera melengkapi nilai pada aplikasi Tes SPMB.`,
+    `Mohon segera melengkapi nilai pada aplikasi Tes SPMB:`,
+    APP_LINK,
     ``,
     `Jazakumullah khairan.`,
     `Panitia SPMB Al-Wildan 29`,
@@ -291,7 +293,8 @@ export function buildPesanTimekeeper(
     ``,
     list,
     ``,
-    `Mohon cek & pastikan kehadiran mereka tercatat pada aplikasi Tes SPMB.`,
+    `Mohon cek & pastikan kehadiran mereka tercatat pada aplikasi Tes SPMB:`,
+    APP_LINK,
     ``,
     `Jazakumullah khairan.`,
     `Panitia SPMB Al-Wildan 29`,
