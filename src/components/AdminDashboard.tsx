@@ -36,6 +36,7 @@ import {
   buildPesanPenguji,
   buildPesanTimekeeper,
   displayKategori,
+  hasPresensi,
 } from '../utils/broadcast';
 import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
 import { RubrikModal } from './RubrikModal';
@@ -286,9 +287,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const wsNilai = XLSX.utils.json_to_sheet(flatNilai);
       XLSX.utils.book_append_sheet(wb, wsNilai, 'web_nilai');
 
+      // Sheet 4: Siswa Tidak Hadir (jadwal Aktif tapi belum ada presensi Siswa)
+      const tidakHadir = jadwalList
+        .filter((s) => s.status === 'Aktif')
+        .filter((s) => !hasPresensi(presensiList, s.id, 'Siswa'))
+        .map((s) => ({ id: s.id, nama: s.nama_siswa, kelas: s.kelas }))
+        .sort((a, b) => a.nama.localeCompare(b.nama));
+      const wsTidakHadir = XLSX.utils.json_to_sheet(tidakHadir, { header: ['id', 'nama', 'kelas'] });
+      XLSX.utils.book_append_sheet(wb, wsTidakHadir, 'web_tidak_hadir');
+
       // Download
       XLSX.writeFile(wb, `REKAP_SPMB_ALWILDAN29_${Date.now()}.xlsx`);
-      showToast('Ekspor Berhasil', 'File Excel (.xlsx) lengkap berhasil diunduh.', 'success');
+      showToast('Ekspor Berhasil', `File Excel (.xlsx) lengkap berhasil diunduh (${tidakHadir.length} siswa tidak hadir).`, 'success');
     } catch (err: any) {
       showToast('Ekspor Gagal', err.message || 'Gagal membuat file excel.', 'error');
     }
@@ -1458,7 +1468,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Format Rekapitulasi Terpadu Al-Wildan 29</span>
             </div>
             <p className="leading-relaxed">
-              File Excel yang diunduh mencakup 3 worksheet terpisah: <strong>web_jadwal</strong>, <strong>web_presensi</strong>, dan <strong>web_nilai</strong> (termasuk rincian skor JSON per pos ujian).
+              File Excel yang diunduh mencakup 4 worksheet terpisah: <strong>web_jadwal</strong>, <strong>web_presensi</strong>, <strong>web_nilai</strong> (termasuk rincian skor JSON per pos ujian), dan <strong>web_tidak_hadir</strong> (ID, Nama, Kelas siswa jadwal Aktif yang belum presensi Siswa).
             </p>
           </div>
 
