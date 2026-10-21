@@ -7,9 +7,9 @@ export interface SiswaJadwal {
   gender: 'L' | 'P';
   grade: 'SD' | 'SMP' | 'SMA';
   ruangan_siswa: string;
-  ord_alq_arab: string; // e.g. "Pos 1 (08.00 - 08.45)"
-  ord_catung_eng: string; // e.g. "Pos 2 (08.45 - 09.30)"
-  waktu_all: string; // e.g. "07.30 - 11.30 WIB"
+  ord_alq_arab: string; // e.g. "1"
+  ord_catung_eng: string; // e.g. "2"
+  waktu_all: string; // e.g. "07:30 - 11:30"
   waktu_alq_arab: string;
   waktu_catung_eng: string;
   ruangan_walmur: string;
@@ -253,7 +253,7 @@ export function formatTanggalUjian(value: string): string {
 }
 
 /**
- * Ambil jam mulai dan selesai dari teks rentang waktu, contoh "08.00 - 08.45 WIB".
+ * Ambil jam mulai dan selesai dari teks rentang waktu, contoh "08:00 - 08:45".
  */
 export function parseTimeRange(value: string): { start: number; end: number } | null {
   const matches = String(value || '').match(/(\d{1,2})[.:](\d{2})/g);
@@ -272,7 +272,7 @@ export function parseTimeRange(value: string): { start: number; end: number } | 
 function formatMinutes(total: number): string {
   const hour = Math.floor(total / 60);
   const minute = total % 60;
-  return `${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}`;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
 /**
@@ -292,7 +292,7 @@ export function summarizeWaktuAll(
   const start = Math.min(...ranges.map((range) => range.start));
   const end = Math.max(...ranges.map((range) => range.end));
 
-  return `${formatMinutes(start)} - ${formatMinutes(end)} WIB`;
+  return `${formatMinutes(start)} - ${formatMinutes(end)}`;
 }
 
 /**

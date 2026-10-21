@@ -40,6 +40,7 @@ import {
   formatKelas,
   getJenjangFromKelas,
   parseStartTimeMinutes,
+  parseTimeRange,
   summarizeWaktuAll,
   toISODate,
   formatTanggalUjian,
@@ -71,6 +72,69 @@ interface AdminDashboardProps {
   onDataChanged: () => void;
   showToast: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
 }
+
+type TimeField = 'waktu_alq_arab' | 'waktu_catung_eng' | 'waktu_interview';
+type TimeInputPair = { start: string; end: string };
+type StudentTimeInputs = Record<TimeField, TimeInputPair>;
+type StudentFormDraft = Omit<SiswaJadwal, 'gender'> & { gender: 'L' | 'P' | '' };
+
+const TIME_FIELDS: TimeField[] = ['waktu_alq_arab', 'waktu_catung_eng', 'waktu_interview'];
+
+const EMPTY_STUDENT_FORM: StudentFormDraft = {
+  id: '',
+  nama_siswa: '',
+  kelas: '',
+  gender: '',
+  grade: 'SD',
+  ruangan_siswa: '',
+  ord_alq_arab: '',
+  ord_catung_eng: '',
+  waktu_all: '',
+  waktu_alq_arab: '',
+  waktu_catung_eng: '',
+  ruangan_walmur: '',
+  penguji_alq_arab: '',
+  penguji_catung_eng: '',
+  timekeeper_siswa: '',
+  interview_walmur: '',
+  timekeeper_walmur: '',
+  waktu_interview: '',
+  hari_tanggal: '',
+  status: 'Aktif',
+  status_kehadiran_siswa: '',
+  status_kehadiran_walmur: ''
+};
+
+const createEmptyTimeInputs = (): StudentTimeInputs => ({
+  waktu_alq_arab: { start: '', end: '' },
+  waktu_catung_eng: { start: '', end: '' },
+  waktu_interview: { start: '', end: '' }
+});
+
+const minutesToTimeValue = (total: number): string => {
+  const hour = Math.floor(total / 60) % 24;
+  const minute = total % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
+const timeRangeToInputs = (value: string): TimeInputPair => {
+  const range = parseTimeRange(value);
+  if (!range) return { start: '', end: '' };
+  return {
+    start: minutesToTimeValue(range.start),
+    end: minutesToTimeValue(range.end)
+  };
+};
+
+const composeTimeRange = (pair: TimeInputPair): string => {
+  if (!pair.start || !pair.end) return '';
+  return `${pair.start} - ${pair.end}`;
+};
+
+const timeValueToMinutes = (value: string): number => {
+  const [hour, minute] = value.split(':').map(Number);
+  return hour * 60 + minute;
+};
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   session,
@@ -106,29 +170,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Student CRUD Modal State
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [studentFormData, setStudentFormData] = useState<SiswaJadwal>({
-    id: '',
-    nama_siswa: '',
-    kelas: 'SD 1',
-    gender: 'L',
-    grade: 'SD',
-    ruangan_siswa: 'R. 101',
-    ord_alq_arab: 'Pos 1 (08.00 - 08.45)',
-    ord_catung_eng: 'Pos 2 (08.45 - 09.30)',
-    waktu_all: '08.00 - 10.30 WIB',
-    waktu_alq_arab: '08.00 - 08.45 WIB',
-    waktu_catung_eng: '08.45 - 09.30 WIB',
-    ruangan_walmur: 'R. Audiovisual 1',
-    penguji_alq_arab: 'Ustadz Ihsan Al-Hafidz',
-    penguji_catung_eng: 'Ustadzah Siti Maryam, S.Pd.',
-    timekeeper_siswa: 'Ustadz Bambang Hermanto',
-    interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
-    timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-    waktu_interview: '09.30 - 10.15 WIB',
-    hari_tanggal: '2026-09-20',
-    status: 'Aktif',
-    status_kehadiran_siswa: '',
-    status_kehadiran_walmur: ''
+  const [studentFormData, setStudentFormData] = useState<StudentFormDraft>({ ...EMPTY_STUDENT_FORM });
+  const [studentTimeInputs, setStudentTimeInputs] = useState<StudentTimeInputs>(createEmptyTimeInputs);
+
+  const [isSessionDateModalOpen, setIsSessionDateModalOpen] = useState(false);
+  const [sessionDateForm, setSessionDateForm] = useState<{ date: string; mode: ModeUjian }>({
+    date: '',
+    mode: 'Offline'
   });
 
   const pengujiList = apiService.getPengujiList();
@@ -180,6 +228,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } else {
       showToast('Gagal', res.message, 'error');
     }
+  };
+
+  const openSessionDateModal = () => {
+    setSessionDateForm({ date: '', mode: 'Offline' });
+    setIsSessionDateModalOpen(true);
+  };
+
+  const handleSessionDateChange = (value: string) => {
+    const iso = toISODate(value);
+    const existing = iso
+      ? sesiUjianList.find((item) => toISODate(item.hari_tanggal) === iso)
+      : undefined;
+    setSessionDateForm({
+      date: value,
+      mode: existing?.mode_ujian === 'Online' ? 'Online' : 'Offline'
+    });
+  };
+
+  const handleSaveSessionDate = (e: React.FormEvent) => {
+    e.preventDefault();
+    const iso = toISODate(sessionDateForm.date);
+    if (!iso) {
+      showToast('Tanggal Belum Diisi', 'Pilih tanggal ujian terlebih dahulu.', 'error');
+      return;
+    }
+
+    const existing = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === iso);
+    const res = apiService.saveSesiUjian({
+      id_sesi: existing?.id_sesi || '',
+      hari_tanggal: iso,
+      mode_ujian: sessionDateForm.mode,
+      catatan: existing?.catatan || '',
+      updated_at: ''
+    });
+
+    if (res.success) {
+      showToast(
+        existing ? 'Mode Tanggal Diperbarui' : 'Tanggal Ditambahkan',
+        `Tanggal ${formatTanggalUjian(iso)} diatur ke mode ${sessionDateForm.mode}.`,
+        'success'
+      );
+      setIsSessionDateModalOpen(false);
+      onDataChanged();
+    } else {
+      showToast('Gagal', res.message, 'error');
+    }
+  };
+
+  const handleDeleteSessionDate = (row: { date: string; id_sesi: string }) => {
+    if (!row.id_sesi) return;
+    setConfirmDialog({
+      title: 'Hapus Tanggal Ujian?',
+      message: `Tanggal ${formatTanggalUjian(row.date)} belum memiliki siswa. Hapus tanggal ini dari daftar?`,
+      confirmLabel: 'Hapus',
+      variant: 'danger',
+      onConfirm: () => {
+        const res = apiService.deleteSesiUjian(row.id_sesi);
+        if (res.success) {
+          showToast('Tanggal Dihapus', res.message, 'info');
+          onDataChanged();
+        } else {
+          showToast('Gagal', res.message, 'error');
+        }
+      }
+    });
   };
 
   // Admin Grade Edit Modal
@@ -241,12 +354,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Handle Save Student (Add or Edit)
   const handleSaveStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentFormData.id.trim() || !studentFormData.nama_siswa.trim()) {
-      showToast('Form Tidak Lengkap', 'ID dan Nama Siswa wajib diisi!', 'error');
+    const gender = studentFormData.gender;
+
+    if (
+      !studentFormData.id.trim() ||
+      !studentFormData.nama_siswa.trim() ||
+      !studentFormData.kelas.trim() ||
+      !gender ||
+      !toISODate(studentFormData.hari_tanggal)
+    ) {
+      showToast('Form Tidak Lengkap', 'ID, nama, kelas, jenis kelamin, dan tanggal ujian wajib diisi!', 'error');
       return;
     }
 
-    const res = apiService.saveJadwal(studentFormData, isEditMode);
+    const incompleteTime = TIME_FIELDS.find((field) => {
+      const pair = studentTimeInputs[field];
+      return Boolean(pair.start) !== Boolean(pair.end);
+    });
+    if (incompleteTime) {
+      showToast('Waktu Belum Lengkap', 'Isi jam mulai dan jam selesai untuk setiap waktu ujian.', 'error');
+      return;
+    }
+
+    const invalidTime = TIME_FIELDS.find((field) => {
+      const pair = studentTimeInputs[field];
+      return pair.start && pair.end && timeValueToMinutes(pair.end) <= timeValueToMinutes(pair.start);
+    });
+    if (invalidTime) {
+      showToast('Waktu Tidak Valid', 'Jam selesai harus lebih besar dari jam mulai.', 'error');
+      return;
+    }
+
+    const payload: SiswaJadwal = {
+      ...studentFormData,
+      gender,
+      waktu_all: summarizeWaktuAll(
+        studentFormData.waktu_alq_arab,
+        studentFormData.waktu_catung_eng,
+        studentFormData.waktu_interview
+      )
+    };
+
+    const res = apiService.saveJadwal(payload, isEditMode);
     if (res.success) {
       showToast('Berhasil', res.message, 'success');
       setIsStudentModalOpen(false);
@@ -298,17 +447,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  const handleTimeChange = (
-    field: 'waktu_alq_arab' | 'waktu_catung_eng' | 'waktu_interview',
+  const handleTimeInputChange = (
+    field: TimeField,
+    edge: 'start' | 'end',
     value: string
   ) => {
-    setStudentFormData((prev) => {
-      const next = { ...prev, [field]: value };
-      return {
-        ...next,
-        waktu_all: summarizeWaktuAll(next.waktu_alq_arab, next.waktu_catung_eng, next.waktu_interview)
-      };
-    });
+    const nextInputs: StudentTimeInputs = {
+      ...studentTimeInputs,
+      [field]: { ...studentTimeInputs[field], [edge]: value }
+    };
+    setStudentTimeInputs(nextInputs);
+
+    const waktuAlqArab = composeTimeRange(nextInputs.waktu_alq_arab);
+    const waktuCatungEng = composeTimeRange(nextInputs.waktu_catung_eng);
+    const waktuInterview = composeTimeRange(nextInputs.waktu_interview);
+
+    setStudentFormData((prev) => ({
+      ...prev,
+      waktu_alq_arab: waktuAlqArab,
+      waktu_catung_eng: waktuCatungEng,
+      waktu_interview: waktuInterview,
+      waktu_all: summarizeWaktuAll(waktuAlqArab, waktuCatungEng, waktuInterview)
+    }));
   };
 
   const handleChangeKehadiran = (
@@ -333,39 +493,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const openAddStudentModal = () => {
-    const nextNum = (jadwalList.length + 1).toString().padStart(3, '0');
-    setStudentFormData({
-      id: `SPMB-29-${nextNum}`,
-      nama_siswa: '',
-      kelas: 'SD 1',
-      gender: 'L',
-      grade: 'SD',
-      ruangan_siswa: 'R. 101',
-      ord_alq_arab: 'Pos 1 (08.00 - 08.45)',
-      ord_catung_eng: 'Pos 2 (08.45 - 09.30)',
-      waktu_all: '08.00 - 10.30 WIB',
-      waktu_alq_arab: '08.00 - 08.45 WIB',
-      waktu_catung_eng: '08.45 - 09.30 WIB',
-      ruangan_walmur: 'R. Audiovisual 1',
-      penguji_alq_arab: 'Ustadz Ihsan Al-Hafidz',
-      penguji_catung_eng: 'Ustadzah Siti Maryam, S.Pd.',
-      timekeeper_siswa: 'Ustadz Bambang Hermanto',
-      interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
-      timekeeper_walmur: 'Ustadzah Fatimah Zahra',
-      waktu_interview: '09.30 - 10.15 WIB',
-      hari_tanggal: '2026-09-20',
-      status: 'Aktif',
-      status_kehadiran_siswa: '',
-      status_kehadiran_walmur: ''
-    });
+    setStudentFormData({ ...EMPTY_STUDENT_FORM });
+    setStudentTimeInputs(createEmptyTimeInputs());
     setIsEditMode(false);
     setIsStudentModalOpen(true);
   };
 
   const openEditStudentModal = (siswa: SiswaJadwal) => {
+    const nextTimeInputs: StudentTimeInputs = {
+      waktu_alq_arab: timeRangeToInputs(siswa.waktu_alq_arab),
+      waktu_catung_eng: timeRangeToInputs(siswa.waktu_catung_eng),
+      waktu_interview: timeRangeToInputs(siswa.waktu_interview)
+    };
+    const waktuAlqArab = composeTimeRange(nextTimeInputs.waktu_alq_arab);
+    const waktuCatungEng = composeTimeRange(nextTimeInputs.waktu_catung_eng);
+    const waktuInterview = composeTimeRange(nextTimeInputs.waktu_interview);
+
+    setStudentTimeInputs(nextTimeInputs);
     setStudentFormData({
       ...siswa,
-      hari_tanggal: toISODate(siswa.hari_tanggal) || siswa.hari_tanggal
+      hari_tanggal: toISODate(siswa.hari_tanggal) || siswa.hari_tanggal,
+      waktu_alq_arab: waktuAlqArab,
+      waktu_catung_eng: waktuCatungEng,
+      waktu_interview: waktuInterview,
+      waktu_all: summarizeWaktuAll(waktuAlqArab, waktuCatungEng, waktuInterview)
     });
     setIsEditMode(true);
     setIsStudentModalOpen(true);
@@ -937,12 +1088,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="space-y-4">
           {/* Mode Ujian per Tanggal */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mode Ujian per Tanggal</h3>
-                <p className="text-[11px] text-slate-500">Satu tanggal/sesi berlaku untuk semua peserta di tanggal tersebut.</p>
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mode Ujian per Tanggal</h3>
+                  <p className="text-[11px] text-slate-500">Satu tanggal/sesi berlaku untuk semua peserta di tanggal tersebut.</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={openSessionDateModal}
+                className="px-3 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white text-[11px] font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Tambah Tanggal
+              </button>
             </div>
             <div className="p-4">
               {sessionDateRows.length === 0 ? (
@@ -962,19 +1123,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="text-[10px] text-slate-500">{row.count} siswa</span>
                         </div>
                       </div>
-                      <select
-                        value={row.mode}
-                        onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
-                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
-                          row.mode === 'Online'
-                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                            : 'bg-slate-200 text-slate-700 border-slate-300'
-                        }`}
-                        title="Ubah mode ujian sesi ini"
-                      >
-                        <option value="Offline">Offline</option>
-                        <option value="Online">Online</option>
-                      </select>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {row.count === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSessionDate(row)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Hapus tanggal"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <select
+                          value={row.mode}
+                          onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
+                            row.mode === 'Online'
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                              : 'bg-slate-200 text-slate-700 border-slate-300'
+                          }`}
+                          title="Ubah mode ujian sesi ini"
+                        >
+                          <option value="Offline">Offline</option>
+                          <option value="Online">Online</option>
+                        </select>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2044,6 +2217,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     disabled={isEditMode}
                     onChange={(e) => setStudentFormData({ ...studentFormData, id: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:bg-white focus:outline-none"
+                    placeholder="Contoh: 27282901001"
                     required
                   />
                 </div>
@@ -2071,7 +2245,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       setStudentFormData({ ...studentFormData, kelas: k, grade: g });
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                    required
                   >
+                    <option value="">-- Pilih Kelas --</option>
                     <option value="SD 1">SD - Kelas 1</option>
                     <option value="SD 2">SD - Kelas 2</option>
                     <option value="SMP 7">SMP - Kelas 7</option>
@@ -2085,9 +2261,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <label className="font-bold text-slate-800 block mb-1">Jenis Kelamin</label>
                   <select
                     value={studentFormData.gender}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, gender: e.target.value as 'L' | 'P' })}
+                    onChange={(e) => setStudentFormData({ ...studentFormData, gender: e.target.value as 'L' | 'P' | '' })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                    required
                   >
+                    <option value="">-- Pilih Jenis Kelamin --</option>
                     <option value="L">Laki-laki</option>
                     <option value="P">Perempuan</option>
                   </select>
@@ -2186,35 +2364,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Qur'an / Arab</label>
-                  <input
-                    type="text"
-                    value={studentFormData.waktu_alq_arab}
-                    onChange={(e) => handleTimeChange('waktu_alq_arab', e.target.value)}
-                    placeholder="Contoh: 08.00 - 08.45 WIB"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      step={300}
+                      value={studentTimeInputs.waktu_alq_arab.start}
+                      onChange={(e) => handleTimeInputChange('waktu_alq_arab', 'start', e.target.value)}
+                      className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                      aria-label="Jam mulai ujian Qur'an / Arab"
+                    />
+                    <span className="text-slate-400 font-bold">-</span>
+                    <input
+                      type="time"
+                      step={300}
+                      value={studentTimeInputs.waktu_alq_arab.end}
+                      onChange={(e) => handleTimeInputChange('waktu_alq_arab', 'end', e.target.value)}
+                      className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                      aria-label="Jam selesai ujian Qur'an / Arab"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Catung / English</label>
-                  <input
-                    type="text"
-                    value={studentFormData.waktu_catung_eng}
-                    onChange={(e) => handleTimeChange('waktu_catung_eng', e.target.value)}
-                    placeholder="Contoh: 08.45 - 09.30 WIB"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      step={300}
+                      value={studentTimeInputs.waktu_catung_eng.start}
+                      onChange={(e) => handleTimeInputChange('waktu_catung_eng', 'start', e.target.value)}
+                      className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                      aria-label="Jam mulai ujian Catung / English"
+                    />
+                    <span className="text-slate-400 font-bold">-</span>
+                    <input
+                      type="time"
+                      step={300}
+                      value={studentTimeInputs.waktu_catung_eng.end}
+                      onChange={(e) => handleTimeInputChange('waktu_catung_eng', 'end', e.target.value)}
+                      className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                      aria-label="Jam selesai ujian Catung / English"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Waktu Wawancara Orang Tua</label>
-                  <input
-                    type="text"
-                    value={studentFormData.waktu_interview}
-                    onChange={(e) => handleTimeChange('waktu_interview', e.target.value)}
-                    placeholder="Contoh: 09.30 - 10.15 WIB"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      step={300}
+                      value={studentTimeInputs.waktu_interview.start}
+                      onChange={(e) => handleTimeInputChange('waktu_interview', 'start', e.target.value)}
+                      className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                      aria-label="Jam mulai wawancara orang tua"
+                    />
+                    <span className="text-slate-400 font-bold">-</span>
+                    <input
+                      type="time"
+                      step={300}
+                      value={studentTimeInputs.waktu_interview.end}
+                      onChange={(e) => handleTimeInputChange('waktu_interview', 'end', e.target.value)}
+                      className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                      aria-label="Jam selesai wawancara orang tua"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -2243,6 +2457,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="px-5 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold rounded-xl shadow cursor-pointer"
                 >
                   {isEditMode ? 'Simpan Perubahan' : 'Tambahkan Siswa'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Tambah/Atur Tanggal Ujian */}
+      {isSessionDateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="bg-[#1E3A8A] text-white p-5 flex items-start justify-between border-b-4 border-[#D97706]">
+              <div>
+                <h3 className="font-extrabold text-base">Tambah / Atur Tanggal Ujian</h3>
+                <p className="text-[11px] text-blue-200 mt-0.5">Tanggal tanpa siswa tetap bisa disiapkan lebih awal.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSessionDateModalOpen(false)}
+                className="p-1 text-blue-200 hover:text-white"
+                title="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSessionDate} className="p-6 space-y-4 text-xs text-slate-700">
+              <div>
+                <label className="font-bold text-slate-800 block mb-1">Tanggal Ujian</label>
+                <input
+                  type="date"
+                  value={sessionDateForm.date}
+                  onChange={(e) => handleSessionDateChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                  required
+                />
+                {sessionDateForm.date && (
+                  <p className="mt-1.5 text-[10px] text-slate-500">
+                    {formatTanggalUjian(sessionDateForm.date)}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-800 block mb-1">Mode Ujian</label>
+                <select
+                  value={sessionDateForm.mode}
+                  onChange={(e) => setSessionDateForm({ ...sessionDateForm, mode: e.target.value as ModeUjian })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                >
+                  <option value="Offline">Offline</option>
+                  <option value="Online">Online</option>
+                </select>
+                <p className="mt-1.5 text-[10px] text-slate-500">
+                  Jika tanggal sudah ada, mode pada tanggal tersebut akan diperbarui.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSessionDateModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold rounded-xl shadow cursor-pointer"
+                >
+                  Simpan Tanggal
                 </button>
               </div>
             </form>
