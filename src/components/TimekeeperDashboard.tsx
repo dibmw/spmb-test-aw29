@@ -17,7 +17,7 @@ import {
   CalendarClock
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { SiswaJadwal, PresensiRecord, UserSession, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, getSortedSiswaExamStations } from '../types/spmb';
+import { SiswaJadwal, PresensiRecord, UserSession, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, getSortedSiswaExamStations, resolveKehadiran, formatTanggalUjian } from '../types/spmb';
 import { apiService } from '../services/apiService';
 
 interface TimekeeperDashboardProps {
@@ -256,8 +256,8 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
       .sort((a, b) => parseStartTimeMinutes(a.waktu_all) - parseStartTimeMinutes(b.waktu_all));
   }, [jadwalList, tkName, isAdmin]);
 
-  const isPresent = (id: string, type: 'Siswa' | 'Walmur') =>
-    livePresensi.some(p => p.id_siswa.toUpperCase() === id.toUpperCase() && p.tipe_presensi === type);
+  const isPresent = (siswa: SiswaJadwal, type: 'Siswa' | 'Walmur') =>
+    resolveKehadiran(siswa, livePresensi, type) === 'Hadir';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -445,7 +445,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Hari & Tanggal:</span>
-                    <strong className="text-slate-800">{scannedStudent.hari_tanggal || '-'}</strong>
+                    <strong className="text-slate-800">{formatTanggalUjian(scannedStudent.hari_tanggal) || '-'}</strong>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Waktu Sesi:</span>
@@ -554,7 +554,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                 </tr>
               ) : (
                 scheduleList.map((s) => {
-                  const present = isPresent(s.id, attendanceType);
+                  const present = isPresent(s, attendanceType);
                   return (
                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all}</td>

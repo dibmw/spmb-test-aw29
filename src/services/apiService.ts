@@ -5,13 +5,15 @@ import {
   NilaiRecord, 
   UserSession, 
   Role, 
-  KategoriUjian 
+  KategoriUjian,
+  SesiUjian
 } from '../types/spmb';
 import { 
   INITIAL_JADWAL_LIST, 
   INITIAL_PENGUJI_LIST, 
   INITIAL_PRESENSI_LIST, 
   INITIAL_NILAI_LIST, 
+  INITIAL_SESI_UJIAN,
   ADMIN_EMAIL 
 } from '../data/mockData';
 
@@ -22,6 +24,7 @@ const STORAGE_KEYS = {
   PENGUJI: 'spmb29_penguji',
   PRESENSI: 'spmb29_presensi',
   NILAI: 'spmb29_nilai',
+  SESI_UJIAN: 'spmb29_sesi_ujian',
   USER_SESSION: 'spmb29_session',
   GAS_URL: 'spmb29_gas_url'
 };
@@ -51,6 +54,9 @@ class ApiService {
     if (!localStorage.getItem(STORAGE_KEYS.NILAI)) {
       localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(INITIAL_NILAI_LIST));
     }
+    if (!localStorage.getItem(STORAGE_KEYS.SESI_UJIAN)) {
+      localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(INITIAL_SESI_UJIAN));
+    }
   }
 
   public getGasUrl(): string {
@@ -67,6 +73,7 @@ class ApiService {
     localStorage.setItem(STORAGE_KEYS.PENGUJI, JSON.stringify(INITIAL_PENGUJI_LIST));
     localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(INITIAL_PRESENSI_LIST));
     localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(INITIAL_NILAI_LIST));
+    localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(INITIAL_SESI_UJIAN));
   }
 
   // Kirim POST ke GAS dengan retry (background, fire-and-forget agar tidak menahan UI)
@@ -93,7 +100,7 @@ class ApiService {
   public async syncFromGas(): Promise<{ 
     success: boolean; 
     message: string; 
-    counts?: { jadwal: number; penguji: number; presensi: number; nilai: number } 
+    counts?: { jadwal: number; penguji: number; presensi: number; nilai: number; sesi: number }
   }> {
     if (!this.gasUrl) {
       return { success: false, message: 'URL Google Apps Script belum dikonfigurasi.' };
@@ -114,12 +121,13 @@ class ApiService {
 
       const json = await res.json();
       if (json.status === 'success' && json.data) {
-        const { jadwal, penguji, presensi, nilai } = json.data;
+        const { jadwal, penguji, presensi, nilai, sesi, sesi_ujian } = json.data;
 
         let jCount = 0;
         let pCount = 0;
         let prCount = 0;
         let nCount = 0;
+        let sCount = 0;
 
         if (Array.isArray(jadwal) && jadwal.length > 0) {
           // Normalize field names if needed
@@ -147,6 +155,12 @@ class ApiService {
             waktu_interview: String(item.waktu_interview || '').trim(),
             hari_tanggal: String(item.hari_tanggal || item['hari tanggal'] || '').trim(),
             status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : 'Aktif',
+            status_kehadiran_siswa: item.status_kehadiran_siswa === 'Hadir' || item.status_kehadiran_siswa === 'Belum Hadir'
+              ? item.status_kehadiran_siswa
+              : '',
+            status_kehadiran_walmur: item.status_kehadiran_walmur === 'Hadir' || item.status_kehadiran_walmur === 'Belum Hadir'
+              ? item.status_kehadiran_walmur
+              : '',
           } as SiswaJadwal;
           });
           localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(normalizedJadwal));
@@ -199,10 +213,23 @@ class ApiService {
           nCount = normalizedNilai.length;
         }
 
+        const rawSesi = Array.isArray(sesi) ? sesi : Array.isArray(sesi_ujian) ? sesi_ujian : null;
+        if (rawSesi && rawSesi.length > 0) {
+          const normalizedSesi: SesiUjian[] = rawSesi.map((item: any, index: number) => ({
+            id_sesi: String(item.id_sesi || item.id || `SESI-${String(index + 1).padStart(3, '0')}`).trim(),
+            hari_tanggal: String(item.hari_tanggal || item['hari tanggal'] || item.tanggal || '').trim(),
+            mode_ujian: String(item.mode_ujian || item.mode || '').trim().toLowerCase() === 'online' ? 'Online' : 'Offline',
+            catatan: String(item.catatan || '').trim(),
+            updated_at: String(item.updated_at || item.timestamp || '').trim()
+          }));
+          localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(normalizedSesi));
+          sCount = normalizedSesi.length;
+        }
+
         return {
           success: true,
           message: 'Sinkronisasi berhasil! Data terbaru dari Google Spreadsheet berhasil dimuat.',
-          counts: { jadwal: jCount, penguji: pCount, presensi: prCount, nilai: nCount }
+          counts: { jadwal: jCount, penguji: pCount, presensi: prCount, nilai: nCount, sesi: sCount }
         };
       } else {
         return { success: false, message: json.message || 'Format respons Google Apps Script tidak sesuai.' };
@@ -336,6 +363,11 @@ class ApiService {
   public getNilaiList(): NilaiRecord[] {
     const raw = localStorage.getItem(STORAGE_KEYS.NILAI);
     return raw ? JSON.parse(raw) : INITIAL_NILAI_LIST;
+  }
+
+  public getSesiUjianList(): SesiUjian[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.SESI_UJIAN);
+    return raw ? JSON.parse(raw) : INITIAL_SESI_UJIAN;
   }
 
   public getSiswaById(id: string): SiswaJadwal | undefined {
@@ -560,6 +592,56 @@ class ApiService {
     current = current.filter(p => p.id !== id);
     localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(current));
     return { success: true, message: 'Data presensi berhasil dihapus.' };
+  }
+
+  // Admin CRUD for Exam Sessions (mode Online/Offline per date)
+  public saveSesiUjian(sesi: SesiUjian): { success: boolean; message: string; record?: SesiUjian } {
+    const current = this.getSesiUjianList();
+    const now = new Date();
+    const updatedAt = now.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ' ' +
+      now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const next: SesiUjian = {
+      id_sesi: sesi.id_sesi || `SESI-${Date.now().toString().slice(-6)}`,
+      hari_tanggal: sesi.hari_tanggal,
+      mode_ujian: sesi.mode_ujian === 'Online' ? 'Online' : 'Offline',
+      catatan: sesi.catatan || '',
+      updated_at: updatedAt
+    };
+
+    const idx = current.findIndex(
+      (item) => item.id_sesi === next.id_sesi || item.hari_tanggal === next.hari_tanggal
+    );
+
+    if (idx >= 0) {
+      next.id_sesi = current[idx].id_sesi;
+      current[idx] = next;
+    } else {
+      current.push(next);
+    }
+
+    localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(current));
+
+    if (this.gasUrl) {
+      void this.pushWithRetry({ action: 'adminSaveSession', sesi: next });
+    }
+
+    return { success: true, message: 'Mode ujian per tanggal berhasil disimpan.', record: next };
+  }
+
+  public deleteSesiUjian(id: string): { success: boolean; message: string } {
+    const current = this.getSesiUjianList();
+    const next = current.filter((item) => item.id_sesi !== id);
+    if (next.length === current.length) {
+      return { success: false, message: 'Sesi ujian tidak ditemukan.' };
+    }
+    localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(next));
+
+    if (this.gasUrl) {
+      void this.pushWithRetry({ action: 'adminDeleteSession', id_sesi: id });
+    }
+
+    return { success: true, message: 'Sesi ujian berhasil dihapus.' };
   }
 }
 

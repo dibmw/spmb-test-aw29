@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
 import { TimekeeperDashboard } from './components/TimekeeperDashboard';
@@ -8,7 +8,7 @@ import { LoginModal } from './components/LoginModal';
 import { StudentCardModal } from './components/StudentCardModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { apiService } from './services/apiService';
-import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, Role } from './types/spmb';
+import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, Role, SesiUjian } from './types/spmb';
 import { SCHOOL_LOGO_URL } from './data/mockData';
 import { MapPin, ShieldCheck, MessageCircle, ExternalLink } from 'lucide-react';
 
@@ -21,6 +21,8 @@ export default function App() {
   const [jadwalList, setJadwalList] = useState<SiswaJadwal[]>([]);
   const [presensiList, setPresensiList] = useState<PresensiRecord[]>([]);
   const [nilaiList, setNilaiList] = useState<NilaiRecord[]>([]);
+  const [sesiUjianList, setSesiUjianList] = useState<SesiUjian[]>([]);
+  const syncInFlight = useRef(false);
 
   // Student Card Modal State
   const [selectedStudentForCard, setSelectedStudentForCard] = useState<SiswaJadwal | null>(null);
@@ -45,6 +47,7 @@ export default function App() {
     setJadwalList(apiService.getJadwalList());
     setPresensiList(apiService.getPresensiList());
     setNilaiList(apiService.getNilaiList());
+    setSesiUjianList(apiService.getSesiUjianList());
   };
 
   useEffect(() => {
@@ -71,6 +74,26 @@ export default function App() {
       // Keep local data gracefully
     });
   }, []);
+
+  // Auto-sync ringan agar perubahan admin (mode/kehadiran) cepat terlihat di perangkat lain.
+  useEffect(() => {
+    if (!session) return;
+
+    const timer = window.setInterval(async () => {
+      if (document.hidden || !navigator.onLine || syncInFlight.current) return;
+      syncInFlight.current = true;
+      try {
+        const res = await apiService.syncFromGas();
+        if (res.success) refreshData();
+      } catch {
+        // Biarkan data lokal tetap tampil saat jaringan bermasalah.
+      } finally {
+        syncInFlight.current = false;
+      }
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, [session]);
 
   const handleLoginSuccess = (userSession: UserSession) => {
     setSession(userSession);
@@ -128,6 +151,7 @@ export default function App() {
           <LandingPage
             jadwalList={jadwalList}
             presensiList={presensiList}
+            sesiUjianList={sesiUjianList}
             onSelectStudentForCard={(s) => setSelectedStudentForCard(s)}
             onOpenLogin={() => setIsLoginOpen(true)}
           />
@@ -175,6 +199,7 @@ export default function App() {
             jadwalList={jadwalList}
             presensiList={presensiList}
             nilaiList={nilaiList}
+            sesiUjianList={sesiUjianList}
             onDataChanged={refreshData}
             showToast={showToast}
           />

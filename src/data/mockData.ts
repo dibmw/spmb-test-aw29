@@ -1,4 +1,4 @@
-import { SiswaJadwal, PengujiAccount, PresensiRecord, NilaiRecord } from '../types/spmb';
+import { SiswaJadwal, PengujiAccount, PresensiRecord, NilaiRecord, SesiUjian } from '../types/spmb';
 
 export const ADMIN_EMAIL = 'kurikulum.alwildan29@gmail.com';
 
@@ -81,7 +81,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
     waktu_interview: '09.30 - 10.15 WIB',
     hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
   },
   {
     id: 'SPMB-29-002',
@@ -103,7 +105,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
     waktu_interview: '08.45 - 09.30 WIB',
     hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
   },
   {
     id: 'SPMB-29-003',
@@ -125,7 +129,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_walmur: 'Ustadz Bambang Hermanto',
     waktu_interview: '09.30 - 10.15 WIB',
     hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
   },
   {
     id: 'SPMB-29-004',
@@ -147,7 +153,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
     waktu_interview: '08.30 - 09.15 WIB',
     hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
   },
   {
     id: 'SPMB-29-005',
@@ -169,7 +177,9 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
     waktu_interview: '10.00 - 10.45 WIB',
     hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
   },
   {
     id: 'SPMB-29-006',
@@ -191,7 +201,19 @@ export const INITIAL_JADWAL_LIST: SiswaJadwal[] = [
     timekeeper_walmur: 'Ustadz Bambang Hermanto',
     waktu_interview: '10.30 - 11.15 WIB',
     hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
+  }
+];
+
+export const INITIAL_SESI_UJIAN: SesiUjian[] = [
+  {
+    id_sesi: 'SESI-001',
+    hari_tanggal: '2026-09-20',
+    mode_ujian: 'Offline',
+    catatan: '',
+    updated_at: ''
   }
 ];
 

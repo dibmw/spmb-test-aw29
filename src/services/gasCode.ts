@@ -4,7 +4,8 @@
  * 
  * Fitur:
  * 1. Concurrency Lock: LockService.getScriptLock() (mencegah race condition saat puluhan penguji submit serentak)
- * 2. Auto-initialize sheet `web_nilai` dan `web_presensi` jika belum ada
+ * 2. Auto-initialize sheet `web_nilai`, `web_presensi`, dan `web_sesi_ujian` jika belum ada
+ *    serta migrasi otomatis kolom baru pada `web_jadwal`
  * 3. Auth verification tanpa password via email petugas (sheet `web_penguji`)
  * 4. Full CRUD operations untuk Admin & Live endpoints untuk Timekeeper & Penguji
  * 5. High-performance cached getValues()
@@ -19,20 +20,20 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
 
 var ADMIN_EMAIL = "kurikulum.alwildan29@gmail.com";
 
-// Skema terkunci header web_jadwal (kolom A s/d V) dan key kanoniknya
+// Skema terkunci header web_jadwal (kolom A s/d X) dan key kanoniknya
 var JADWAL_HEADERS = [
   "id", "nama siswa", "kelas", "gender", "nomor walmur", "email walmur", "grade",
   "ruangan_siswa", "ord_alq_arab", "ord_catung_eng", "waktu_all", "waktu_alq_arab",
   "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
   "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
-  "hari tanggal", "Status"
+  "hari tanggal", "Status", "status_kehadiran_siswa", "status_kehadiran_walmur"
 ];
 var JADWAL_KEYS = [
   "id", "nama_siswa", "kelas", "gender", "nomor_walmur", "email_walmur", "grade",
   "ruangan_siswa", "ord_alq_arab", "ord_catung_eng", "waktu_all", "waktu_alq_arab",
   "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
   "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
-  "hari_tanggal", "status"
+  "hari_tanggal", "status", "status_kehadiran_siswa", "status_kehadiran_walmur"
 ];
 
 // Baca web_jadwal dengan skema terkunci: header dicocokkan case/space-insensitive,
@@ -85,6 +86,17 @@ function normHeader(h) {
   return String(h || "").trim().replace(/\\s+/g, "_").toLowerCase();
 }
 
+// Normalisasi tanggal dari cell Spreadsheet (Date object / string) ke yyyy-mm-dd.
+function dateKey(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, "Asia/Jakarta", "yyyy-MM-dd");
+  }
+  var text = String(value || "").trim();
+  var iso = text.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+  if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+  return text;
+}
+
 // Inisialisasi Sheet jika belum ada
 function initSheets(ss) {
   var sheetNilai = ss.getSheetByName("web_nilai");
@@ -119,6 +131,50 @@ function initSheets(ss) {
     sheetPresensi.setFrozenRows(1);
     sheetPresensi.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#1E3A8A").setFontColor("#FFFFFF");
   }
+
+  var sheetSesi = ss.getSheetByName("web_sesi_ujian");
+  if (!sheetSesi) {
+    sheetSesi = ss.insertSheet("web_sesi_ujian");
+    sheetSesi.appendRow([
+      "id_sesi",
+      "hari_tanggal",
+      "mode_ujian",
+      "catatan",
+      "updated_at"
+    ]);
+    sheetSesi.setFrozenRows(1);
+    sheetSesi.getRange(1, 1, 1, 5).setFontWeight("bold").setBackground("#1E3A8A").setFontColor("#FFFFFF");
+  }
+
+  var jadwalSheet = ss.getSheetByName("web_jadwal");
+  if (jadwalSheet) {
+    ensureJadwalHeaderColumns(jadwalSheet);
+  }
+}
+
+// Pastikan kolom baru web_jadwal otomatis ditambahkan tanpa merusak data lama.
+function ensureJadwalHeaderColumns(sheet) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var normalized = [];
+  for (var h = 0; h < headers.length; h++) {
+    normalized.push(normHeader(headers[h]));
+  }
+
+  var additions = [];
+  for (var i = 0; i < JADWAL_HEADERS.length; i++) {
+    if (normalized.indexOf(normHeader(JADWAL_HEADERS[i])) === -1) {
+      additions.push(JADWAL_HEADERS[i]);
+    }
+  }
+
+  if (additions.length > 0) {
+    sheet.getRange(1, lastCol + 1, 1, additions.length).setValues([additions]);
+    sheet.getRange(1, lastCol + 1, 1, additions.length)
+      .setFontWeight("bold")
+      .setBackground("#1E3A8A")
+      .setFontColor("#FFFFFF");
+  }
 }
 
 // Helper output CORS JSON
@@ -139,6 +195,7 @@ function doGet(e) {
       var pengujiSheet = ss.getSheetByName("web_penguji");
       var nilaiSheet = ss.getSheetByName("web_nilai");
       var presensiSheet = ss.getSheetByName("web_presensi");
+      var sesiSheet = ss.getSheetByName("web_sesi_ujian");
 
       // Privasi: nomor & email walmur TIDAK PERNAH dikirim ke klien.
       // email_penguji hanya dikirim bila request terverifikasi sebagai petugas.
@@ -149,6 +206,7 @@ function doGet(e) {
       var pengujis = sheetToObjects(pengujiSheet);
       var nilais = sheetToObjects(nilaiSheet);
       var presensis = sheetToObjects(presensiSheet);
+      var sesis = sheetToObjects(sesiSheet);
 
       for (var pi = 0; pi < jadwals.length; pi++) {
         delete jadwals[pi]["nomor_walmur"];
@@ -170,7 +228,8 @@ function doGet(e) {
           jadwal: jadwals,
           penguji: pengujis,
           nilai: nilais,
-          presensi: presensis
+          presensi: presensis,
+          sesi: sesis
         }
       });
     }
@@ -307,7 +366,7 @@ function doPost(e) {
         s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
         s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
         s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
-        s.hari_tanggal, s.status
+        s.hari_tanggal, s.status, s.status_kehadiran_siswa || "", s.status_kehadiran_walmur || ""
       ]);
       return jsonResponse({ status: "success", message: "Jadwal siswa berhasil ditambahkan." });
     }
@@ -320,12 +379,12 @@ function doPost(e) {
       var found = false;
       for (var i = 1; i < vals.length; i++) {
         if (String(vals[i][0]) === String(s.id)) {
-          jSheet.getRange(i + 1, 1, 1, 22).setValues([[
+          jSheet.getRange(i + 1, 1, 1, 24).setValues([[
             s.id, s.nama_siswa, s.kelas, s.gender, vals[i][4], vals[i][5], s.grade,
             s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
             s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
             s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
-            s.hari_tanggal, s.status
+            s.hari_tanggal, s.status, s.status_kehadiran_siswa || "", s.status_kehadiran_walmur || ""
           ]]);
           found = true;
           break;
@@ -347,7 +406,62 @@ function doPost(e) {
       return jsonResponse({ status: "error", message: "ID siswa tidak ditemukan." });
     }
 
-    // 7. ADMIN - DELETE NILAI (by id_siswa + kategori_ujian, konsisten dgn submitGrade)
+    // 7. ADMIN - SIMPAN MODE UJIAN PER TANGGAL
+    if (action === "adminSaveSession") {
+      var sesiSheet = ss.getSheetByName("web_sesi_ujian");
+      var sesi = postData.sesi || {};
+      var sesiVals = sesiSheet.getDataRange().getValues();
+      var sesiUpdatedAt = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
+      var sesiRowIndex = -1;
+      var sesiId = String(sesi.id_sesi || "").trim();
+      var sesiTanggal = String(sesi.hari_tanggal || "").trim();
+
+      for (var si = 1; si < sesiVals.length; si++) {
+        var rowId = String(sesiVals[si][0] || "").trim();
+        var rowTanggal = dateKey(sesiVals[si][1]);
+        if ((sesiId && rowId === sesiId) || (sesiTanggal && rowTanggal === dateKey(sesiTanggal))) {
+          sesiRowIndex = si + 1;
+          if (!sesiId) sesiId = rowId;
+          break;
+        }
+      }
+
+      if (!sesiId) {
+        sesiId = "SESI-" + String(Date.now()).slice(-6);
+      }
+
+      var sesiMode = String(sesi.mode_ujian || "").trim().toLowerCase() === "online" ? "Online" : "Offline";
+      var sesiRow = [
+        sesiId,
+        sesiTanggal,
+        sesiMode,
+        String(sesi.catatan || "").trim(),
+        sesiUpdatedAt
+      ];
+
+      if (sesiRowIndex > 0) {
+        sesiSheet.getRange(sesiRowIndex, 1, 1, 5).setValues([sesiRow]);
+      } else {
+        sesiSheet.appendRow(sesiRow);
+      }
+
+      return jsonResponse({ status: "success", message: "Mode ujian per tanggal berhasil disimpan.", id_sesi: sesiId });
+    }
+
+    // 8. ADMIN - HAPUS MODE UJIAN PER TANGGAL
+    if (action === "adminDeleteSession") {
+      var sesiSheet = ss.getSheetByName("web_sesi_ujian");
+      var sesiVals = sesiSheet.getDataRange().getValues();
+      for (var sd = 1; sd < sesiVals.length; sd++) {
+        if (String(sesiVals[sd][0]) === String(postData.id_sesi)) {
+          sesiSheet.deleteRow(sd + 1);
+          return jsonResponse({ status: "success", message: "Sesi ujian berhasil dihapus." });
+        }
+      }
+      return jsonResponse({ status: "error", message: "Sesi ujian tidak ditemukan." });
+    }
+
+    // 9. ADMIN - DELETE NILAI (by id_siswa + kategori_ujian, konsisten dgn submitGrade)
     if (action === "deleteGrade") {
       var nSheet = ss.getSheetByName("web_nilai");
       var nVals = nSheet.getDataRange().getValues();

@@ -14,7 +14,7 @@ import {
   BookOpen, 
   Sparkles 
 } from 'lucide-react';
-import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
+import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran } from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { RubrikModal } from './RubrikModal';
 
@@ -241,7 +241,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
           {filteredStudents.map((siswa) => {
             const categories = getExaminerCategoriesForStudent(siswa);
             const studentGrades = getStudentGrades(siswa.id);
-            const hasStudentAttendance = livePresensi.some(p => p.id_siswa.toUpperCase() === siswa.id.toUpperCase() && p.tipe_presensi === 'Siswa');
+            const hasStudentAttendance = resolveKehadiran(siswa, livePresensi, 'Siswa') === 'Hadir';
             const sessionTime = getExaminerSessionTime(siswa, categories);
 
             return (

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Check, UserCheck, Users } from 'lucide-react';
 import { cardToPng } from '../utils/captureCard';
 import QRCode from 'qrcode';
-import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations } from '../types/spmb';
+import { SiswaJadwal, formatKelas, getJenjangFromKelas, getSortedSiswaExamStations, formatTanggalUjian } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
 
 interface StudentCardModalProps {
@@ -180,7 +180,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-500 block">Hari & Tanggal:</span>
-                      <div className="font-semibold text-slate-800">{siswa.hari_tanggal || '-'}</div>
+                      <div className="font-semibold text-slate-800">{formatTanggalUjian(siswa.hari_tanggal) || '-'}</div>
                     </div>
                   </div>
                 </div>

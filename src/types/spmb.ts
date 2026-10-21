@@ -21,6 +21,18 @@ export interface SiswaJadwal {
   waktu_interview: string;
   hari_tanggal: string;
   status: 'Aktif' | 'Reschedule' | 'Selesai';
+  status_kehadiran_siswa?: 'Hadir' | 'Belum Hadir' | '';
+  status_kehadiran_walmur?: 'Hadir' | 'Belum Hadir' | '';
+}
+
+export type ModeUjian = 'Online' | 'Offline';
+
+export interface SesiUjian {
+  id_sesi: string;
+  hari_tanggal: string;
+  mode_ujian: ModeUjian;
+  catatan: string;
+  updated_at: string;
 }
 
 export interface PengujiAccount {
@@ -178,6 +190,139 @@ export function parseStartTimeMinutes(timeStr: string): number {
   const match = timeStr.match(/(\d{1,2})[.:](\d{2})/);
   if (!match) return 9999;
   return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+}
+
+const BULAN_INDONESIA: Record<string, number> = {
+  januari: 1,
+  februari: 2,
+  maret: 3,
+  april: 4,
+  mei: 5,
+  juni: 6,
+  juli: 7,
+  agustus: 8,
+  september: 9,
+  oktober: 10,
+  november: 11,
+  desember: 12
+};
+
+/**
+ * Normalisasi tanggal ke format ISO (yyyy-mm-dd).
+ * Mendukung data lama seperti "Minggu, 20 September 2026".
+ */
+export function toISODate(value: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const match = raw.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = BULAN_INDONESIA[match[2].toLowerCase()];
+    const year = parseInt(match[3], 10);
+    if (month && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  const parsed = new Date(raw);
+  if (!isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+
+  return '';
+}
+
+/**
+ * Format tanggal menjadi "Minggu, 20 September 2026".
+ */
+export function formatTanggalUjian(value: string): string {
+  const iso = toISODate(value);
+  if (!iso) return value || '-';
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+/**
+ * Ambil jam mulai dan selesai dari teks rentang waktu, contoh "08.00 - 08.45 WIB".
+ */
+export function parseTimeRange(value: string): { start: number; end: number } | null {
+  const matches = String(value || '').match(/(\d{1,2})[.:](\d{2})/g);
+  if (!matches || matches.length === 0) return null;
+  const toMinutes = (text: string) => {
+    const match = text.match(/(\d{1,2})[.:](\d{2})/);
+    if (!match) return NaN;
+    return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  };
+  const start = toMinutes(matches[0]);
+  const end = matches.length > 1 ? toMinutes(matches[matches.length - 1]) : start;
+  if (isNaN(start) || isNaN(end)) return null;
+  return { start, end };
+}
+
+function formatMinutes(total: number): string {
+  const hour = Math.floor(total / 60);
+  const minute = total % 60;
+  return `${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * Rangkum waktu_all dari tiga waktu ujian: ambil mulai paling awal dan selesai paling akhir.
+ */
+export function summarizeWaktuAll(
+  waktuAlqArab: string,
+  waktuCatungEng: string,
+  waktuInterview: string
+): string {
+  const ranges = [waktuAlqArab, waktuCatungEng, waktuInterview]
+    .map(parseTimeRange)
+    .filter((range): range is { start: number; end: number } => range !== null);
+
+  if (ranges.length === 0) return '';
+
+  const start = Math.min(...ranges.map((range) => range.start));
+  const end = Math.max(...ranges.map((range) => range.end));
+
+  return `${formatMinutes(start)} - ${formatMinutes(end)} WIB`;
+}
+
+/**
+ * Cari mode ujian berdasarkan tanggal sesi. Default Offline.
+ */
+export function getModeUjianForDate(sesiList: SesiUjian[], hariTanggal: string): ModeUjian {
+  const iso = toISODate(hariTanggal);
+  if (!iso) return 'Offline';
+  const sesi = sesiList.find((item) => toISODate(item.hari_tanggal) === iso);
+  return sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline';
+}
+
+/**
+ * Status kehadiran efektif: override admin menang, jika kosong ikut presensi timekeeper.
+ */
+export function resolveKehadiran(
+  siswa: SiswaJadwal,
+  presensiList: PresensiRecord[],
+  tipe: 'Siswa' | 'Walmur'
+): 'Hadir' | 'Belum Hadir' {
+  const override = tipe === 'Siswa'
+    ? siswa.status_kehadiran_siswa
+    : siswa.status_kehadiran_walmur;
+
+  if (override === 'Hadir' || override === 'Belum Hadir') return override;
+
+  const hadir = presensiList.some(
+    (p) => p.id_siswa.toUpperCase() === siswa.id.toUpperCase() && p.tipe_presensi === tipe
+  );
+  return hadir ? 'Hadir' : 'Belum Hadir';
 }
 
 export function getSortedSiswaExamStations(siswa: SiswaJadwal, unit: 'SD' | 'SMP' | 'SMA'): ExamStationItem[] {

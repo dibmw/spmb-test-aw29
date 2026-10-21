@@ -16,6 +16,8 @@ import {
   formatKelas,
   getJenjangFromKelas,
   getSortedSiswaExamStations,
+  resolveKehadiran,
+  formatTanggalUjian,
 } from "../types/spmb";
 import { SchoolLogo } from "./SchoolLogo";
 
@@ -53,13 +55,9 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
   const unit = getJenjangFromKelas(siswa.kelas, siswa.grade);
   const sortedStations = getSortedSiswaExamStations(siswa, unit);
 
-  // Check student attendance status
-  const studentCheck = presensiList.some(
-    (p) => p.id_siswa === siswa.id && p.tipe_presensi === "Siswa",
-  );
-  const walmurCheck = presensiList.some(
-    (p) => p.id_siswa === siswa.id && p.tipe_presensi === "Walmur",
-  );
+  // Check student attendance status (override admin > presensi timekeeper)
+  const studentCheck = resolveKehadiran(siswa, presensiList, "Siswa") === "Hadir";
+  const walmurCheck = resolveKehadiran(siswa, presensiList, "Walmur") === "Hadir";
 
   const handleDownloadPNG = async () => {
     if (!cardRef.current) return;
@@ -206,7 +204,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
                       Hari & Tanggal:
                     </span>
                     <div className="font-semibold text-slate-800">
-                      {siswa.hari_tanggal || "-"}
+                      {formatTanggalUjian(siswa.hari_tanggal) || "-"}
                     </div>
                   </div>
                 </div>

@@ -22,10 +22,30 @@ import {
   Save,
   Printer,
   Send,
-  MessageCircle
+  MessageCircle,
+  CalendarDays,
+  Wifi,
+  WifiOff,
+  RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes } from '../types/spmb';
+import {
+  SiswaJadwal,
+  PresensiRecord,
+  NilaiRecord,
+  UserSession,
+  KategoriUjian,
+  SesiUjian,
+  ModeUjian,
+  formatKelas,
+  getJenjangFromKelas,
+  parseStartTimeMinutes,
+  summarizeWaktuAll,
+  toISODate,
+  formatTanggalUjian,
+  getModeUjianForDate,
+  resolveKehadiran
+} from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../services/gasCode';
 import {
@@ -46,6 +66,7 @@ interface AdminDashboardProps {
   jadwalList: SiswaJadwal[];
   presensiList: PresensiRecord[];
   nilaiList: NilaiRecord[];
+  sesiUjianList: SesiUjian[];
   onDataChanged: () => void;
   showToast: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -55,12 +76,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   jadwalList,
   presensiList,
   nilaiList,
+  sesiUjianList,
   onDataChanged,
   showToast
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
+  const [dateFilter, setDateFilter] = useState('');
 
   // Print target state untuk cetak jadwal per ruangan
   const [printTarget, setPrintTarget] = useState<null | { group: 'siswa' | 'walmur'; room: string | null }>(null);
@@ -93,9 +116,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
     timekeeper_walmur: 'Ustadzah Fatimah Zahra',
     waktu_interview: '09.30 - 10.15 WIB',
-    hari_tanggal: 'Minggu, 20 September 2026',
-    status: 'Aktif'
+    hari_tanggal: '2026-09-20',
+    status: 'Aktif',
+    status_kehadiran_siswa: '',
+    status_kehadiran_walmur: ''
   });
+
+  const pengujiList = apiService.getPengujiList();
+
+  const sessionDateRows = useMemo(() => {
+    const map = new Map<string, { date: string; count: number; mode: ModeUjian; id_sesi: string }>();
+    jadwalList.forEach((siswa) => {
+      const iso = toISODate(siswa.hari_tanggal);
+      if (!iso) return;
+      const existing = map.get(iso);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        const sesi = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === iso);
+        map.set(iso, {
+          date: iso,
+          count: 1,
+          mode: sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline',
+          id_sesi: sesi?.id_sesi || ''
+        });
+      }
+    });
+    sesiUjianList.forEach((sesi) => {
+      const iso = toISODate(sesi.hari_tanggal);
+      if (!iso) return;
+      const existing = map.get(iso);
+      if (existing) {
+        existing.mode = sesi.mode_ujian;
+        existing.id_sesi = sesi.id_sesi;
+      } else {
+        map.set(iso, { date: iso, count: 0, mode: sesi.mode_ujian, id_sesi: sesi.id_sesi });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [jadwalList, sesiUjianList]);
+
+  const handleSetSessionMode = (date: string, mode: ModeUjian) => {
+    const sesi = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === date);
+    const res = apiService.saveSesiUjian({
+      id_sesi: sesi?.id_sesi || '',
+      hari_tanggal: date,
+      mode_ujian: mode,
+      catatan: sesi?.catatan || '',
+      updated_at: ''
+    });
+    if (res.success) {
+      showToast('Mode Ujian Disimpan', `Tanggal ${formatTanggalUjian(date)} diatur ke mode ${mode}.`, 'success');
+      onDataChanged();
+    } else {
+      showToast('Gagal', res.message, 'error');
+    }
+  };
 
   // Admin Grade Edit Modal
   const [editingGradeStudent, setEditingGradeStudent] = useState<SiswaJadwal | null>(null);
@@ -109,16 +185,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const kpiData = useMemo(() => {
     const totalSiswa = activeJadwalList.length;
 
-    // Student Attendance
+    // Student Attendance (hormati override admin)
     const hadirSiswaIds = new Set(
-      presensiList.filter(p => p.tipe_presensi === 'Siswa' && activeIds.has(p.id_siswa)).map(p => p.id_siswa)
+      activeJadwalList
+        .filter((s) => resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir')
+        .map((s) => s.id)
     );
     const hadirSiswaCount = hadirSiswaIds.size;
     const hadirSiswaPercent = totalSiswa ? Math.round((hadirSiswaCount / totalSiswa) * 100) : 0;
 
-    // Walmur Attendance
+    // Walmur Attendance (hormati override admin)
     const hadirWalmurIds = new Set(
-      presensiList.filter(p => p.tipe_presensi === 'Walmur' && activeIds.has(p.id_siswa)).map(p => p.id_siswa)
+      activeJadwalList
+        .filter((s) => resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir')
+        .map((s) => s.id)
     );
     const hadirWalmurCount = hadirWalmurIds.size;
     const hadirWalmurPercent = totalSiswa ? Math.round((hadirWalmurCount / totalSiswa) * 100) : 0;
@@ -197,6 +277,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleTimeChange = (
+    field: 'waktu_alq_arab' | 'waktu_catung_eng' | 'waktu_interview',
+    value: string
+  ) => {
+    setStudentFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      return {
+        ...next,
+        waktu_all: summarizeWaktuAll(next.waktu_alq_arab, next.waktu_catung_eng, next.waktu_interview)
+      };
+    });
+  };
+
+  const handleChangeKehadiran = (
+    siswa: SiswaJadwal,
+    tipe: 'Siswa' | 'Walmur',
+    value: '' | 'Hadir' | 'Belum Hadir'
+  ) => {
+    const payload: SiswaJadwal = tipe === 'Siswa'
+      ? { ...siswa, status_kehadiran_siswa: value }
+      : { ...siswa, status_kehadiran_walmur: value };
+    const res = apiService.saveJadwal(payload, true);
+    if (res.success) {
+      showToast(
+        'Kehadiran Diperbarui',
+        `Status kehadiran ${tipe === 'Siswa' ? 'siswa' : 'wali murid'} ${siswa.nama_siswa} disimpan.`,
+        'success'
+      );
+      onDataChanged();
+    } else {
+      showToast('Gagal', res.message, 'error');
+    }
+  };
+
   const openAddStudentModal = () => {
     const nextNum = (jadwalList.length + 1).toString().padStart(3, '0');
     setStudentFormData({
@@ -218,15 +332,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       interview_walmur: 'Ustadzah Dewi Sartika, S.Psi.',
       timekeeper_walmur: 'Ustadzah Fatimah Zahra',
       waktu_interview: '09.30 - 10.15 WIB',
-      hari_tanggal: 'Minggu, 20 September 2026',
-      status: 'Aktif'
+      hari_tanggal: '2026-09-20',
+      status: 'Aktif',
+      status_kehadiran_siswa: '',
+      status_kehadiran_walmur: ''
     });
     setIsEditMode(false);
     setIsStudentModalOpen(true);
   };
 
   const openEditStudentModal = (siswa: SiswaJadwal) => {
-    setStudentFormData({ ...siswa });
+    setStudentFormData({
+      ...siswa,
+      hari_tanggal: toISODate(siswa.hari_tanggal) || siswa.hari_tanggal
+    });
     setIsEditMode(true);
     setIsStudentModalOpen(true);
   };
@@ -476,7 +595,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="text-sm font-black">TES SPMB AL-WILDAN ISLAMIC SCHOOL 29 DEPOK</div>
                 <div className="text-xs font-bold mt-0.5">Daftar {title} per Ruangan</div>
                 <div className="text-xs font-bold mt-0.5">
-                  {g.room} — {g.date || 'Tanggal tidak tercantum'}
+                  {g.room} — {formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'}
                 </div>
               </div>
             </div>
@@ -783,6 +902,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 2: JADWAL CRUD */}
       {activeSubTab === 'jadwal' && (
         <div className="space-y-4">
+          {/* Mode Ujian per Tanggal */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mode Ujian per Tanggal</h3>
+                <p className="text-[11px] text-slate-500">Satu tanggal/sesi berlaku untuk semua peserta di tanggal tersebut.</p>
+              </div>
+            </div>
+            <div className="p-4">
+              {sessionDateRows.length === 0 ? (
+                <p className="text-xs text-slate-500">Belum ada tanggal ujian pada jadwal.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {sessionDateRows.map((row) => (
+                    <div key={row.date} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 truncate">{formatTanggalUjian(row.date)}</p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {row.mode === 'Online' ? (
+                            <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <WifiOff className="w-3.5 h-3.5 text-slate-500" />
+                          )}
+                          <span className="text-[10px] text-slate-500">{row.count} siswa</span>
+                        </div>
+                      </div>
+                      <select
+                        value={row.mode}
+                        onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
+                          row.mode === 'Online'
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            : 'bg-slate-200 text-slate-700 border-slate-300'
+                        }`}
+                        title="Ubah mode ujian sesi ini"
+                      >
+                        <option value="Offline">Offline</option>
+                        <option value="Online">Online</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -790,12 +956,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Cari siswa, nomor walmur, ruangan..."
+                placeholder="Cari siswa, nomor pendaftaran, ruangan..."
                 className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-slate-500" />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                  title="Filter tanggal ujian"
+                />
+                {dateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setDateFilter('')}
+                    className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Reset filter tanggal"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as SiswaJadwal['status'] | 'Semua')}
@@ -827,27 +1014,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="p-3">Nama Siswa</th>
                     <th className="p-3">Gender</th>
                     <th className="p-3">Unit & Kelas</th>
+                    <th className="p-3">Tanggal Ujian</th>
+                    <th className="p-3">Mode</th>
                     <th className="p-3">Ruang Siswa</th>
                     <th className="p-3">Penguji Qur'an/Arab</th>
                     <th className="p-3">Penguji Catung/Eng</th>
                     <th className="p-3">Wawancara Orang Tua</th>
-                    <th className="p-3">Status</th>
+                    <th className="p-3">Waktu Ujian (All)</th>
+                    <th className="p-3">Kehadiran Siswa</th>
+                    <th className="p-3">Kehadiran Wali Murid</th>
+                    <th className="p-3">Status Jadwal</th>
                     <th className="p-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {jadwalList
                     .filter(s => statusFilter === 'Semua' || s.status === statusFilter)
+                    .filter(s => !dateFilter || toISODate(s.hari_tanggal) === dateFilter)
                     .filter(s => 
                       !searchFilter || 
                       s.nama_siswa.toLowerCase().includes(searchFilter.toLowerCase()) ||
                       s.id.toLowerCase().includes(searchFilter.toLowerCase()) ||
                       s.kelas.toLowerCase().includes(searchFilter.toLowerCase())
                     )
-                    .map((s) => (
+                    .map((s) => {
+                      const mode = getModeUjianForDate(sesiUjianList, s.hari_tanggal);
+                      const kehadiranSiswa = resolveKehadiran(s, presensiList, 'Siswa');
+                      const kehadiranWalmur = resolveKehadiran(s, presensiList, 'Walmur');
+                      return (
                       <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-3 font-mono font-bold text-[#1E3A8A]">{s.id}</td>
-<td className="p-3 font-bold text-slate-900">{s.nama_siswa}</td>
+                        <td className="p-3 font-bold text-slate-900">{s.nama_siswa}</td>
                         <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
@@ -857,12 +1054,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {formatKelas(s.kelas)}
                           </span>
                         </td>
+                        <td className="p-3 text-slate-700 font-medium whitespace-nowrap">
+                          {formatTanggalUjian(s.hari_tanggal)}
+                        </td>
+                        <td className="p-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                            mode === 'Online'
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                              : 'bg-slate-100 text-slate-600 border-slate-300'
+                          }`}>
+                            {mode === 'Online' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                            {mode}
+                          </span>
+                        </td>
                         <td className="p-3 font-medium text-slate-700">{s.ruangan_siswa}</td>
-                        <td className="p-3 text-slate-600 truncate max-w-[140px]">{s.penguji_alq_arab}</td>
-                        <td className="p-3 text-slate-600 truncate max-w-[140px]">{s.penguji_catung_eng}</td>
-                        <td className="p-3 text-slate-700 truncate max-w-[160px]">
+                        <td className="p-3 text-slate-600 truncate max-w-[150px]">
+                          <span className="block font-medium text-slate-700">{s.penguji_alq_arab}</span>
+                          <span className="block text-[10px] text-slate-500 font-mono">{s.waktu_alq_arab}</span>
+                        </td>
+                        <td className="p-3 text-slate-600 truncate max-w-[150px]">
+                          <span className="block font-medium text-slate-700">{s.penguji_catung_eng}</span>
+                          <span className="block text-[10px] text-slate-500 font-mono">{s.waktu_catung_eng}</span>
+                        </td>
+                        <td className="p-3 text-slate-700 truncate max-w-[170px]">
                           <strong>{s.interview_walmur}</strong>
+                          <span className="block text-[10px] text-slate-500 font-mono">{s.waktu_interview}</span>
                           <span className="block text-[10px] text-slate-400 font-normal">{s.ruangan_walmur}</span>
+                        </td>
+                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all || '-'}</td>
+                        <td className="p-3">
+                          <select
+                            value={s.status_kehadiran_siswa || ''}
+                            onChange={(e) => handleChangeKehadiran(s, 'Siswa', e.target.value as '' | 'Hadir' | 'Belum Hadir')}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
+                              kehadiranSiswa === 'Hadir'
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                                : 'bg-amber-100 text-amber-700 border-amber-300'
+                            }`}
+                            title="Status kehadiran siswa (otomatis dari presensi, bisa di-override admin)"
+                          >
+                            <option value="">Otomatis: {kehadiranSiswa}</option>
+                            <option value="Hadir">Hadir</option>
+                            <option value="Belum Hadir">Belum Hadir</option>
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <select
+                            value={s.status_kehadiran_walmur || ''}
+                            onChange={(e) => handleChangeKehadiran(s, 'Walmur', e.target.value as '' | 'Hadir' | 'Belum Hadir')}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
+                              kehadiranWalmur === 'Hadir'
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                                : 'bg-amber-100 text-amber-700 border-amber-300'
+                            }`}
+                            title="Status kehadiran wali murid (otomatis dari presensi, bisa di-override admin)"
+                          >
+                            <option value="">Otomatis: {kehadiranWalmur}</option>
+                            <option value="Hadir">Hadir</option>
+                            <option value="Belum Hadir">Belum Hadir</option>
+                          </select>
                         </td>
                         <td className="p-3">
                           <select
@@ -899,7 +1149,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -1643,7 +1894,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="bg-[#1E3A8A] text-white px-4 py-2.5 flex items-center justify-between">
                       <div>
                         <div className="font-extrabold text-sm">{g.room}</div>
-                        <div className="text-[10px] text-blue-200">{g.date || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
+                        <div className="text-[10px] text-blue-200">{formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
                       </div>
                       <button
                         onClick={() => triggerPrint('siswa', g.room)}
@@ -1692,7 +1943,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="bg-[#D97706] text-white px-4 py-2.5 flex items-center justify-between">
                       <div>
                         <div className="font-extrabold text-sm">{g.room}</div>
-                        <div className="text-[10px] text-amber-100">{g.date || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
+                        <div className="text-[10px] text-amber-100">{formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
                       </div>
                       <button
                         onClick={() => triggerPrint('walmur', g.room)}
@@ -1821,32 +2072,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Penguji Pos Qur'an & Arab</label>
-                  <input
-                    type="text"
+                  <select
                     value={studentFormData.penguji_alq_arab}
                     onChange={(e) => setStudentFormData({ ...studentFormData, penguji_alq_arab: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
+                  >
+                    <option value="">-- Pilih Penguji --</option>
+                    {pengujiList.map((p) => (
+                      <option key={`alq-${p.email_penguji}`} value={p.penguji}>{p.penguji}</option>
+                    ))}
+                    {studentFormData.penguji_alq_arab && !pengujiList.some((p) => p.penguji === studentFormData.penguji_alq_arab) && (
+                      <option value={studentFormData.penguji_alq_arab}>{studentFormData.penguji_alq_arab}</option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Penguji Pos Catung / Eng</label>
-                  <input
-                    type="text"
+                  <select
                     value={studentFormData.penguji_catung_eng}
                     onChange={(e) => setStudentFormData({ ...studentFormData, penguji_catung_eng: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
+                  >
+                    <option value="">-- Pilih Penguji --</option>
+                    {pengujiList.map((p) => (
+                      <option key={`catung-${p.email_penguji}`} value={p.penguji}>{p.penguji}</option>
+                    ))}
+                    {studentFormData.penguji_catung_eng && !pengujiList.some((p) => p.penguji === studentFormData.penguji_catung_eng) && (
+                      <option value={studentFormData.penguji_catung_eng}>{studentFormData.penguji_catung_eng}</option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Pewawancara Orang Tua</label>
-                  <input
-                    type="text"
+                  <select
                     value={studentFormData.interview_walmur}
                     onChange={(e) => setStudentFormData({ ...studentFormData, interview_walmur: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
-                  />
+                  >
+                    <option value="">-- Pilih Pewawancara --</option>
+                    {pengujiList.map((p) => (
+                      <option key={`interview-${p.email_penguji}`} value={p.penguji}>{p.penguji}</option>
+                    ))}
+                    {studentFormData.interview_walmur && !pengujiList.some((p) => p.penguji === studentFormData.interview_walmur) && (
+                      <option value={studentFormData.interview_walmur}>{studentFormData.interview_walmur}</option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
@@ -1862,12 +2134,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <label className="font-bold text-slate-800 block mb-1">Hari & Tanggal Ujian</label>
                   <input
-                    type="text"
-                    value={studentFormData.hari_tanggal}
+                    type="date"
+                    value={toISODate(studentFormData.hari_tanggal)}
                     onChange={(e) => setStudentFormData({ ...studentFormData, hari_tanggal: e.target.value })}
-                    placeholder="Contoh: Minggu, 20 September 2026"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                    required
+                  />
+                  <p className="mt-1.5 text-[10px] text-slate-500 flex items-center gap-1.5">
+                    {getModeUjianForDate(sesiUjianList, studentFormData.hari_tanggal) === 'Online' ? (
+                      <Wifi className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <WifiOff className="w-3 h-3 text-slate-400" />
+                    )}
+                    Mode sesi: <strong>{getModeUjianForDate(sesiUjianList, studentFormData.hari_tanggal)}</strong>
+                    <span className="text-slate-400">(diatur lewat panel Mode Ujian per Tanggal)</span>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Qur'an / Arab</label>
+                  <input
+                    type="text"
+                    value={studentFormData.waktu_alq_arab}
+                    onChange={(e) => handleTimeChange('waktu_alq_arab', e.target.value)}
+                    placeholder="Contoh: 08.00 - 08.45 WIB"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Catung / English</label>
+                  <input
+                    type="text"
+                    value={studentFormData.waktu_catung_eng}
+                    onChange={(e) => handleTimeChange('waktu_catung_eng', e.target.value)}
+                    placeholder="Contoh: 08.45 - 09.30 WIB"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">Waktu Wawancara Orang Tua</label>
+                  <input
+                    type="text"
+                    value={studentFormData.waktu_interview}
+                    onChange={(e) => handleTimeChange('waktu_interview', e.target.value)}
+                    placeholder="Contoh: 09.30 - 10.15 WIB"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Keseluruhan (Otomatis)</label>
+                  <input
+                    type="text"
+                    value={studentFormData.waktu_all}
+                    readOnly
+                    className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-[#1E3A8A] font-mono font-bold focus:outline-none"
+                    placeholder="Otomatis dari tiga waktu ujian"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-500">Diambil dari jam paling awal sampai paling akhir.</p>
                 </div>
               </div>
 
