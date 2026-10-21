@@ -60,6 +60,7 @@ import {
 } from '../utils/broadcast';
 import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
 import { RubrikModal } from './RubrikModal';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface AdminDashboardProps {
   session: UserSession;
@@ -84,6 +85,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
   const [dateFilter, setDateFilter] = useState('');
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   // Print target state untuk cetak jadwal per ruangan
   const [printTarget, setPrintTarget] = useState<null | { group: 'siswa' | 'walmur'; room: string | null }>(null);
@@ -248,33 +257,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeleteStudent = (id: string, name: string) => {
-    if (window.confirm(`Yakin ingin menghapus calon siswa "${name}" (${id}) dari jadwal?`)) {
-      const res = apiService.deleteJadwal(id);
-      if (res.success) {
-        showToast('Dihapus', res.message, 'info');
-        onDataChanged();
-      } else {
-        showToast('Gagal', res.message, 'error');
+    setConfirmDialog({
+      title: 'Hapus Calon Siswa?',
+      message: `Data "${name}" (${id}) akan dihapus dari jadwal. Tindakan ini tidak dapat dibatalkan.`,
+      confirmLabel: 'Hapus',
+      variant: 'danger',
+      onConfirm: () => {
+        const res = apiService.deleteJadwal(id);
+        if (res.success) {
+          showToast('Dihapus', res.message, 'info');
+          onDataChanged();
+        } else {
+          showToast('Gagal', res.message, 'error');
+        }
       }
-    }
+    });
   };
 
   const handleChangeStudentStatus = (siswa: SiswaJadwal, nextStatus: SiswaJadwal['status']) => {
     if (nextStatus === siswa.status) return;
-    const label: Record<SiswaJadwal['status'], string> = {
-      Aktif: 'mengaktifkan kembali',
-      Reschedule: 'menandai Reschedule',
-      Selesai: 'menandai Selesai',
+    const titles: Record<SiswaJadwal['status'], string> = {
+      Aktif: 'Aktifkan Kembali?',
+      Reschedule: 'Tandai Reschedule?',
+      Selesai: 'Tandai Selesai?',
     };
-    if (window.confirm(`Yakin ingin ${label[nextStatus]} "${siswa.nama_siswa}" (${siswa.id})?`)) {
-      const res = apiService.saveJadwal({ ...siswa, status: nextStatus }, true);
-      if (res.success) {
-        showToast(nextStatus === 'Selesai' ? 'Ditandai Selesai' : nextStatus === 'Reschedule' ? 'Diubah ke Reschedule' : 'Diaktifkan', res.message, 'success');
-        onDataChanged();
-      } else {
-        showToast('Gagal', res.message, 'error');
+    setConfirmDialog({
+      title: titles[nextStatus],
+      message: `Status jadwal "${siswa.nama_siswa}" (${siswa.id}) akan diubah menjadi ${nextStatus}.`,
+      confirmLabel: 'Ya, Lanjutkan',
+      variant: nextStatus === 'Aktif' ? 'info' : 'warning',
+      onConfirm: () => {
+        const res = apiService.saveJadwal({ ...siswa, status: nextStatus }, true);
+        if (res.success) {
+          showToast(nextStatus === 'Selesai' ? 'Ditandai Selesai' : nextStatus === 'Reschedule' ? 'Diubah ke Reschedule' : 'Diaktifkan', res.message, 'success');
+          onDataChanged();
+        } else {
+          showToast('Gagal', res.message, 'error');
+        }
       }
-    }
+    });
   };
 
   const handleTimeChange = (
@@ -363,19 +384,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeleteGrade = (id: string) => {
-    if (window.confirm('Hapus entri penilaian ini?')) {
-      apiService.deleteNilai(id);
-      showToast('Berhasil', 'Entri nilai dihapus.', 'info');
-      onDataChanged();
-    }
+    setConfirmDialog({
+      title: 'Hapus Entri Nilai?',
+      message: 'Entri penilaian ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.',
+      confirmLabel: 'Hapus',
+      variant: 'danger',
+      onConfirm: () => {
+        apiService.deleteNilai(id);
+        showToast('Berhasil', 'Entri nilai dihapus.', 'info');
+        onDataChanged();
+      }
+    });
   };
 
   const handleDeletePresensi = (id: string) => {
-    if (window.confirm('Hapus entri presensi ini?')) {
-      apiService.deletePresensi(id);
-      showToast('Berhasil', 'Entri presensi dihapus.', 'info');
-      onDataChanged();
-    }
+    setConfirmDialog({
+      title: 'Hapus Entri Presensi?',
+      message: 'Entri presensi ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.',
+      confirmLabel: 'Hapus',
+      variant: 'danger',
+      onConfirm: () => {
+        apiService.deletePresensi(id);
+        showToast('Berhasil', 'Entri presensi dihapus.', 'info');
+        onDataChanged();
+      }
+    });
   };
 
   // Export to Excel Workbook
@@ -2215,6 +2248,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => {
+            const action = confirmDialog.onConfirm;
+            setConfirmDialog(null);
+            action();
+          }}
+        />
       )}
 
       {/* Admin Grade Edit Modal */}
