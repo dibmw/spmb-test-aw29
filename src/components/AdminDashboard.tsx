@@ -803,24 +803,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     try {
-      const header = [
+      const dates = rekapPenguji.dates;
+      const headerDate = [
         'Penguji',
-        ...rekapPenguji.dates.map((date) => formatTanggalSingkat(date)),
-        'Total Siswa Unik'
+        ...dates.flatMap((date) => [formatTanggalSingkat(date), '']),
+        'Jumlah Penilaian'
       ];
+      const headerSub = ['', ...dates.flatMap(() => ['Kategori', 'Siswa']), ''];
       const body = rekapPenguji.rows.map((row) => [
         row.nama,
-        ...rekapPenguji.dates.map((date) => row.counts[date] || 0),
+        ...dates.flatMap((date) => [
+          (row.kategoriByDate[date] || [])
+            .map((kategori) => displayKategori(kategori as KategoriUjian))
+            .join(', ') || '-',
+          row.counts[date] || 0
+        ]),
         row.total
       ]);
-      body.push([
-        'Total Siswa Unik',
-        ...rekapPenguji.dates.map((date) => rekapPenguji.totalByDate[date] || 0),
+      const footer = [
+        'Total Penilaian',
+        ...dates.flatMap((date) => ['', rekapPenguji.totalPenilaianByDate[date] || 0]),
         rekapPenguji.grandTotal
-      ]);
+      ];
 
-      const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
-      ws['!cols'] = [{ wch: 34 }, ...rekapPenguji.dates.map(() => ({ wch: 16 })), { wch: 18 }];
+      const ws = XLSX.utils.aoa_to_sheet([headerDate, headerSub, ...body, footer]);
+      ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+        ...dates.map((_, index) => ({
+          s: { r: 0, c: 1 + index * 2 },
+          e: { r: 0, c: 2 + index * 2 }
+        })),
+        { s: { r: 0, c: 1 + dates.length * 2 }, e: { r: 1, c: 1 + dates.length * 2 } }
+      ];
+      ws['!cols'] = [
+        { wch: 34 },
+        ...dates.flatMap(() => [{ wch: 30 }, { wch: 10 }]),
+        { wch: 18 }
+      ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'rekap_penguji');
@@ -1899,13 +1918,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Siswa Unik Dinilai</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">Total Penilaian</span>
                 <BarChart3 className="w-5 h-5 text-emerald-600" />
               </div>
               <div className="text-2xl font-extrabold text-emerald-700 font-mono">
                 {rekapPenguji.grandTotal}
               </div>
-              <p className="text-[11px] text-slate-500">Siswa dihitung sekali walau dinilai beberapa mapel</p>
+              <p className="text-[11px] text-slate-500">Penjumlahan siswa-teruji per penguji per tanggal</p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
@@ -1927,7 +1946,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 type="text"
                 value={rekapSearch}
                 onChange={(e) => setRekapSearch(e.target.value)}
-                placeholder="Cari nama penguji..."
+                placeholder="Cari penguji atau kategori..."
                 className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
               />
             </div>
@@ -2003,10 +2022,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                    Jumlah Siswa Unik per Penguji per Tanggal Ujian
+                    Siswa & Kategori per Penguji per Tanggal Ujian
                   </h3>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Berdasarkan nilai yang sudah masuk. Tanggal ujian diambil dari jadwal siswa.
+                    Angka Siswa adalah siswa unik per tanggal. Jumlah Penilaian adalah penjumlahan angka Siswa per tanggal.
                   </p>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium">
@@ -2020,13 +2039,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider">
                     <tr>
-                      <th className="p-3 min-w-[220px] sticky left-0 z-20 bg-[#1E3A8A]">Penguji</th>
+                      <th rowSpan={2} className="p-3 min-w-[220px] sticky left-0 z-20 bg-[#1E3A8A]">Penguji</th>
                       {rekapPenguji.dates.map((date) => (
-                        <th key={date} className="p-3 text-center min-w-[110px] whitespace-nowrap">
+                        <th key={date} colSpan={2} className="p-3 text-center min-w-[210px] whitespace-nowrap border-l border-blue-700/50">
                           {formatTanggalSingkat(date)}
                         </th>
                       ))}
-                      <th className="p-3 text-center min-w-[120px] bg-blue-900/60 whitespace-nowrap">Total Unik</th>
+                      <th rowSpan={2} className="p-3 text-center min-w-[120px] bg-blue-900/60 whitespace-nowrap">
+                        Jumlah Penilaian
+                      </th>
+                    </tr>
+                    <tr>
+                      {rekapPenguji.dates.map((date) => (
+                        <React.Fragment key={date}>
+                          <th className="p-2 min-w-[140px] text-left border-l border-blue-700/50">Kategori</th>
+                          <th className="p-2 min-w-[70px] text-center">Siswa</th>
+                        </React.Fragment>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -2034,31 +2063,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <tr key={row.key} className="hover:bg-slate-50">
                         <td className="p-3 sticky left-0 z-10 bg-white">
                           <div className="font-bold text-slate-800">{row.nama}</div>
-                          {row.kategori.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {row.kategori.map((kategori) => (
-                                <span
-                                  key={kategori}
-                                  className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-semibold"
-                                >
-                                  {displayKategori(kategori as KategoriUjian)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                         </td>
                         {rekapPenguji.dates.map((date) => {
                           const count = row.counts[date] || 0;
+                          const kategoriText = (row.kategoriByDate[date] || [])
+                            .map((kategori) => displayKategori(kategori as KategoriUjian))
+                            .join(', ');
                           return (
-                            <td key={date} className="p-3 text-center">
-                              {count > 0 ? (
-                                <span className="inline-flex min-w-7 justify-center px-2 py-0.5 rounded-md bg-blue-50 text-[#1E3A8A] font-bold font-mono">
-                                  {count}
-                                </span>
-                              ) : (
-                                <span className="text-slate-300">-</span>
-                              )}
-                            </td>
+                            <React.Fragment key={date}>
+                              <td className="p-3 text-[10px] text-slate-600 leading-snug border-l border-slate-100">
+                                {kategoriText || <span className="text-slate-300">-</span>}
+                              </td>
+                              <td className="p-3 text-center">
+                                {count > 0 ? (
+                                  <span className="inline-flex min-w-7 justify-center px-2 py-0.5 rounded-md bg-blue-50 text-[#1E3A8A] font-bold font-mono">
+                                    {count}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
+                            </React.Fragment>
                           );
                         })}
                         <td className="p-3 text-center bg-slate-50">
@@ -2072,12 +2097,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <tfoot>
                     <tr className="bg-blue-50 border-t-2 border-blue-200">
                       <td className="p-3 sticky left-0 z-10 bg-blue-50 font-bold text-[#1E3A8A]">
-                        Total Siswa Unik
+                        Total Penilaian
                       </td>
                       {rekapPenguji.dates.map((date) => (
-                        <td key={date} className="p-3 text-center font-bold text-[#1E3A8A] font-mono">
-                          {rekapPenguji.totalByDate[date] || 0}
-                        </td>
+                        <React.Fragment key={date}>
+                          <td className="p-3 border-l border-blue-200" />
+                          <td className="p-3 text-center font-bold text-[#1E3A8A] font-mono">
+                            {rekapPenguji.totalPenilaianByDate[date] || 0}
+                          </td>
+                        </React.Fragment>
                       ))}
                       <td className="p-3 text-center bg-blue-100 text-[#1E3A8A] font-extrabold font-mono">
                         {rekapPenguji.grandTotal}
@@ -2088,8 +2116,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <p className="px-4 py-3 text-[11px] leading-relaxed text-slate-500 border-t border-slate-200">
-                Total adalah jumlah siswa unik. Siswa yang dinilai beberapa mapel oleh penguji yang sama tetap dihitung sekali.
-                Total baris bawah adalah siswa unik dari penguji yang tampil pada tanggal tersebut, sehingga tidak selalu sama dengan penjumlahan sel.
+                Angka Siswa adalah jumlah siswa unik per penguji per tanggal. Siswa yang dinilai beberapa mapel oleh penguji yang sama tetap dihitung sekali.
+                Jumlah Penilaian adalah penjumlahan angka Siswa per tanggal.
               </p>
             </div>
           )}

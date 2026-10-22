@@ -2,12 +2,30 @@ import { NilaiRecord, SiswaJadwal, toISODate } from '../types/spmb';
 
 const TANPA_PENGUJI = 'Tanpa Nama Penguji';
 
+const KATEGORI_ORDER: Record<string, number> = {
+  'Al-Quran SD': 1,
+  'Al-Quran SMP/SMA': 2,
+  'Bahasa Arab': 3,
+  Calistung: 4,
+  English: 5,
+  'Interview Walmur': 6
+};
+
 const normalizeKey = (value: string): string =>
   String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
 const cleanNama = (value: string): string => {
   const cleaned = String(value || '').trim().replace(/\s+/g, ' ');
   return cleaned || TANPA_PENGUJI;
+};
+
+const cleanKategori = (value: string): string => String(value || '').trim();
+
+const sortKategori = (a: string, b: string): number => {
+  const orderA = KATEGORI_ORDER[a] ?? 999;
+  const orderB = KATEGORI_ORDER[b] ?? 999;
+  if (orderA !== orderB) return orderA - orderB;
+  return a.localeCompare(b, 'id');
 };
 
 const tanggalDariTimestamp = (value: string): string => {
@@ -27,7 +45,7 @@ const tanggalDariTimestamp = (value: string): string => {
 export interface RekapPengujiRow {
   key: string;
   nama: string;
-  kategori: string[];
+  kategoriByDate: Record<string, string[]>;
   counts: Record<string, number>;
   total: number;
 }
@@ -36,7 +54,7 @@ export interface RekapPengujiResult {
   availableDates: string[];
   dates: string[];
   rows: RekapPengujiRow[];
-  totalByDate: Record<string, number>;
+  totalPenilaianByDate: Record<string, number>;
   grandTotal: number;
 }
 
@@ -48,18 +66,8 @@ export interface RekapPengujiOptions {
 
 interface RowAccumulator {
   nama: string;
-  kategori: Set<string>;
   idsByDate: Map<string, Set<string>>;
-}
-
-interface InternalRow {
-  key: string;
-  nama: string;
-  kategori: string[];
-  counts: Record<string, number>;
-  total: number;
-  idsByDate: Map<string, Set<string>>;
-  allIds: Set<string>;
+  kategoriByDate: Map<string, Set<string>>;
 }
 
 /**
@@ -97,17 +105,26 @@ export function buildRekapPenguji(
 
     let acc = accumulators.get(rowKey);
     if (!acc) {
-      acc = { nama, kategori: new Set(), idsByDate: new Map() };
+      acc = { nama, idsByDate: new Map(), kategoriByDate: new Map() };
       accumulators.set(rowKey, acc);
     }
 
-    acc.kategori.add(String(nilai.kategori_ujian || '').trim());
     let ids = acc.idsByDate.get(date);
     if (!ids) {
       ids = new Set();
       acc.idsByDate.set(date, ids);
     }
     ids.add(siswaKey);
+
+    const kategori = cleanKategori(nilai.kategori_ujian);
+    if (kategori) {
+      let kategoriSet = acc.kategoriByDate.get(date);
+      if (!kategoriSet) {
+        kategoriSet = new Set();
+        acc.kategoriByDate.set(date, kategoriSet);
+      }
+      kategoriSet.add(kategori);
+    }
   });
 
   const from = toISODate(options.from || '');
@@ -115,74 +132,56 @@ export function buildRekapPenguji(
   const searchKey = normalizeKey(options.search || '');
   const inRange = (date: string) =>
     (!from || date >= from) && (!to || date <= to);
-  const matchesSearch = (nama: string) =>
-    !searchKey || normalizeKey(nama).includes(searchKey);
+  const matchesSearch = (acc: RowAccumulator): boolean => {
+    if (!searchKey) return true;
+    if (normalizeKey(acc.nama).includes(searchKey)) return true;
+    return Array.from(acc.kategoriByDate.values()).some((kategoriSet) =>
+      Array.from(kategoriSet).some((kategori) => normalizeKey(kategori).includes(searchKey))
+    );
+  };
 
-  const internalRows: InternalRow[] = Array.from(accumulators.entries())
-    .filter(([, acc]) => matchesSearch(acc.nama))
+  const rows: RekapPengujiRow[] = Array.from(accumulators.entries())
+    .filter(([, acc]) => matchesSearch(acc))
     .map(([key, acc]) => {
-      const idsByDate = new Map<string, Set<string>>();
-      const allIds = new Set<string>();
       const counts: Record<string, number> = {};
+      const kategoriByDate: Record<string, string[]> = {};
 
       acc.idsByDate.forEach((ids, date) => {
         if (!inRange(date)) return;
-        idsByDate.set(date, ids);
         counts[date] = ids.size;
-        ids.forEach((id) => allIds.add(id));
+        kategoriByDate[date] = Array.from(acc.kategoriByDate.get(date) || []).sort(sortKategori);
       });
+
+      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
       return {
         key,
         nama: acc.nama,
-        kategori: Array.from(acc.kategori)
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b, 'id')),
+        kategoriByDate,
         counts,
-        total: allIds.size,
-        idsByDate,
-        allIds
+        total
       };
     })
     .filter((row) => row.total > 0);
 
   const dateSet = new Set<string>();
-  internalRows.forEach((row) => {
+  rows.forEach((row) => {
     Object.keys(row.counts).forEach((date) => dateSet.add(date));
   });
   const dates = Array.from(dateSet).sort();
 
-  const idsByDateAll = new Map<string, Set<string>>();
-  internalRows.forEach((row) => {
-    row.idsByDate.forEach((ids, date) => {
-      let combined = idsByDateAll.get(date);
-      if (!combined) {
-        combined = new Set();
-        idsByDateAll.set(date, combined);
-      }
-      ids.forEach((id) => combined.add(id));
-    });
-  });
-
-  const totalByDate: Record<string, number> = {};
+  const totalPenilaianByDate: Record<string, number> = {};
   dates.forEach((date) => {
-    totalByDate[date] = idsByDateAll.get(date)?.size || 0;
+    totalPenilaianByDate[date] = rows.reduce((sum, row) => sum + (row.counts[date] || 0), 0);
   });
 
-  const grandIds = new Set<string>();
-  internalRows.forEach((row) => {
-    row.allIds.forEach((id) => grandIds.add(id));
-  });
-
-  const rows: RekapPengujiRow[] = internalRows
-    .map(({ idsByDate, allIds, ...row }) => row)
-    .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
 
   return {
     availableDates: Array.from(availableDates).sort(),
     dates,
-    rows,
-    totalByDate,
-    grandTotal: grandIds.size
+    rows: rows.sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
+    totalPenilaianByDate,
+    grandTotal
   };
 }
