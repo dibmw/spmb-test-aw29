@@ -77,8 +77,24 @@ type TimeField = 'waktu_alq_arab' | 'waktu_catung_eng' | 'waktu_interview';
 type TimeInputPair = { start: string; end: string };
 type StudentTimeInputs = Record<TimeField, TimeInputPair>;
 type StudentFormDraft = Omit<SiswaJadwal, 'gender'> & { gender: 'L' | 'P' | '' };
+type KehadiranFilter = 'Semua' | 'Hadir' | 'Belum Hadir';
 
 const TIME_FIELDS: TimeField[] = ['waktu_alq_arab', 'waktu_catung_eng', 'waktu_interview'];
+
+const STUDENT_CLASS_OPTIONS: Array<{ value: string; label: string; grade: 'SD' | 'SMP' | 'SMA' }> = [
+  { value: 'SD 1', label: 'SD - Kelas 1', grade: 'SD' },
+  { value: 'SD 2', label: 'SD - Kelas 2', grade: 'SD' },
+  { value: 'SD 3', label: 'SD - Kelas 3', grade: 'SD' },
+  { value: 'SD 4', label: 'SD - Kelas 4', grade: 'SD' },
+  { value: 'SD 5', label: 'SD - Kelas 5', grade: 'SD' },
+  { value: 'SD 6', label: 'SD - Kelas 6', grade: 'SD' },
+  { value: 'SMP 7', label: 'SMP - Kelas 7', grade: 'SMP' },
+  { value: 'SMP 8', label: 'SMP - Kelas 8', grade: 'SMP' },
+  { value: 'SMP 9', label: 'SMP - Kelas 9', grade: 'SMP' },
+  { value: 'SMA 10', label: 'SMA - Kelas 10', grade: 'SMA' },
+  { value: 'SMA 11', label: 'SMA - Kelas 11', grade: 'SMA' },
+  { value: 'SMA 12', label: 'SMA - Kelas 12', grade: 'SMA' }
+];
 
 const EMPTY_STUDENT_FORM: StudentFormDraft = {
   id: '',
@@ -149,6 +165,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
   const [dateFilter, setDateFilter] = useState('');
+  const [kehadiranSiswaFilter, setKehadiranSiswaFilter] = useState<KehadiranFilter>('Semua');
+  const [kehadiranWalmurFilter, setKehadiranWalmurFilter] = useState<KehadiranFilter>('Semua');
 
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -212,6 +230,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [jadwalList, sesiUjianList]);
+
+  const jadwalDateOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    jadwalList.forEach((siswa) => {
+      const iso = toISODate(siswa.hari_tanggal);
+      if (!iso) return;
+      counts.set(iso, (counts.get(iso) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [jadwalList]);
+
+  useEffect(() => {
+    if (dateFilter && !jadwalDateOptions.some((option) => option.date === dateFilter)) {
+      setDateFilter('');
+    }
+  }, [dateFilter, jadwalDateOptions]);
+
+  const filteredJadwalList = useMemo(() => {
+    const query = searchFilter.trim().toLowerCase();
+    return jadwalList.filter((siswa) => {
+      if (statusFilter !== 'Semua' && siswa.status !== statusFilter) return false;
+      if (dateFilter && toISODate(siswa.hari_tanggal) !== dateFilter) return false;
+      if (kehadiranSiswaFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Siswa') !== kehadiranSiswaFilter) return false;
+      if (kehadiranWalmurFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Walmur') !== kehadiranWalmurFilter) return false;
+      if (!query) return true;
+      return siswa.nama_siswa.toLowerCase().includes(query)
+        || siswa.id.toLowerCase().includes(query)
+        || siswa.kelas.toLowerCase().includes(query);
+    });
+  }, [
+    jadwalList,
+    statusFilter,
+    dateFilter,
+    kehadiranSiswaFilter,
+    kehadiranWalmurFilter,
+    searchFilter,
+    presensiList
+  ]);
+
+  const hasJadwalFilter = Boolean(dateFilter)
+    || kehadiranSiswaFilter !== 'Semua'
+    || kehadiranWalmurFilter !== 'Semua';
+
+  const resetJadwalFilters = () => {
+    setDateFilter('');
+    setKehadiranSiswaFilter('Semua');
+    setKehadiranWalmurFilter('Semua');
+  };
 
   const handleSetSessionMode = (date: string, mode: ModeUjian) => {
     const sesi = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === date);
@@ -1170,24 +1238,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="w-4 h-4 text-slate-500" />
-                <input
-                  type="date"
+                <select
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                  className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
                   title="Filter tanggal ujian"
-                />
-                {dateFilter && (
-                  <button
-                    type="button"
-                    onClick={() => setDateFilter('')}
-                    className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                    title="Reset filter tanggal"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                )}
+                >
+                  <option value="">Tanggal: Semua</option>
+                  {jadwalDateOptions.map((option) => (
+                    <option key={option.date} value={option.date}>
+                      {formatTanggalUjian(option.date)} ({option.count})
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              <select
+                value={kehadiranSiswaFilter}
+                onChange={(e) => setKehadiranSiswaFilter(e.target.value as KehadiranFilter)}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
+                title="Filter kehadiran siswa"
+              >
+                <option value="Semua">Siswa: Semua Kehadiran</option>
+                <option value="Hadir">Siswa: Hadir</option>
+                <option value="Belum Hadir">Siswa: Belum Hadir</option>
+              </select>
+
+              <select
+                value={kehadiranWalmurFilter}
+                onChange={(e) => setKehadiranWalmurFilter(e.target.value as KehadiranFilter)}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
+                title="Filter kehadiran wali murid"
+              >
+                <option value="Semua">Wali: Semua Kehadiran</option>
+                <option value="Hadir">Wali: Hadir</option>
+                <option value="Belum Hadir">Wali: Belum Hadir</option>
+              </select>
+
+              {hasJadwalFilter && (
+                <button
+                  type="button"
+                  onClick={resetJadwalFilters}
+                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Reset filter tanggal dan kehadiran"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
 
               <select
                 value={statusFilter}
@@ -1234,16 +1331,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {jadwalList
-                    .filter(s => statusFilter === 'Semua' || s.status === statusFilter)
-                    .filter(s => !dateFilter || toISODate(s.hari_tanggal) === dateFilter)
-                    .filter(s => 
-                      !searchFilter || 
-                      s.nama_siswa.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                      s.id.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                      s.kelas.toLowerCase().includes(searchFilter.toLowerCase())
-                    )
-                    .map((s) => {
+                  {filteredJadwalList.map((s) => {
                       const mode = getModeUjianForDate(sesiUjianList, s.hari_tanggal);
                       const kehadiranSiswa = resolveKehadiran(s, presensiList, 'Siswa');
                       const kehadiranWalmur = resolveKehadiran(s, presensiList, 'Walmur');
@@ -1357,6 +1445,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </tr>
                       );
                     })}
+                  {filteredJadwalList.length === 0 && (
+                    <tr>
+                      <td colSpan={15} className="p-8 text-center text-slate-500 text-xs font-semibold">
+                        Tidak ada siswa yang sesuai dengan filter.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2238,22 +2333,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <select
                     value={studentFormData.kelas}
                     onChange={(e) => {
-                      const k = e.target.value;
-                      let g: 'SD' | 'SMP' | 'SMA' = 'SD';
-                      if (k.startsWith('SMP')) g = 'SMP';
-                      if (k.startsWith('SMA')) g = 'SMA';
-                      setStudentFormData({ ...studentFormData, kelas: k, grade: g });
+                      const nextClass = STUDENT_CLASS_OPTIONS.find((option) => option.value === e.target.value);
+                      setStudentFormData({
+                        ...studentFormData,
+                        kelas: e.target.value,
+                        grade: nextClass?.grade || getJenjangFromKelas(e.target.value, studentFormData.grade)
+                      });
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                     required
                   >
                     <option value="">-- Pilih Kelas --</option>
-                    <option value="SD 1">SD - Kelas 1</option>
-                    <option value="SD 2">SD - Kelas 2</option>
-                    <option value="SMP 7">SMP - Kelas 7</option>
-                    <option value="SMP 8">SMP - Kelas 8</option>
-                    <option value="SMA 10">SMA - Kelas 10</option>
-                    <option value="SMA 11">SMA - Kelas 11</option>
+                    {studentFormData.kelas && !STUDENT_CLASS_OPTIONS.some((option) => option.value === studentFormData.kelas) && (
+                      <option value={studentFormData.kelas}>{studentFormData.kelas}</option>
+                    )}
+                    {STUDENT_CLASS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
 
