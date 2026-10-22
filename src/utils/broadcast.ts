@@ -392,3 +392,98 @@ export function buildPesanWaliMurid(
     `*PANITIA SPMB ${SCHOOL_NAME}*`,
   ].join('\n');
 }
+
+export interface PengujiTanggalBroadcastItem {
+  nama: string;
+  peran: string[];
+}
+
+/**
+ * Pesan broadcast penguji untuk satu tanggal/sesi ujian.
+ */
+export function buildPesanPengujiTanggal(
+  hariTanggal: string,
+  mode: ModeUjian,
+  location: string,
+  pengujiItems: PengujiTanggalBroadcastItem[],
+  totalSiswa: number
+): string {
+  const isOnline = mode === 'Online';
+  const modeLabel = mode.toUpperCase();
+  const tanggal = formatTanggalUjian(hariTanggal);
+  const locationLines = isOnline
+    ? [
+        `*LINK ZOOM TES*`,
+        location || 'Link Zoom belum tersedia',
+        ``,
+        `Link Zoom ini digunakan untuk seluruh peserta pada tanggal tersebut.`,
+      ]
+    : [
+        `*LOKASI TES*`,
+        SCHOOL_NAME,
+        SCHOOL_ADDRESS,
+        `Google Maps: ${SCHOOL_MAPS_URL}`,
+      ];
+  const pengujiLines = pengujiItems.length > 0
+    ? pengujiItems.map((item, index) => `${index + 1}. ${item.nama} — ${item.peran.join(', ')}`)
+    : ['Belum ada penguji pada tanggal ini.'];
+  const guideLines = isOnline
+    ? [
+        `*PANDUAN PENGUJI ONLINE*`,
+        `• Masuk ke link Zoom 15 menit sebelum jadwal.`,
+        `• Gunakan nama lengkap saat bergabung.`,
+        `• Pastikan kamera dan mikrofon berfungsi.`,
+        `• Cek jadwal, ruangan, dan pos penilaian siswa melalui aplikasi.`,
+      ]
+    : [
+        `*PANDUAN PENGUJI OFFLINE*`,
+        `• Hadir di sekolah 15 menit sebelum jadwal.`,
+        `• Cek jadwal, ruangan, dan pos penilaian siswa melalui aplikasi.`,
+        `• Ikuti arahan panitia selama rangkaian tes.`,
+        `• Pastikan seluruh nilai siswa terisi sebelum meninggalkan lokasi.`,
+      ];
+
+  return [
+    `*PEMBERITAHUAN TUGAS PENGUJI TES SPMB*`,
+    `*${SCHOOL_NAME}*`,
+    ``,
+    `Assalamu'alaikum warahmatullahi wabarakatuh`,
+    ``,
+    `Yth. Penguji Tes SPMB,`,
+    ``,
+    `Dengan hormat, berikut informasi pelaksanaan tes:`,
+    ``,
+    `*HARI/TANGGAL*`,
+    tanggal,
+    ``,
+    `*MODE UJIAN*`,
+    modeLabel,
+    ``,
+    ...locationLines,
+    ``,
+    `*DAFTAR PENGUJI*`,
+    ...pengujiLines,
+    ``,
+    `*JUMLAH PESERTA*`,
+    `${totalSiswa} siswa aktif`,
+    ``,
+    `*CEK JADWAL & TUGAS*`,
+    APP_LINK,
+    ``,
+    `Silakan cek nama siswa, waktu, ruangan, dan pos penilaian masing-masing melalui aplikasi.`,
+    ``,
+    ...guideLines,
+    ``,
+    `*CATATAN*`,
+    `• Informasi resmi hanya melalui website dan kanal panitia SPMB.`,
+    `• Kendala teknis dapat disampaikan ke hotline:`,
+    `WhatsApp: ${SCHOOL_WHATSAPP_LABEL}`,
+    SCHOOL_WHATSAPP_URL,
+    ``,
+    `Demikian informasi ini kami sampaikan. Atas perhatian dan kerja sama para penguji, kami ucapkan terima kasih.`,
+    ``,
+    `Wassalamu'alaikum warahmatullahi wabarakatuh`,
+    ``,
+    `*PANITIA SPMB ${SCHOOL_NAME}*`,
+  ].join('\n');
+}

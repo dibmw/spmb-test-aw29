@@ -58,6 +58,7 @@ import {
   buildPesanPenguji,
   buildPesanTimekeeper,
   buildPesanWaliMurid,
+  buildPesanPengujiTanggal,
   displayKategori,
   hasPresensi,
 } from '../utils/broadcast';
@@ -260,6 +261,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
     return map;
   }, [sessionDateRows, jadwalList]);
+
+  const pengujiBroadcastByDate = useMemo(() => {
+    const map = new Map<string, { count: number; message: string }>();
+    sessionDateRows.forEach((row) => {
+      const students = jadwalList.filter(
+        (siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === row.date
+      );
+      const pengujiMap = new Map<string, { nama: string; peran: Set<string> }>();
+      const roleFields: Array<{ field: 'penguji_alq_arab' | 'penguji_catung_eng' | 'interview_walmur'; label: string }> = [
+        { field: 'penguji_alq_arab', label: "Al-Qur'an/Bahasa Arab" },
+        { field: 'penguji_catung_eng', label: 'Calistung/English' },
+        { field: 'interview_walmur', label: 'Wawancara Orang Tua' },
+      ];
+
+      students.forEach((siswa) => {
+        roleFields.forEach(({ field, label }) => {
+          const nama = (siswa[field] || '').trim();
+          if (!nama || nama === '-') return;
+          const key = nama.toLowerCase();
+          const existing = pengujiMap.get(key);
+          if (existing) {
+            existing.peran.add(label);
+          } else {
+            pengujiMap.set(key, { nama, peran: new Set([label]) });
+          }
+        });
+      });
+
+      const pengujiItems = Array.from(pengujiMap.values())
+        .map((item) => ({ nama: item.nama, peran: Array.from(item.peran) }))
+        .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+      const onlineUrl = waliBroadcastByDate.get(row.date)?.onlineUrl || '';
+
+      map.set(row.date, {
+        count: pengujiItems.length,
+        message: buildPesanPengujiTanggal(row.date, row.mode, onlineUrl, pengujiItems, students.length),
+      });
+    });
+    return map;
+  }, [sessionDateRows, jadwalList, waliBroadcastByDate]);
 
   const jadwalDateOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -1220,8 +1261,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   {sessionDateRows.map((row) => {
                     const broadcast = waliBroadcastByDate.get(row.date);
+                    const pengujiBroadcast = pengujiBroadcastByDate.get(row.date);
                     const missingOnlineLink = row.mode === 'Online' && !broadcast?.onlineUrl;
+                    const missingPenguji = !pengujiBroadcast || pengujiBroadcast.count === 0;
                     const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
+                    const pengujiBroadcastLabel = `Broadcast penguji ${formatTanggalUjian(row.date)}`;
 
                     return (
                       <div key={row.date} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col gap-2">
@@ -1284,6 +1328,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </button>
                           {missingOnlineLink && (
                             <span className="text-[9px] font-semibold text-amber-700">Link Zoom belum tersedia</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-dashed border-slate-200">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 mr-0.5">Penguji</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
+                            disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
+                            className="px-2.5 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            Salin Penguji
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
+                            disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Send className="w-3 h-3" />
+                            Kirim WA Penguji
+                          </button>
+                          {missingPenguji && (
+                            <span className="text-[9px] font-semibold text-slate-500">Belum ada penguji</span>
                           )}
                         </div>
                       </div>
