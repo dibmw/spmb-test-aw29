@@ -1381,13 +1381,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[1500px] text-left text-xs">
                 <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="p-3">ID Siswa</th>
-                    <th className="p-3">Nama Siswa</th>
-                    <th className="p-3">Gender</th>
-                    <th className="p-3">Unit & Kelas</th>
+                    <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">ID Siswa</th>
+                    <th className="p-3 w-[180px] min-w-[180px] bg-[#1E3A8A] lg:sticky lg:left-[104px] lg:z-30">Nama Siswa</th>
+                    <th className="p-3 w-[88px] min-w-[88px] bg-[#1E3A8A] lg:sticky lg:left-[284px] lg:z-30">Gender</th>
+                    <th className="p-3 w-[112px] min-w-[112px] bg-[#1E3A8A] border-r border-blue-700/60 lg:sticky lg:left-[372px] lg:z-30 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">Unit & Kelas</th>
                     <th className="p-3">Tanggal Ujian</th>
                     <th className="p-3">Mode</th>
                     <th className="p-3">Ruang Siswa</th>
@@ -1407,11 +1407,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       const kehadiranSiswa = resolveKehadiran(s, presensiList, 'Siswa');
                       const kehadiranWalmur = resolveKehadiran(s, presensiList, 'Walmur');
                       return (
-                      <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 font-mono font-bold text-[#1E3A8A]">{s.id}</td>
-                        <td className="p-3 font-bold text-slate-900">{s.nama_siswa}</td>
-                        <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                        <td className="p-3">
+                      <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
+                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-0 lg:z-20">{s.id}</td>
+                        <td className="p-3 font-bold text-slate-900 bg-white group-hover:bg-slate-50 w-[180px] min-w-[180px] lg:sticky lg:left-[104px] lg:z-20">{s.nama_siswa}</td>
+                        <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[284px] lg:z-20">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+                        <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[372px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
                             {getJenjangFromKelas(s.kelas)}
                           </span>
