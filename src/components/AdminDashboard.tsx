@@ -58,8 +58,6 @@ import {
   buildPesanPenguji,
   buildPesanTimekeeper,
   buildPesanWaliMurid,
-  SCHOOL_ADDRESS,
-  SCHOOL_MAPS_URL,
   displayKategori,
   hasPresensi,
 } from '../utils/broadcast';
@@ -238,8 +236,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [jadwalList, sesiUjianList]);
 
-  const waliBroadcastRows = useMemo(() => {
-    return sessionDateRows.map((row) => {
+  const waliBroadcastByDate = useMemo(() => {
+    const map = new Map<string, { onlineUrl: string; message: string }>();
+    sessionDateRows.forEach((row) => {
       const students = jadwalList.filter(
         (siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === row.date
       );
@@ -253,16 +252,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }
         }
       }
-      const location = row.mode === 'Online' ? onlineUrl : SCHOOL_ADDRESS;
 
-      return {
-        ...row,
-        studentCount: students.length,
+      map.set(row.date, {
         onlineUrl,
-        location,
-        message: buildPesanWaliMurid(row.date, row.mode, location)
-      };
+        message: buildPesanWaliMurid(row.date, row.mode, onlineUrl)
+      });
     });
+    return map;
   }, [sessionDateRows, jadwalList]);
 
   const jadwalDateOptions = useMemo(() => {
@@ -1222,134 +1218,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <p className="text-xs text-slate-500">Belum ada tanggal ujian pada jadwal.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {sessionDateRows.map((row) => (
-                    <div key={row.date} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 truncate">{formatTanggalUjian(row.date)}</p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          {row.mode === 'Online' ? (
-                            <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <WifiOff className="w-3.5 h-3.5 text-slate-500" />
-                          )}
-                          <span className="text-[10px] text-slate-500">{row.count} siswa</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {row.count === 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSessionDate(row)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Hapus tanggal"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <select
-                          value={row.mode}
-                          onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
-                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
-                            row.mode === 'Online'
-                              ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                              : 'bg-slate-200 text-slate-700 border-slate-300'
-                          }`}
-                          title="Ubah mode ujian sesi ini"
-                        >
-                          <option value="Offline">Offline</option>
-                          <option value="Online">Online</option>
-                        </select>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                  {sessionDateRows.map((row) => {
+                    const broadcast = waliBroadcastByDate.get(row.date);
+                    const missingOnlineLink = row.mode === 'Online' && !broadcast?.onlineUrl;
+                    const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
 
-          {/* Broadcast Wali Murid per Tanggal */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-              <MessageCircle className="w-4 h-4 text-[#D97706]" />
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Broadcast Wali Murid</h3>
-                <p className="text-[11px] text-slate-500">Satu pesan untuk satu tanggal ujian. Salin atau buka WhatsApp, lalu pilih kontak wali murid.</p>
-              </div>
-            </div>
-            <div className="p-4">
-              {waliBroadcastRows.length === 0 ? (
-                <p className="text-xs text-slate-500">Belum ada tanggal ujian untuk dibuatkan broadcast.</p>
-              ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  {waliBroadcastRows.map((row) => {
-                    const missingOnlineLink = row.mode === 'Online' && !row.onlineUrl;
                     return (
-                      <div key={row.date} className="border border-slate-200 rounded-xl overflow-hidden">
-                        <div className="px-3 py-2 bg-white border-b border-slate-200 flex items-start justify-between gap-2">
+                      <div key={row.date} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <strong className="text-xs text-slate-900 block truncate">{formatTanggalUjian(row.date)}</strong>
+                            <p className="text-xs font-bold text-slate-800 truncate">{formatTanggalUjian(row.date)}</p>
                             <div className="flex items-center gap-1.5 mt-1">
                               {row.mode === 'Online' ? (
                                 <Wifi className="w-3.5 h-3.5 text-emerald-600" />
                               ) : (
                                 <WifiOff className="w-3.5 h-3.5 text-slate-500" />
                               )}
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                                row.mode === 'Online'
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-slate-200 text-slate-700'
-                              }`}>{row.mode}</span>
-                              <span className="text-[10px] text-slate-500">{row.studentCount} siswa aktif</span>
+                              <span className="text-[10px] text-slate-500">{row.count} siswa</span>
                             </div>
                           </div>
-                        </div>
-                        <div className="p-3 space-y-3">
-                          <div className="text-[11px] text-slate-600 leading-relaxed">
-                            <span className="font-bold text-slate-700">Lokasi: </span>
-                            {row.mode === 'Online' ? (
-                              row.onlineUrl ? (
-                                <>
-                                  <a href={row.onlineUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-semibold underline underline-offset-2 break-all">
-                                    {row.onlineUrl}
-                                  </a>
-                                  <span className="block text-[10px] text-slate-500 mt-0.5">Link Zoom yang sama untuk seluruh peserta pada tanggal ini.</span>
-                                </>
-                              ) : (
-                                <span className="text-amber-700 font-semibold">Link Zoom belum tersedia.</span>
-                              )
-                            ) : (
-                              <>
-                                {SCHOOL_ADDRESS}
-                                <a href={SCHOOL_MAPS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 ml-1 text-[#1E3A8A] font-semibold underline underline-offset-2">
-                                  Google Maps <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {row.count === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSessionDate(row)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Hapus tanggal"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             )}
+                            <select
+                              value={row.mode}
+                              onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
+                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
+                                row.mode === 'Online'
+                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                                  : 'bg-slate-200 text-slate-700 border-slate-300'
+                              }`}
+                              title="Ubah mode ujian sesi ini"
+                            >
+                              <option value="Offline">Offline</option>
+                              <option value="Online">Online</option>
+                            </select>
                           </div>
-                          <pre className="p-3 max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">{row.message}</pre>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(broadcast?.message || '', broadcastLabel)}
+                            disabled={!broadcast?.message || missingOnlineLink}
+                            className="px-2.5 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            Salin
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppText(broadcast?.message || '', broadcastLabel)}
+                            disabled={!broadcast?.message || missingOnlineLink}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Send className="w-3 h-3" />
+                            Kirim WA
+                          </button>
                           {missingOnlineLink && (
-                            <p className="text-[10px] font-semibold text-amber-700">Isi link Zoom pada data siswa tanggal ini sebelum mengirim broadcast.</p>
+                            <span className="text-[9px] font-semibold text-amber-700">Link Zoom belum tersedia</span>
                           )}
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyText(row.message, `Broadcast wali murid ${formatTanggalUjian(row.date)}`)}
-                              disabled={missingOnlineLink}
-                              className="px-3 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                              Salin Pesan
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSendWhatsAppText(row.message, `Broadcast wali murid ${formatTanggalUjian(row.date)}`)}
-                              disabled={missingOnlineLink}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              Kirim WhatsApp
-                            </button>
-                          </div>
                         </div>
                       </div>
                     );
