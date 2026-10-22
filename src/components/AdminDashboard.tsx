@@ -1331,7 +1331,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-dashed border-slate-200">
-                          <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 mr-0.5">Penguji</span>
                           <button
                             type="button"
                             onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
