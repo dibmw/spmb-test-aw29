@@ -209,6 +209,16 @@ export function toISODate(value: string): string {
   const raw = String(value || '').trim();
   if (!raw) return '';
 
+  const isoDateTimeMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (isoDateTimeMatch) {
+    const parsed = new Date(raw);
+    if (!isNaN(parsed.getTime())) {
+      const jakarta = new Date(parsed.getTime() + 7 * 60 * 60 * 1000);
+      return `${jakarta.getUTCFullYear()}-${String(jakarta.getUTCMonth() + 1).padStart(2, '0')}-${String(jakarta.getUTCDate()).padStart(2, '0')}`;
+    }
+    return `${isoDateTimeMatch[1]}-${isoDateTimeMatch[2]}-${isoDateTimeMatch[3]}`;
+  }
+
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
 
@@ -290,12 +300,29 @@ export function summarizeWaktuAll(
 }
 
 /**
+ * Pilih data sesi terbaik untuk satu tanggal.
+ */
+export function pickSesiUjianForDate(sesiList: SesiUjian[], hariTanggal: string): SesiUjian | undefined {
+  const iso = toISODate(hariTanggal);
+  if (!iso) return undefined;
+  const matches = sesiList.filter((item) => toISODate(item.hari_tanggal) === iso);
+  if (matches.length === 0) return undefined;
+
+  return [...matches].sort((a, b) => {
+    const aHasId = a.id_sesi ? 1 : 0;
+    const bHasId = b.id_sesi ? 1 : 0;
+    if (aHasId !== bHasId) return bHasId - aHasId;
+    const aTime = Date.parse(a.updated_at) || 0;
+    const bTime = Date.parse(b.updated_at) || 0;
+    return bTime - aTime;
+  })[0];
+}
+
+/**
  * Cari mode ujian berdasarkan tanggal sesi. Default Offline.
  */
 export function getModeUjianForDate(sesiList: SesiUjian[], hariTanggal: string): ModeUjian {
-  const iso = toISODate(hariTanggal);
-  if (!iso) return 'Offline';
-  const sesi = sesiList.find((item) => toISODate(item.hari_tanggal) === iso);
+  const sesi = pickSesiUjianForDate(sesiList, hariTanggal);
   return sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline';
 }
 

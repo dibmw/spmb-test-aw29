@@ -6,7 +6,8 @@ import {
   UserSession, 
   Role, 
   KategoriUjian,
-  SesiUjian
+  SesiUjian,
+  toISODate
 } from '../types/spmb';
 import { 
   INITIAL_JADWAL_LIST, 
@@ -211,14 +212,41 @@ class ApiService {
         }
 
         const rawSesi = Array.isArray(sesi) ? sesi : Array.isArray(sesi_ujian) ? sesi_ujian : null;
-        if (rawSesi && rawSesi.length > 0) {
-          const normalizedSesi: SesiUjian[] = rawSesi.map((item: any, index: number) => ({
-            id_sesi: String(item.id_sesi || item.id || `SESI-${String(index + 1).padStart(3, '0')}`).trim(),
-            hari_tanggal: String(item.hari_tanggal || item['hari tanggal'] || item.tanggal || '').trim(),
-            mode_ujian: String(item.mode_ujian || item.mode || '').trim().toLowerCase() === 'online' ? 'Online' : 'Offline',
-            catatan: String(item.catatan || '').trim(),
-            updated_at: String(item.updated_at || item.timestamp || '').trim()
-          }));
+        if (rawSesi) {
+          const candidatesByDate = new Map<string, { sesi: SesiUjian; hasExplicitId: boolean; updatedAtMs: number }>();
+
+          rawSesi.forEach((item: any) => {
+            const date = toISODate(String(item.hari_tanggal || item['hari tanggal'] || item.tanggal || '').trim());
+            const rawId = String(item.id_sesi || item.id || '').trim();
+            const rawMode = String(item.mode_ujian || item.mode || '').trim();
+            if (!date || (!rawId && !rawMode)) return;
+
+            const updatedAt = String(item.updated_at || item.timestamp || '').trim();
+            const sesiItem: SesiUjian = {
+              id_sesi: rawId || `SESI-${date.replace(/-/g, '')}`,
+              hari_tanggal: date,
+              mode_ujian: rawMode.toLowerCase() === 'online' ? 'Online' : 'Offline',
+              catatan: String(item.catatan || '').trim(),
+              updated_at: updatedAt
+            };
+            const candidate = {
+              sesi: sesiItem,
+              hasExplicitId: Boolean(rawId),
+              updatedAtMs: Date.parse(updatedAt) || 0
+            };
+            const current = candidatesByDate.get(date);
+            if (
+              !current
+              || (candidate.hasExplicitId && !current.hasExplicitId)
+              || (candidate.hasExplicitId === current.hasExplicitId && candidate.updatedAtMs > current.updatedAtMs)
+            ) {
+              candidatesByDate.set(date, candidate);
+            }
+          });
+
+          const normalizedSesi = Array.from(candidatesByDate.values())
+            .map((candidate) => candidate.sesi)
+            .sort((a, b) => a.hari_tanggal.localeCompare(b.hari_tanggal));
           localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(normalizedSesi));
           sCount = normalizedSesi.length;
         }

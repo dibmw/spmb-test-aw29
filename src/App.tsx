@@ -175,6 +175,7 @@ export default function App() {
             jadwalList={jadwalList}
             nilaiList={nilaiList}
             presensiList={presensiList}
+            sesiUjianList={sesiUjianList}
             onGradeSaved={(newRecord) => {
               setNilaiList(prev => {
                 const idx = prev.findIndex(

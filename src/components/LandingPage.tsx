@@ -13,7 +13,9 @@ import {
   ArrowRight,
   Monitor,
   BookOpen,
-  AlertCircle
+  AlertCircle,
+  Video,
+  ExternalLink
 } from 'lucide-react';
 import {
   SiswaJadwal,
@@ -28,6 +30,7 @@ import {
   formatTanggalUjian
 } from '../types/spmb';
 import { FullSizeStudentCard } from './FullSizeStudentCard';
+import { getMeetingUrl, isSameMeetingUrl } from '../utils/meeting';
 
 interface LandingPageProps {
   jadwalList: SiswaJadwal[];
@@ -187,6 +190,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 const mode = getModeUjianForDate(sesiUjianList, siswa.hari_tanggal);
                 const stations = getSortedSiswaExamStations(siswa, unit);
                 const isOnline = mode === 'Online';
+                const studentJoinUrl = isOnline ? getMeetingUrl(siswa.ruangan_siswa) : null;
+                const walmurJoinUrl = isOnline ? getMeetingUrl(siswa.ruangan_walmur) : null;
+                const sharedJoinUrl = isSameMeetingUrl(studentJoinUrl, walmurJoinUrl) ? studentJoinUrl : null;
 
                 return (
                   <div
@@ -286,7 +292,55 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           )}
                         </div>
 
-                        {!isOnline && (
+                        {isOnline ? (
+                          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                            {sharedJoinUrl ? (
+                              <a
+                                href={sharedJoinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all active:scale-95"
+                                title="Gabung ujian dan wawancara wali"
+                              >
+                                <Video className="w-4 h-4" />
+                                Gabung Zoom
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            ) : (
+                              <>
+                                {studentJoinUrl && (
+                                  <a
+                                    href={studentJoinUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all active:scale-95"
+                                  >
+                                    <Video className="w-4 h-4" />
+                                    Gabung Ujian Online
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                {walmurJoinUrl && (
+                                  <a
+                                    href={walmurJoinUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#D97706] hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all active:scale-95"
+                                  >
+                                    <Video className="w-4 h-4" />
+                                    Gabung Wawancara Wali
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                {!studentJoinUrl && !walmurJoinUrl && (
+                                  <span className="text-[11px] font-semibold text-amber-700">
+                                    Link Zoom belum tersedia
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ) : (
                           <button
                             type="button"
                             onClick={() => setSelectedStudent(siswa)}

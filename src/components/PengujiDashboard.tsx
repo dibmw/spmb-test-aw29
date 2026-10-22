@@ -12,10 +12,13 @@ import {
   Edit3, 
   PlusCircle, 
   BookOpen, 
-  Sparkles 
+  Sparkles,
+  Video,
+  ExternalLink
 } from 'lucide-react';
-import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran } from '../types/spmb';
+import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, SesiUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran, getModeUjianForDate } from '../types/spmb';
 import { apiService } from '../services/apiService';
+import { getMeetingUrl } from '../utils/meeting';
 import { RubrikModal } from './RubrikModal';
 
 interface PengujiDashboardProps {
@@ -23,6 +26,7 @@ interface PengujiDashboardProps {
   jadwalList: SiswaJadwal[];
   nilaiList: NilaiRecord[];
   presensiList: PresensiRecord[];
+  sesiUjianList: SesiUjian[];
   onGradeSaved: (savedRecord: NilaiRecord) => void;
   showToast: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -32,12 +36,12 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
   jadwalList,
   nilaiList,
   presensiList,
+  sesiUjianList,
   onGradeSaved,
   showToast
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'GRADED'>('ALL');
-  const [postFilter, setPostFilter] = useState<string>('ALL');
 
   // Modal State
   const [selectedStudent, setSelectedStudent] = useState<SiswaJadwal | null>(null);
@@ -125,34 +129,64 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
     return candidates[0].label;
   };
 
-  // Find grades submitted for a student
-  const getStudentGrades = (studentId: string) => {
-    return nilaiList.filter(n => n.id_siswa.toUpperCase() === studentId.toUpperCase());
-  };
-
-  // Filtered student list (sorted by the examiner's own session time)
-  const filteredStudents = useMemo(() => {
-    return myStudents
-      .filter((s) => {
-        const q = searchQuery.trim().toLowerCase();
-        const matchQuery = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.kelas.toLowerCase().includes(q);
-
-        const studentGrades = getStudentGrades(s.id);
-        const categories = getExaminerCategoriesForStudent(s);
-        const isAllGraded = categories.length > 0 && categories.every(cat => studentGrades.some(g => g.kategori_ujian === cat));
-
-        let matchStatus = true;
-        if (statusFilter === 'GRADED') matchStatus = isAllGraded;
-        if (statusFilter === 'PENDING') matchStatus = !isAllGraded;
-
-        return matchQuery && matchStatus;
-      })
+  // One row per exam category, with the student's meeting link shown once per unique URL
+  const tableRows = useMemo(() => {
+    return [...myStudents]
       .sort((a, b) => {
         const ta = parseStartTimeMinutes(getExaminerSessionTime(a, getExaminerCategoriesForStudent(a)));
         const tb = parseStartTimeMinutes(getExaminerSessionTime(b, getExaminerCategoriesForStudent(b)));
         return ta - tb;
+      })
+      .flatMap((siswa) => {
+        const categories = getExaminerCategoriesForStudent(siswa);
+        const studentGrades = nilaiList.filter(n => n.id_siswa.toUpperCase() === siswa.id.toUpperCase());
+        const mode = getModeUjianForDate(sesiUjianList, siswa.hari_tanggal);
+        const isOnline = mode === 'Online';
+        const studentMeetingUrl = isOnline ? getMeetingUrl(siswa.ruangan_siswa) : null;
+        const walmurMeetingUrl = isOnline ? getMeetingUrl(siswa.ruangan_walmur) : null;
+        const displayedMeetingUrls = new Set<string>();
+
+        return categories.map((kategori) => {
+          const isInterview = kategori === 'Interview Walmur';
+          const meetingUrl = isInterview ? walmurMeetingUrl : studentMeetingUrl;
+          const showMeeting = Boolean(meetingUrl) && !displayedMeetingUrls.has(meetingUrl as string);
+          if (showMeeting && meetingUrl) displayedMeetingUrls.add(meetingUrl);
+
+          return {
+            siswa,
+            kategori,
+            gradeRecord: studentGrades.find((grade) => grade.kategori_ujian === kategori),
+            categoryTime: isInterview
+              ? siswa.waktu_interview
+              : kategori === 'Calistung' || kategori === 'English'
+                ? siswa.waktu_catung_eng
+                : siswa.waktu_alq_arab,
+            categoryRoom: isInterview ? siswa.ruangan_walmur : siswa.ruangan_siswa,
+            attendance: resolveKehadiran(siswa, livePresensi, isInterview ? 'Walmur' : 'Siswa'),
+            attendanceType: isInterview ? 'Wali' : 'Siswa',
+            isOnline,
+            hasMeetingUrl: Boolean(meetingUrl),
+            joinUrl: showMeeting ? meetingUrl : null
+          };
+        });
       });
-  }, [myStudents, searchQuery, statusFilter, nilaiList]);
+  }, [myStudents, nilaiList, livePresensi, sesiUjianList]);
+
+  const filteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return tableRows.filter((row) => {
+      if (query) {
+        const matchesQuery = row.siswa.nama_siswa.toLowerCase().includes(query)
+          || row.siswa.id.toLowerCase().includes(query)
+          || row.siswa.kelas.toLowerCase().includes(query)
+          || row.kategori.toLowerCase().includes(query);
+        if (!matchesQuery) return false;
+      }
+      if (statusFilter === 'GRADED') return Boolean(row.gradeRecord);
+      if (statusFilter === 'PENDING') return !row.gradeRecord;
+      return true;
+    });
+  }, [tableRows, searchQuery, statusFilter]);
 
   const handleOpenGrading = (siswa: SiswaJadwal, kategori: KategoriUjian) => {
     setSelectedStudent(siswa);
@@ -179,12 +213,8 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
         {/* Quick Stats Pill */}
         <div className="flex items-center gap-3">
           <div className="bg-blue-900/80 px-4 py-2 rounded-xl border border-blue-700/60 text-center">
-            <span className="text-[10px] text-blue-200 block uppercase font-bold">Total Antrean</span>
+            <span className="text-[10px] text-blue-200 block uppercase font-bold">Total Siswa</span>
             <span className="text-lg font-extrabold text-white">{myStudents.length}</span>
-          </div>
-          <div className="bg-emerald-950/80 px-4 py-2 rounded-xl border border-emerald-700/60 text-center">
-            <span className="text-[10px] text-emerald-200 block uppercase font-bold">Total Entri Nilai</span>
-            <span className="text-lg font-extrabold text-emerald-300">{nilaiList.length}</span>
           </div>
         </div>
       </div>
@@ -218,15 +248,15 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
               }`}
             >
               {st === 'ALL' && 'Semua'}
-              {st === 'PENDING' && 'Belum Lengkap'}
+              {st === 'PENDING' && 'Belum Dinilai'}
               {st === 'GRADED' && 'Sudah Dinilai'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Students Queue Table/Cards */}
-      {filteredStudents.length === 0 ? (
+      {/* Students Queue Table */}
+      {filteredRows.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto">
           <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#1E3A8A] flex items-center justify-center mx-auto mb-3">
             <User className="w-8 h-8" />
@@ -237,124 +267,116 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredStudents.map((siswa) => {
-            const categories = getExaminerCategoriesForStudent(siswa);
-            const studentGrades = getStudentGrades(siswa.id);
-            const hasStudentAttendance = resolveKehadiran(siswa, livePresensi, 'Siswa') === 'Hadir';
-            const sessionTime = getExaminerSessionTime(siswa, categories);
-
-            return (
-              <div
-                key={siswa.id}
-                className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col"
-              >
-                {/* Header */}
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-[#1E3A8A] text-white text-[10px] font-black rounded uppercase">
-                        {gradeOf(siswa)}
-                      </span>
-                      <span className="font-mono text-xs font-bold text-slate-600">{siswa.id}</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        hasStudentAttendance 
-                          ? 'bg-emerald-100 text-emerald-800' 
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1050px] text-left text-xs">
+              <thead className="bg-[#1E3A8A] text-white">
+                <tr>
+                  <th className="px-3 py-3 text-center font-semibold w-12">No</th>
+                  <th className="px-3 py-3 font-semibold">Siswa</th>
+                  <th className="px-3 py-3 font-semibold">Unit/Kelas</th>
+                  <th className="px-3 py-3 font-semibold">Kategori</th>
+                  <th className="px-3 py-3 font-semibold">Jadwal</th>
+                  <th className="px-3 py-3 font-semibold">Kehadiran</th>
+                  <th className="px-3 py-3 font-semibold">Zoom/Ruang</th>
+                  <th className="px-3 py-3 font-semibold">Status</th>
+                  <th className="px-3 py-3 font-semibold">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRows.map((row, index) => (
+                  <tr key={`${row.siswa.id}-${row.kategori}`} className="hover:bg-slate-50/80 transition-colors align-middle">
+                    <td className="px-3 py-3 text-center font-mono text-slate-500">{index + 1}</td>
+                    <td className="px-3 py-3">
+                      <div className="font-bold text-slate-900">{row.siswa.nama_siswa}</div>
+                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">{row.siswa.id}</div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="px-1.5 py-0.5 bg-blue-50 text-[#1E3A8A] text-[10px] font-black rounded">
+                          {gradeOf(row.siswa)}
+                        </span>
+                        <span className="font-semibold text-slate-700">{formatKelas(row.siswa.kelas)}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 font-semibold text-slate-700">
+                      {row.kategori === 'Interview Walmur' ? 'Wawancara Orang Tua' : row.kategori}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="font-mono text-[11px] font-bold text-[#1E3A8A]">{row.categoryTime || '-'}</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                        row.attendance === 'Hadir'
+                          ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-amber-100 text-amber-800'
                       }`}>
-                        {hasStudentAttendance ? 'Hadir di Lokasi' : 'Belum Presensi'}
+                        {row.attendanceType}: {row.attendance}
                       </span>
-                    </div>
-                    <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                      {siswa.nama_siswa}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      <span className={`inline-block px-1.5 py-0.5 rounded font-bold text-[10px] ${siswa.gender === 'L' ? 'bg-sky-100 text-sky-700' : 'bg-rose-100 text-rose-700'}`}>
-                        {siswa.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
-                      </span>{' '}
-                      <strong className="text-[#1E3A8A] font-semibold">{formatKelas(siswa.kelas)}</strong> • Ruangan Siswa: <strong>{siswa.ruangan_siswa}</strong>
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Jadwal Sesi</span>
-                    <span className="text-xs font-bold text-[#1E3A8A] font-mono">{sessionTime}</span>
-                  </div>
-                </div>
-
-                {/* Categories & Actions */}
-                <div className="p-4 space-y-3 flex-1">
-                  <div className="space-y-2">
-                    {categories.map((cat) => {
-                      const gradeRecord = studentGrades.find(g => g.kategori_ujian === cat);
-                      const isGraded = !!gradeRecord;
-                      const displayCategoryName = cat === 'Interview Walmur' ? 'Wawancara Orang Tua' : cat;
-
-                      return (
-                        <div
-                          key={cat}
-                          className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
-                            isGraded 
-                              ? 'bg-emerald-50/50 border-emerald-200' 
-                              : 'bg-slate-50 border-slate-200 hover:border-blue-300'
-                          }`}
-                        >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-800">{displayCategoryName}</span>
-                              {isGraded ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Sudah Dinilai</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded">
-                                  <Clock className="w-3 h-3" />
-                                  <span>Belum Dinilai</span>
-                                </span>
-                              )}
-                            </div>
-
-                            {isGraded && (
-                              <div className="text-[11px] text-slate-600 mt-1">
-                                Skor Akhir: <strong className="text-emerald-800 font-mono">{gradeRecord.skor_akhir_rata2.toFixed(2)}</strong>
-                                {gradeRecord.catatan_umum && (
-                                  <span className="text-slate-500 italic block truncate max-w-xs mt-0.5">
-                                    "{gradeRecord.catatan_umum}"
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={() => handleOpenGrading(siswa, cat)}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                              isGraded
-                                ? 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-700'
-                                : 'bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-sm'
-                            }`}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.isOnline ? (
+                        row.joinUrl ? (
+                          <a
+                            href={row.joinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all"
                           >
-                            {isGraded ? (
-                              <>
-                                <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-                                <span>Koreksi / Edit Nilai</span>
-                              </>
-                            ) : (
-                              <>
-                                <PlusCircle className="w-3.5 h-3.5 text-[#D97706]" />
-                                <span>Input Nilai</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                            <Video className="w-3 h-3" />
+                            Gabung Zoom
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : row.hasMeetingUrl ? (
+                          <span className="text-slate-400">—</span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-amber-700">Link belum tersedia</span>
+                        )
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+                          <MapPin className="w-3 h-3 text-[#D97706]" />
+                          {row.categoryRoom || '-'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                        row.gradeRecord
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {row.gradeRecord ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                        {row.gradeRecord ? 'Sudah Dinilai' : 'Belum Dinilai'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenGrading(row.siswa, row.kategori)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                          row.gradeRecord
+                            ? 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-700'
+                            : 'bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-sm'
+                        }`}
+                      >
+                        {row.gradeRecord ? (
+                          <>
+                            <Edit3 className="w-3 h-3 text-blue-600" />
+                            Edit Nilai
+                          </>
+                        ) : (
+                          <>
+                            <PlusCircle className="w-3 h-3 text-[#D97706]" />
+                            Input Nilai
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

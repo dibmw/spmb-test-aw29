@@ -97,8 +97,26 @@ function dateKey(value) {
     return Utilities.formatDate(value, "Asia/Jakarta", "yyyy-MM-dd");
   }
   var text = String(value || "").trim();
+  var isoDateTime = text.match(/^(\\d{4})-(\\d{2})-(\\d{2})T/);
+  if (isoDateTime) {
+    var parsedDateTime = new Date(text);
+    if (!isNaN(parsedDateTime.getTime())) {
+      return Utilities.formatDate(parsedDateTime, "Asia/Jakarta", "yyyy-MM-dd");
+    }
+    return isoDateTime[1] + "-" + isoDateTime[2] + "-" + isoDateTime[3];
+  }
   var iso = text.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
   if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+  var idDate = text.match(/(\\d{1,2})\\s+([A-Za-z]+)\\s+(\\d{4})/);
+  if (idDate) {
+    var monthNames = {
+      januari: "01", februari: "02", maret: "03", april: "04",
+      mei: "05", juni: "06", juli: "07", agustus: "08",
+      september: "09", oktober: "10", november: "11", desember: "12"
+    };
+    var month = monthNames[idDate[2].toLowerCase()];
+    if (month) return idDate[3] + "-" + month + "-" + ("0" + idDate[1]).slice(-2);
+  }
   return text;
 }
 
@@ -259,7 +277,16 @@ function doGet(e) {
       var pengujis = sheetToObjects(pengujiSheet);
       var nilais = sheetToObjects(nilaiSheet);
       var presensis = sheetToObjects(presensiSheet);
-      var sesis = sheetToObjects(sesiSheet);
+      var sesis = sheetToObjects(sesiSheet).filter(function (item) {
+        return String(item.id_sesi || "").trim() || String(item.mode_ujian || "").trim();
+      });
+
+      for (var jd = 0; jd < jadwals.length; jd++) {
+        jadwals[jd].hari_tanggal = dateKey(jadwals[jd].hari_tanggal);
+      }
+      for (var sd = 0; sd < sesis.length; sd++) {
+        sesis[sd].hari_tanggal = dateKey(sesis[sd].hari_tanggal);
+      }
 
       for (var pi = 0; pi < jadwals.length; pi++) {
         delete jadwals[pi]["nomor_walmur"];
@@ -455,18 +482,23 @@ function doPost(e) {
       var sesiVals = sesiSheet.getDataRange().getValues();
       var sesiUpdatedAt = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
       var sesiRowIndex = -1;
+      var sesiDateMatchIndex = -1;
       var sesiId = String(sesi.id_sesi || "").trim();
       var sesiTanggal = String(sesi.hari_tanggal || "").trim();
 
       for (var si = 1; si < sesiVals.length; si++) {
         var rowId = String(sesiVals[si][0] || "").trim();
         var rowTanggal = dateKey(sesiVals[si][1]);
-        if ((sesiId && rowId === sesiId) || (sesiTanggal && rowTanggal === dateKey(sesiTanggal))) {
+        if (sesiId && rowId === sesiId) {
           sesiRowIndex = si + 1;
-          if (!sesiId) sesiId = rowId;
           break;
         }
+        if (sesiDateMatchIndex < 0 && sesiTanggal && rowTanggal === dateKey(sesiTanggal)) {
+          sesiDateMatchIndex = si + 1;
+        }
       }
+
+      if (sesiRowIndex < 0) sesiRowIndex = sesiDateMatchIndex;
 
       if (!sesiId) {
         sesiId = "SESI-" + String(Date.now()).slice(-6);

@@ -45,6 +45,7 @@ import {
   toISODate,
   formatTanggalUjian,
   getModeUjianForDate,
+  pickSesiUjianForDate,
   resolveKehadiran
 } from '../types/spmb';
 import { apiService } from '../services/apiService';
@@ -205,7 +206,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (existing) {
         existing.count += 1;
       } else {
-        const sesi = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === iso);
+        const sesi = pickSesiUjianForDate(sesiUjianList, iso);
         map.set(iso, {
           date: iso,
           count: 1,
@@ -214,9 +215,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         });
       }
     });
+    const sessionDates = new Set<string>();
     sesiUjianList.forEach((sesi) => {
       const iso = toISODate(sesi.hari_tanggal);
-      if (!iso) return;
+      if (iso) sessionDates.add(iso);
+    });
+    sessionDates.forEach((iso) => {
+      const sesi = pickSesiUjianForDate(sesiUjianList, iso);
+      if (!sesi) return;
       const existing = map.get(iso);
       if (existing) {
         existing.mode = sesi.mode_ujian;
@@ -279,7 +285,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleSetSessionMode = (date: string, mode: ModeUjian) => {
-    const sesi = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === date);
+    const sesi = pickSesiUjianForDate(sesiUjianList, date);
     const res = apiService.saveSesiUjian({
       id_sesi: sesi?.id_sesi || '',
       hari_tanggal: date,
@@ -303,7 +309,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSessionDateChange = (value: string) => {
     const iso = toISODate(value);
     const existing = iso
-      ? sesiUjianList.find((item) => toISODate(item.hari_tanggal) === iso)
+      ? pickSesiUjianForDate(sesiUjianList, iso)
       : undefined;
     setSessionDateForm({
       date: value,
@@ -319,7 +325,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    const existing = sesiUjianList.find((item) => toISODate(item.hari_tanggal) === iso);
+    const existing = pickSesiUjianForDate(sesiUjianList, iso);
     const res = apiService.saveSesiUjian({
       id_sesi: existing?.id_sesi || '',
       hari_tanggal: iso,
