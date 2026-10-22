@@ -182,6 +182,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [rekapDateFrom, setRekapDateFrom] = useState('');
   const [rekapDateTo, setRekapDateTo] = useState('');
   const [rekapSearch, setRekapSearch] = useState('');
+  const [rekapPeranFilter, setRekapPeranFilter] = useState<'Semua' | 'Penguji' | 'Timekeeper'>('Semua');
 
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -505,12 +506,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [activeJadwalList, presensiList, nilaiList, activeIds]);
 
   const rekapPenguji = useMemo(
-    () => buildRekapPenguji(jadwalList, nilaiList, {
+    () => buildRekapPenguji(jadwalList, nilaiList, presensiList, {
       from: rekapDateFrom,
       to: rekapDateTo,
-      search: rekapSearch
+      search: rekapSearch,
+      peran: rekapPeranFilter
     }),
-    [jadwalList, nilaiList, rekapDateFrom, rekapDateTo, rekapSearch]
+    [jadwalList, nilaiList, presensiList, rekapDateFrom, rekapDateTo, rekapSearch, rekapPeranFilter]
   );
 
   const rekapMinDate = rekapPenguji.availableDates[0] || '';
@@ -534,11 +536,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setRekapDateFrom('');
     setRekapDateTo('');
     setRekapSearch('');
+    setRekapPeranFilter('Semua');
   };
 
   const hasRekapFilter = Boolean(rekapDateFrom)
     || Boolean(rekapDateTo)
-    || Boolean(rekapSearch.trim());
+    || Boolean(rekapSearch.trim())
+    || rekapPeranFilter !== 'Semua';
 
   // Handle Save Student (Add or Edit)
   const handleSaveStudent = (e: React.FormEvent) => {
@@ -798,55 +802,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleExportRekapPenguji = () => {
     if (rekapPenguji.rows.length === 0) {
-      showToast('Belum Ada Data', 'Tidak ada nilai pada rentang tanggal yang dipilih.', 'info');
+      showToast('Belum Ada Data', 'Tidak ada data nilai atau presensi pada rentang tanggal yang dipilih.', 'info');
       return;
     }
 
     try {
       const dates = rekapPenguji.dates;
       const headerDate = [
-        'Penguji',
+        'Peran',
+        'Nama',
         ...dates.flatMap((date) => [formatTanggalSingkat(date), '']),
-        'Jumlah Penilaian'
+        'Total'
       ];
-      const headerSub = ['', ...dates.flatMap(() => ['Kategori', 'Siswa']), ''];
+      const headerSub = ['', '', ...dates.flatMap(() => ['Keterangan', 'Jumlah']), ''];
       const body = rekapPenguji.rows.map((row) => [
+        row.peran,
         row.nama,
         ...dates.flatMap((date) => [
-          (row.kategoriByDate[date] || [])
-            .map((kategori) => displayKategori(kategori as KategoriUjian))
+          (row.keteranganByDate[date] || [])
+            .map((keterangan) => displayKategori(keterangan as KategoriUjian))
             .join(', ') || '-',
           row.counts[date] || 0
         ]),
         row.total
       ]);
       const footer = [
-        'Total Penilaian',
-        ...dates.flatMap((date) => ['', rekapPenguji.totalPenilaianByDate[date] || 0]),
+        '',
+        'Total',
+        ...dates.flatMap((date) => ['', rekapPenguji.totalByDate[date] || 0]),
         rekapPenguji.grandTotal
       ];
 
       const ws = XLSX.utils.aoa_to_sheet([headerDate, headerSub, ...body, footer]);
       ws['!merges'] = [
         { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
         ...dates.map((_, index) => ({
-          s: { r: 0, c: 1 + index * 2 },
-          e: { r: 0, c: 2 + index * 2 }
+          s: { r: 0, c: 2 + index * 2 },
+          e: { r: 0, c: 3 + index * 2 }
         })),
-        { s: { r: 0, c: 1 + dates.length * 2 }, e: { r: 1, c: 1 + dates.length * 2 } }
+        { s: { r: 0, c: 2 + dates.length * 2 }, e: { r: 1, c: 2 + dates.length * 2 } }
       ];
       ws['!cols'] = [
+        { wch: 12 },
         { wch: 34 },
         ...dates.flatMap(() => [{ wch: 30 }, { wch: 10 }]),
-        { wch: 18 }
+        { wch: 12 }
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'rekap_penguji');
-      XLSX.writeFile(wb, `REKAP_PENGUJI_ALWILDAN29_${Date.now()}.xlsx`);
+      XLSX.writeFile(wb, `REKAP_PENGUJI_TIMEKEEPER_ALWILDAN29_${Date.now()}.xlsx`);
       showToast(
         'Ekspor Berhasil',
-        `Rekap ${rekapPenguji.rows.length} penguji berhasil diunduh.`,
+        `Rekap ${rekapPenguji.rows.length} penguji/timekeeper berhasil diunduh.`,
         'success'
       );
     } catch (err: any) {
@@ -1171,7 +1180,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <BarChart3 className="w-4 h-4 text-emerald-300" />
-          <span>Rekap Penguji ({rekapPenguji.rows.length})</span>
+          <span>Rekap Penguji & Timekeeper ({rekapPenguji.rows.length})</span>
         </button>
 
         <button
@@ -1904,27 +1913,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 4A: REKAP PENGUJI (siswa unik per tanggal ujian) */}
       {activeSubTab === 'rekap-penguji' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
                 <span className="text-[10px] font-bold uppercase tracking-wider">Penguji Menilai</span>
                 <Users className="w-5 h-5 text-[#1E3A8A]" />
               </div>
               <div className="text-2xl font-extrabold text-[#1E3A8A] font-mono">
-                {rekapPenguji.rows.length}
+                {rekapPenguji.totalPenguji}
               </div>
               <p className="text-[11px] text-slate-500">Penguji dengan nilai pada rentang terpilih</p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Total Penilaian</span>
-                <BarChart3 className="w-5 h-5 text-emerald-600" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Timekeeper Mencatat</span>
+                <Users className="w-5 h-5 text-emerald-600" />
               </div>
               <div className="text-2xl font-extrabold text-emerald-700 font-mono">
-                {rekapPenguji.grandTotal}
+                {rekapPenguji.totalTimekeeper}
+              </div>
+              <p className="text-[11px] text-slate-500">Timekeeper dengan presensi pada rentang terpilih</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Total Penilaian</span>
+                <BarChart3 className="w-5 h-5 text-[#1E3A8A]" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#1E3A8A] font-mono">
+                {rekapPenguji.totalPenilaian}
               </div>
               <p className="text-[11px] text-slate-500">Penjumlahan siswa-teruji per penguji per tanggal</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Total Presensi</span>
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-extrabold text-emerald-700 font-mono">
+                {rekapPenguji.totalPresensi}
+              </div>
+              <p className="text-[11px] text-slate-500">Penjumlahan siswa-tercatat per timekeeper per tanggal</p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
@@ -1935,7 +1966,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="text-2xl font-extrabold text-[#D97706] font-mono">
                 {rekapPenguji.dates.length}
               </div>
-              <p className="text-[11px] text-slate-500">Tanggal yang memiliki nilai pada rentang terpilih</p>
+              <p className="text-[11px] text-slate-500">Tanggal dengan nilai atau presensi pada rentang terpilih</p>
             </div>
           </div>
 
@@ -1946,12 +1977,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 type="text"
                 value={rekapSearch}
                 onChange={(e) => setRekapSearch(e.target.value)}
-                placeholder="Cari penguji atau kategori..."
+                placeholder="Cari penguji, timekeeper, atau keterangan..."
                 className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
               />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={rekapPeranFilter}
+                onChange={(e) => setRekapPeranFilter(e.target.value as 'Semua' | 'Penguji' | 'Timekeeper')}
+                className="px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer"
+                title="Filter peran"
+              >
+                <option value="Semua">Semua Peran</option>
+                <option value="Penguji">Penguji</option>
+                <option value="Timekeeper">Timekeeper</option>
+              </select>
+
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="w-4 h-4 text-slate-500" />
                 <input
@@ -2005,7 +2047,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <h3 className="text-base font-bold text-slate-800">Belum Ada Nilai</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Tidak ada siswa yang sudah dinilai pada rentang tanggal dan pencarian saat ini.
+                Tidak ada data nilai atau presensi pada rentang tanggal, peran, dan pencarian saat ini.
               </p>
               {hasRekapFilter && (
                 <button
@@ -2022,10 +2064,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                    Siswa & Kategori per Penguji per Tanggal Ujian
+                    Rekap Penguji & Timekeeper per Tanggal Ujian
                   </h3>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Angka Siswa adalah siswa unik per tanggal. Jumlah Penilaian adalah penjumlahan angka Siswa per tanggal.
+                    Penguji: siswa dinilai + kategori. Timekeeper: siswa dengan presensi (Siswa atau Walmur).
                   </p>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium">
@@ -2039,21 +2081,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider">
                     <tr>
-                      <th rowSpan={2} className="p-3 min-w-[220px] sticky left-0 z-20 bg-[#1E3A8A]">Penguji</th>
+                      <th rowSpan={2} className="p-3 w-[88px] min-w-[88px] sticky left-0 z-20 bg-[#1E3A8A]">Peran</th>
+                      <th rowSpan={2} className="p-3 min-w-[200px] sticky left-[88px] z-20 bg-[#1E3A8A] border-r border-blue-700/50">
+                        Nama
+                      </th>
                       {rekapPenguji.dates.map((date) => (
                         <th key={date} colSpan={2} className="p-3 text-center min-w-[210px] whitespace-nowrap border-l border-blue-700/50">
                           {formatTanggalSingkat(date)}
                         </th>
                       ))}
-                      <th rowSpan={2} className="p-3 text-center min-w-[120px] bg-blue-900/60 whitespace-nowrap">
-                        Jumlah Penilaian
+                      <th rowSpan={2} className="p-3 text-center min-w-[80px] bg-blue-900/60 whitespace-nowrap">
+                        Total
                       </th>
                     </tr>
                     <tr>
                       {rekapPenguji.dates.map((date) => (
                         <React.Fragment key={date}>
-                          <th className="p-2 min-w-[140px] text-left border-l border-blue-700/50">Kategori</th>
-                          <th className="p-2 min-w-[70px] text-center">Siswa</th>
+                          <th className="p-2 min-w-[140px] text-left border-l border-blue-700/50">Keterangan</th>
+                          <th className="p-2 min-w-[70px] text-center">Jumlah</th>
                         </React.Fragment>
                       ))}
                     </tr>
@@ -2062,21 +2107,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {rekapPenguji.rows.map((row) => (
                       <tr key={row.key} className="hover:bg-slate-50">
                         <td className="p-3 sticky left-0 z-10 bg-white">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-bold uppercase ${
+                              row.peran === 'Penguji'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {row.peran}
+                          </span>
+                        </td>
+                        <td className="p-3 sticky left-[88px] z-10 bg-white border-r border-slate-100">
                           <div className="font-bold text-slate-800">{row.nama}</div>
                         </td>
                         {rekapPenguji.dates.map((date) => {
                           const count = row.counts[date] || 0;
-                          const kategoriText = (row.kategoriByDate[date] || [])
-                            .map((kategori) => displayKategori(kategori as KategoriUjian))
+                          const keteranganText = (row.keteranganByDate[date] || [])
+                            .map((keterangan) => displayKategori(keterangan as KategoriUjian))
                             .join(', ');
                           return (
                             <React.Fragment key={date}>
                               <td className="p-3 text-[10px] text-slate-600 leading-snug border-l border-slate-100">
-                                {kategoriText || <span className="text-slate-300">-</span>}
+                                {keteranganText || <span className="text-slate-300">-</span>}
                               </td>
                               <td className="p-3 text-center">
                                 {count > 0 ? (
-                                  <span className="inline-flex min-w-7 justify-center px-2 py-0.5 rounded-md bg-blue-50 text-[#1E3A8A] font-bold font-mono">
+                                  <span
+                                    className={`inline-flex min-w-7 justify-center px-2 py-0.5 rounded-md font-bold font-mono ${
+                                      row.peran === 'Penguji'
+                                        ? 'bg-blue-50 text-[#1E3A8A]'
+                                        : 'bg-emerald-50 text-emerald-700'
+                                    }`}
+                                  >
                                     {count}
                                   </span>
                                 ) : (
@@ -2087,7 +2149,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           );
                         })}
                         <td className="p-3 text-center bg-slate-50">
-                          <span className="inline-flex min-w-8 justify-center px-2 py-0.5 rounded-md bg-[#1E3A8A] text-white font-bold font-mono">
+                          <span
+                            className={`inline-flex min-w-8 justify-center px-2 py-0.5 rounded-md text-white font-bold font-mono ${
+                              row.peran === 'Penguji' ? 'bg-[#1E3A8A]' : 'bg-emerald-600'
+                            }`}
+                          >
                             {row.total}
                           </span>
                         </td>
@@ -2096,14 +2162,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </tbody>
                   <tfoot>
                     <tr className="bg-blue-50 border-t-2 border-blue-200">
-                      <td className="p-3 sticky left-0 z-10 bg-blue-50 font-bold text-[#1E3A8A]">
-                        Total Penilaian
+                      <td className="p-3 sticky left-0 z-10 bg-blue-50" />
+                      <td className="p-3 sticky left-[88px] z-10 bg-blue-50 font-bold text-[#1E3A8A]">
+                        Total
                       </td>
                       {rekapPenguji.dates.map((date) => (
                         <React.Fragment key={date}>
                           <td className="p-3 border-l border-blue-200" />
                           <td className="p-3 text-center font-bold text-[#1E3A8A] font-mono">
-                            {rekapPenguji.totalPenilaianByDate[date] || 0}
+                            {rekapPenguji.totalByDate[date] || 0}
                           </td>
                         </React.Fragment>
                       ))}
@@ -2116,8 +2183,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <p className="px-4 py-3 text-[11px] leading-relaxed text-slate-500 border-t border-slate-200">
-                Angka Siswa adalah jumlah siswa unik per penguji per tanggal. Siswa yang dinilai beberapa mapel oleh penguji yang sama tetap dihitung sekali.
-                Jumlah Penilaian adalah penjumlahan angka Siswa per tanggal.
+                Penguji: angka adalah siswa unik yang dinilai per tanggal, keterangan berisi kategori ujian.
+                Timekeeper: angka adalah siswa unik yang presensinya dicatat per tanggal (Siswa atau Walmur dihitung sekali).
+                Total adalah penjumlahan angka per tanggal.
               </p>
             </div>
           )}

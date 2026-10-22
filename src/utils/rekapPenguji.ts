@@ -1,6 +1,10 @@
-import { NilaiRecord, SiswaJadwal, toISODate } from '../types/spmb';
+import { NilaiRecord, PresensiRecord, SiswaJadwal, toISODate } from '../types/spmb';
 
 const TANPA_PENGUJI = 'Tanpa Nama Penguji';
+const TANPA_TIMEKEEPER = 'Tanpa Nama Timekeeper';
+const KETERANGAN_PRESENSI = 'Presensi Siswa + Walmur';
+
+const ADMIN_NAME_OVERRIDE = 'ADIB MEIDITHA WIBOWO, S.Si.';
 
 const KATEGORI_ORDER: Record<string, number> = {
   'Al-Quran SD': 1,
@@ -14,10 +18,15 @@ const KATEGORI_ORDER: Record<string, number> = {
 const normalizeKey = (value: string): string =>
   String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-const cleanNama = (value: string): string => {
+const cleanNama = (value: string, fallback: string): string => {
   const cleaned = String(value || '').trim().replace(/\s+/g, ' ');
-  return cleaned || TANPA_PENGUJI;
+  return cleaned || fallback;
 };
+
+const displayNama = (nama: string): string =>
+  normalizeKey(nama) === normalizeKey('Tim Kurikulum Al-Wildan 29 (Admin)')
+    ? ADMIN_NAME_OVERRIDE
+    : nama;
 
 const cleanKategori = (value: string): string => String(value || '').trim();
 
@@ -42,10 +51,13 @@ const tanggalDariTimestamp = (value: string): string => {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 
+export type PeranRekap = 'Penguji' | 'Timekeeper';
+
 export interface RekapPengujiRow {
   key: string;
+  peran: PeranRekap;
   nama: string;
-  kategoriByDate: Record<string, string[]>;
+  keteranganByDate: Record<string, string[]>;
   counts: Record<string, number>;
   total: number;
 }
@@ -54,30 +66,39 @@ export interface RekapPengujiResult {
   availableDates: string[];
   dates: string[];
   rows: RekapPengujiRow[];
-  totalPenilaianByDate: Record<string, number>;
+  totalByDate: Record<string, number>;
   grandTotal: number;
+  totalPenguji: number;
+  totalTimekeeper: number;
+  totalPenilaian: number;
+  totalPresensi: number;
 }
 
 export interface RekapPengujiOptions {
   from?: string;
   to?: string;
   search?: string;
+  peran?: 'Semua' | PeranRekap;
 }
 
 interface RowAccumulator {
+  peran: PeranRekap;
   nama: string;
   idsByDate: Map<string, Set<string>>;
-  kategoriByDate: Map<string, Set<string>>;
+  keteranganByDate: Map<string, Set<string>>;
 }
 
 /**
- * Rekap jumlah siswa unik yang sudah dinilai, per penguji per tanggal ujian.
+ * Rekap data penguji dan timekeeper per tanggal ujian.
+ * - Penguji: jumlah siswa unik yang sudah dinilai + kategori ujian.
+ * - Timekeeper: jumlah siswa unik yang presensinya dicatat (Siswa atau Walmur).
  * Tanggal ujian diambil dari jadwal siswa; bila siswa tidak ditemukan,
- * dipakai tanggal timestamp nilai sebagai fallback.
+ * dipakai tanggal timestamp nilai/presensi sebagai fallback.
  */
 export function buildRekapPenguji(
   jadwalList: SiswaJadwal[],
   nilaiList: NilaiRecord[],
+  presensiList: PresensiRecord[],
   options: RekapPengujiOptions = {}
 ): RekapPengujiResult {
   const jadwalDateById = new Map<string, string>();
@@ -93,9 +114,36 @@ export function buildRekapPenguji(
 
   const accumulators = new Map<string, RowAccumulator>();
 
+  const getAccumulator = (
+    peran: PeranRekap,
+    originalNama: string,
+    fallback: string
+  ): RowAccumulator => {
+    const key = `${peran}:${normalizeKey(originalNama)}`;
+    let acc = accumulators.get(key);
+    if (!acc) {
+      acc = {
+        peran,
+        nama: displayNama(cleanNama(originalNama, fallback)),
+        idsByDate: new Map(),
+        keteranganByDate: new Map()
+      };
+      accumulators.set(key, acc);
+    }
+    return acc;
+  };
+
+  const addKeterangan = (acc: RowAccumulator, date: string, keterangan: string) => {
+    if (!keterangan) return;
+    let set = acc.keteranganByDate.get(date);
+    if (!set) {
+      set = new Set();
+      acc.keteranganByDate.set(date, set);
+    }
+    set.add(keterangan);
+  };
+
   nilaiList.forEach((nilai) => {
-    const nama = cleanNama(nilai.nama_penguji);
-    const rowKey = normalizeKey(nama);
     const siswaKey = normalizeKey(nilai.id_siswa) || normalizeKey(nilai.nama_siswa);
     if (!siswaKey) return;
 
@@ -103,11 +151,7 @@ export function buildRekapPenguji(
     if (!date) return;
     availableDates.add(date);
 
-    let acc = accumulators.get(rowKey);
-    if (!acc) {
-      acc = { nama, idsByDate: new Map(), kategoriByDate: new Map() };
-      accumulators.set(rowKey, acc);
-    }
+    const acc = getAccumulator('Penguji', nilai.nama_penguji, TANPA_PENGUJI);
 
     let ids = acc.idsByDate.get(date);
     if (!ids) {
@@ -116,27 +160,44 @@ export function buildRekapPenguji(
     }
     ids.add(siswaKey);
 
-    const kategori = cleanKategori(nilai.kategori_ujian);
-    if (kategori) {
-      let kategoriSet = acc.kategoriByDate.get(date);
-      if (!kategoriSet) {
-        kategoriSet = new Set();
-        acc.kategoriByDate.set(date, kategoriSet);
-      }
-      kategoriSet.add(kategori);
+    addKeterangan(acc, date, cleanKategori(nilai.kategori_ujian));
+  });
+
+  presensiList.forEach((presensi) => {
+    if (presensi.status && presensi.status !== 'Hadir') return;
+
+    const siswaKey = normalizeKey(presensi.id_siswa) || normalizeKey(presensi.nama_siswa);
+    if (!siswaKey) return;
+
+    const date = jadwalDateById.get(siswaKey) || tanggalDariTimestamp(presensi.timestamp);
+    if (!date) return;
+    availableDates.add(date);
+
+    const acc = getAccumulator('Timekeeper', presensi.petugas_timekeeper, TANPA_TIMEKEEPER);
+
+    let ids = acc.idsByDate.get(date);
+    if (!ids) {
+      ids = new Set();
+      acc.idsByDate.set(date, ids);
     }
+    ids.add(siswaKey);
+
+    addKeterangan(acc, date, KETERANGAN_PRESENSI);
   });
 
   const from = toISODate(options.from || '');
   const to = toISODate(options.to || '');
   const searchKey = normalizeKey(options.search || '');
+  const peranFilter = options.peran || 'Semua';
   const inRange = (date: string) =>
     (!from || date >= from) && (!to || date <= to);
   const matchesSearch = (acc: RowAccumulator): boolean => {
+    if (peranFilter !== 'Semua' && acc.peran !== peranFilter) return false;
     if (!searchKey) return true;
     if (normalizeKey(acc.nama).includes(searchKey)) return true;
-    return Array.from(acc.kategoriByDate.values()).some((kategoriSet) =>
-      Array.from(kategoriSet).some((kategori) => normalizeKey(kategori).includes(searchKey))
+    if (normalizeKey(acc.peran).includes(searchKey)) return true;
+    return Array.from(acc.keteranganByDate.values()).some((keteranganSet) =>
+      Array.from(keteranganSet).some((keterangan) => normalizeKey(keterangan).includes(searchKey))
     );
   };
 
@@ -144,20 +205,21 @@ export function buildRekapPenguji(
     .filter(([, acc]) => matchesSearch(acc))
     .map(([key, acc]) => {
       const counts: Record<string, number> = {};
-      const kategoriByDate: Record<string, string[]> = {};
+      const keteranganByDate: Record<string, string[]> = {};
 
       acc.idsByDate.forEach((ids, date) => {
         if (!inRange(date)) return;
         counts[date] = ids.size;
-        kategoriByDate[date] = Array.from(acc.kategoriByDate.get(date) || []).sort(sortKategori);
+        keteranganByDate[date] = Array.from(acc.keteranganByDate.get(date) || []).sort(sortKategori);
       });
 
       const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
       return {
         key,
+        peran: acc.peran,
         nama: acc.nama,
-        kategoriByDate,
+        keteranganByDate,
         counts,
         total
       };
@@ -170,18 +232,31 @@ export function buildRekapPenguji(
   });
   const dates = Array.from(dateSet).sort();
 
-  const totalPenilaianByDate: Record<string, number> = {};
+  const totalByDate: Record<string, number> = {};
   dates.forEach((date) => {
-    totalPenilaianByDate[date] = rows.reduce((sum, row) => sum + (row.counts[date] || 0), 0);
+    totalByDate[date] = rows.reduce((sum, row) => sum + (row.counts[date] || 0), 0);
   });
 
-  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
+  const pengujiRows = rows.filter((row) => row.peran === 'Penguji');
+  const timekeeperRows = rows.filter((row) => row.peran === 'Timekeeper');
+  const totalPenilaian = pengujiRows.reduce((sum, row) => sum + row.total, 0);
+  const totalPresensi = timekeeperRows.reduce((sum, row) => sum + row.total, 0);
+
+  const peranOrder: Record<PeranRekap, number> = { Penguji: 1, Timekeeper: 2 };
 
   return {
     availableDates: Array.from(availableDates).sort(),
     dates,
-    rows: rows.sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
-    totalPenilaianByDate,
-    grandTotal
+    rows: rows.sort((a, b) => {
+      const peranDiff = peranOrder[a.peran] - peranOrder[b.peran];
+      if (peranDiff !== 0) return peranDiff;
+      return a.nama.localeCompare(b.nama, 'id');
+    }),
+    totalByDate,
+    grandTotal: totalPenilaian + totalPresensi,
+    totalPenguji: pengujiRows.length,
+    totalTimekeeper: timekeeperRows.length,
+    totalPenilaian,
+    totalPresensi
   };
 }
