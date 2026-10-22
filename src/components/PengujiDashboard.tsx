@@ -129,7 +129,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
     return candidates[0].label;
   };
 
-  // One row per exam category, with the student's meeting link shown once per unique URL
+  // One row per student, with their handled categories stacked inside the row
   const tableRows = useMemo(() => {
     return [...myStudents]
       .sort((a, b) => {
@@ -137,38 +137,57 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
         const tb = parseStartTimeMinutes(getExaminerSessionTime(b, getExaminerCategoriesForStudent(b)));
         return ta - tb;
       })
-      .flatMap((siswa) => {
+      .map((siswa) => {
         const categories = getExaminerCategoriesForStudent(siswa);
         const studentGrades = nilaiList.filter(n => n.id_siswa.toUpperCase() === siswa.id.toUpperCase());
         const mode = getModeUjianForDate(sesiUjianList, siswa.hari_tanggal);
         const isOnline = mode === 'Online';
         const studentMeetingUrl = isOnline ? getMeetingUrl(siswa.ruangan_siswa) : null;
         const walmurMeetingUrl = isOnline ? getMeetingUrl(siswa.ruangan_walmur) : null;
-        const displayedMeetingUrls = new Set<string>();
+        const meetingTypesByUrl = new Map<string, Set<'ujian' | 'wawancara'>>();
 
-        return categories.map((kategori) => {
+        const categoryRows = categories.map((kategori) => {
           const isInterview = kategori === 'Interview Walmur';
           const meetingUrl = isInterview ? walmurMeetingUrl : studentMeetingUrl;
-          const showMeeting = Boolean(meetingUrl) && !displayedMeetingUrls.has(meetingUrl as string);
-          if (showMeeting && meetingUrl) displayedMeetingUrls.add(meetingUrl);
+          if (meetingUrl) {
+            const types = meetingTypesByUrl.get(meetingUrl) || new Set<'ujian' | 'wawancara'>();
+            types.add(isInterview ? 'wawancara' : 'ujian');
+            meetingTypesByUrl.set(meetingUrl, types);
+          }
 
           return {
-            siswa,
             kategori,
+            isInterview,
             gradeRecord: studentGrades.find((grade) => grade.kategori_ujian === kategori),
             categoryTime: isInterview
               ? siswa.waktu_interview
               : kategori === 'Calistung' || kategori === 'English'
                 ? siswa.waktu_catung_eng
                 : siswa.waktu_alq_arab,
-            categoryRoom: isInterview ? siswa.ruangan_walmur : siswa.ruangan_siswa,
-            attendance: resolveKehadiran(siswa, livePresensi, isInterview ? 'Walmur' : 'Siswa'),
-            attendanceType: isInterview ? 'Wali' : 'Siswa',
-            isOnline,
-            hasMeetingUrl: Boolean(meetingUrl),
-            joinUrl: showMeeting ? meetingUrl : null
+            categoryRoom: isInterview ? siswa.ruangan_walmur : siswa.ruangan_siswa
           };
         });
+
+        const meetingLinks = Array.from(meetingTypesByUrl.entries()).map(([url, types]) => ({
+          url,
+          label: types.size > 1 ? 'Gabung Zoom' : types.has('wawancara') ? 'Gabung Wawancara Wali' : 'Gabung Ujian Online'
+        }));
+        const hasStudentCategory = categoryRows.some((row) => !row.isInterview);
+        const hasWalmurCategory = categoryRows.some((row) => row.isInterview);
+
+        return {
+          siswa,
+          categories: categoryRows,
+          isOnline,
+          meetingLinks,
+          rooms: Array.from(new Set(categoryRows.map((row) => row.categoryRoom).filter(Boolean))),
+          hasStudentAttendance: hasStudentCategory,
+          hasWalmurAttendance: hasWalmurCategory,
+          attendanceSiswa: resolveKehadiran(siswa, livePresensi, 'Siswa'),
+          attendanceWalmur: resolveKehadiran(siswa, livePresensi, 'Walmur'),
+          isFullyGraded: categoryRows.length > 0 && categoryRows.every((row) => Boolean(row.gradeRecord)),
+          hasPending: categoryRows.some((row) => !row.gradeRecord)
+        };
       });
   }, [myStudents, nilaiList, livePresensi, sesiUjianList]);
 
@@ -179,11 +198,11 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
         const matchesQuery = row.siswa.nama_siswa.toLowerCase().includes(query)
           || row.siswa.id.toLowerCase().includes(query)
           || row.siswa.kelas.toLowerCase().includes(query)
-          || row.kategori.toLowerCase().includes(query);
+          || row.categories.some((category) => category.kategori.toLowerCase().includes(query));
         if (!matchesQuery) return false;
       }
-      if (statusFilter === 'GRADED') return Boolean(row.gradeRecord);
-      if (statusFilter === 'PENDING') return !row.gradeRecord;
+      if (statusFilter === 'GRADED') return row.isFullyGraded;
+      if (statusFilter === 'PENDING') return row.hasPending;
       return true;
     });
   }, [tableRows, searchQuery, statusFilter]);
@@ -285,7 +304,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRows.map((row, index) => (
-                  <tr key={`${row.siswa.id}-${row.kategori}`} className="hover:bg-slate-50/80 transition-colors align-middle">
+                  <tr key={row.siswa.id} className="hover:bg-slate-50/80 transition-colors align-top">
                     <td className="px-3 py-3 text-center font-mono text-slate-500">{index + 1}</td>
                     <td className="px-3 py-3">
                       <div className="font-bold text-slate-900">{row.siswa.nama_siswa}</div>
@@ -299,78 +318,122 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
                         <span className="font-semibold text-slate-700">{formatKelas(row.siswa.kelas)}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3 font-semibold text-slate-700">
-                      {row.kategori === 'Interview Walmur' ? 'Wawancara Orang Tua' : row.kategori}
+                    <td className="px-3 py-3">
+                      <div className="space-y-1.5">
+                        {row.categories.map((category) => (
+                          <div key={category.kategori} className="min-h-[30px] flex items-center font-semibold text-slate-700">
+                            {category.isInterview ? 'Wawancara Orang Tua' : category.kategori}
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
-                      <span className="font-mono text-[11px] font-bold text-[#1E3A8A]">{row.categoryTime || '-'}</span>
+                      <div className="space-y-1.5">
+                        {row.categories.map((category) => (
+                          <div key={category.kategori} className="min-h-[30px] flex items-center">
+                            <span className="font-mono text-[11px] font-bold text-[#1E3A8A]">{category.categoryTime || '-'}</span>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                        row.attendance === 'Hadir'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {row.attendanceType}: {row.attendance}
-                      </span>
+                      <div className="space-y-1.5">
+                        {row.hasStudentAttendance && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            row.attendanceSiswa === 'Hadir'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            Siswa: {row.attendanceSiswa}
+                          </span>
+                        )}
+                        {row.hasWalmurAttendance && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            row.attendanceWalmur === 'Hadir'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            Wali: {row.attendanceWalmur}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       {row.isOnline ? (
-                        row.joinUrl ? (
-                          <a
-                            href={row.joinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all"
-                          >
-                            <Video className="w-3 h-3" />
-                            Gabung Zoom
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : row.hasMeetingUrl ? (
-                          <span className="text-slate-400">—</span>
+                        row.meetingLinks.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {row.meetingLinks.map((link) => (
+                              <a
+                                key={link.url}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all"
+                              >
+                                <Video className="w-3 h-3" />
+                                {link.label}
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-[10px] font-semibold text-amber-700">Link belum tersedia</span>
                         )
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
-                          <MapPin className="w-3 h-3 text-[#D97706]" />
-                          {row.categoryRoom || '-'}
-                        </span>
+                        <div className="space-y-1">
+                          {row.rooms.map((room) => (
+                            <span key={room} className="flex items-center gap-1 text-[11px] text-slate-600">
+                              <MapPin className="w-3 h-3 text-[#D97706] shrink-0" />
+                              {room}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                        row.gradeRecord
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {row.gradeRecord ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                        {row.gradeRecord ? 'Sudah Dinilai' : 'Belum Dinilai'}
-                      </span>
+                      <div className="space-y-1.5">
+                        {row.categories.map((category) => (
+                          <div key={category.kategori} className="min-h-[30px] flex items-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                              category.gradeRecord
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {category.gradeRecord ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                              {category.gradeRecord ? 'Sudah Dinilai' : 'Belum Dinilai'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenGrading(row.siswa, row.kategori)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                          row.gradeRecord
-                            ? 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-700'
-                            : 'bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-sm'
-                        }`}
-                      >
-                        {row.gradeRecord ? (
-                          <>
-                            <Edit3 className="w-3 h-3 text-blue-600" />
-                            Edit Nilai
-                          </>
-                        ) : (
-                          <>
-                            <PlusCircle className="w-3 h-3 text-[#D97706]" />
-                            Input Nilai
-                          </>
-                        )}
-                      </button>
+                      <div className="space-y-1.5">
+                        {row.categories.map((category) => (
+                          <div key={category.kategori} className="min-h-[30px] flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenGrading(row.siswa, category.kategori)}
+                              className={`px-3 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                                category.gradeRecord
+                                  ? 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-700'
+                                  : 'bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-sm'
+                              }`}
+                            >
+                              {category.gradeRecord ? (
+                                <>
+                                  <Edit3 className="w-3 h-3 text-blue-600" />
+                                  Edit Nilai
+                                </>
+                              ) : (
+                                <>
+                                  <PlusCircle className="w-3 h-3 text-[#D97706]" />
+                                  Input Nilai
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ))}

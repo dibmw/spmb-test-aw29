@@ -57,9 +57,13 @@ import {
   groupBroadcastByTimekeeper,
   buildPesanPenguji,
   buildPesanTimekeeper,
+  buildPesanWaliMurid,
+  SCHOOL_ADDRESS,
+  SCHOOL_MAPS_URL,
   displayKategori,
   hasPresensi,
 } from '../utils/broadcast';
+import { getMeetingUrl } from '../utils/meeting';
 import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
 import { RubrikModal } from './RubrikModal';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -233,6 +237,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [jadwalList, sesiUjianList]);
+
+  const waliBroadcastRows = useMemo(() => {
+    return sessionDateRows.map((row) => {
+      const students = jadwalList.filter(
+        (siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === row.date
+      );
+      let onlineUrl = '';
+      if (row.mode === 'Online') {
+        for (const siswa of students) {
+          const url = getMeetingUrl(siswa.ruangan_siswa) || getMeetingUrl(siswa.ruangan_walmur);
+          if (url) {
+            onlineUrl = url;
+            break;
+          }
+        }
+      }
+      const location = row.mode === 'Online' ? onlineUrl : SCHOOL_ADDRESS;
+
+      return {
+        ...row,
+        studentCount: students.length,
+        onlineUrl,
+        location,
+        message: buildPesanWaliMurid(row.date, row.mode, location)
+      };
+    });
+  }, [sessionDateRows, jadwalList]);
 
   const jadwalDateOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -767,6 +798,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .catch(() => showToast('Gagal Menyalin', 'Clipboard tidak tersedia di browser ini. Salin manual dari kolom preview.', 'error'));
   };
 
+  const handleSendWhatsAppText = (text: string, label: string) => {
+    if (!text.trim()) return;
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    showToast('WhatsApp Dibuka', `${label} siap dikirim. Silakan pilih kontak wali murid.`, 'info');
+  };
+
   const handleCopyAllPenguji = () => {
     const all = broadcastPengujiGroups.map((g) => buildPesanPenguji(g.penguji, g.items)).join('\n\n———————————\n\n');
     handleCopyText(all, `Semua pesan penguji (${broadcastPengujiGroups.length} orang)`);
@@ -1221,6 +1262,98 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Broadcast Wali Murid per Tanggal */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-[#D97706]" />
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Broadcast Wali Murid</h3>
+                <p className="text-[11px] text-slate-500">Satu pesan untuk satu tanggal ujian. Salin atau buka WhatsApp, lalu pilih kontak wali murid.</p>
+              </div>
+            </div>
+            <div className="p-4">
+              {waliBroadcastRows.length === 0 ? (
+                <p className="text-xs text-slate-500">Belum ada tanggal ujian untuk dibuatkan broadcast.</p>
+              ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {waliBroadcastRows.map((row) => {
+                    const missingOnlineLink = row.mode === 'Online' && !row.onlineUrl;
+                    return (
+                      <div key={row.date} className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 bg-white border-b border-slate-200 flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <strong className="text-xs text-slate-900 block truncate">{formatTanggalUjian(row.date)}</strong>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {row.mode === 'Online' ? (
+                                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <WifiOff className="w-3.5 h-3.5 text-slate-500" />
+                              )}
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                row.mode === 'Online'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}>{row.mode}</span>
+                              <span className="text-[10px] text-slate-500">{row.studentCount} siswa aktif</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 space-y-3">
+                          <div className="text-[11px] text-slate-600 leading-relaxed">
+                            <span className="font-bold text-slate-700">Lokasi: </span>
+                            {row.mode === 'Online' ? (
+                              row.onlineUrl ? (
+                                <>
+                                  <a href={row.onlineUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-semibold underline underline-offset-2 break-all">
+                                    {row.onlineUrl}
+                                  </a>
+                                  <span className="block text-[10px] text-slate-500 mt-0.5">Link Zoom yang sama untuk seluruh peserta pada tanggal ini.</span>
+                                </>
+                              ) : (
+                                <span className="text-amber-700 font-semibold">Link Zoom belum tersedia.</span>
+                              )
+                            ) : (
+                              <>
+                                {SCHOOL_ADDRESS}
+                                <a href={SCHOOL_MAPS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 ml-1 text-[#1E3A8A] font-semibold underline underline-offset-2">
+                                  Google Maps <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </>
+                            )}
+                          </div>
+                          <pre className="p-3 max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">{row.message}</pre>
+                          {missingOnlineLink && (
+                            <p className="text-[10px] font-semibold text-amber-700">Isi link Zoom pada data siswa tanggal ini sebelum mengirim broadcast.</p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(row.message, `Broadcast wali murid ${formatTanggalUjian(row.date)}`)}
+                              disabled={missingOnlineLink}
+                              className="px-3 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              Salin Pesan
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSendWhatsAppText(row.message, `Broadcast wali murid ${formatTanggalUjian(row.date)}`)}
+                              disabled={missingOnlineLink}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              Kirim WhatsApp
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

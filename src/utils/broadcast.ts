@@ -7,7 +7,9 @@ import {
   PresensiRecord,
   NilaiRecord,
   KategoriUjian,
+  ModeUjian,
   getJenjangFromKelas,
+  formatTanggalUjian,
 } from '../types/spmb';
 
 const normId = (v: string): string => (v || '').trim().toLowerCase();
@@ -298,5 +300,95 @@ export function buildPesanTimekeeper(
     ``,
     `Jazakumullah khairan.`,
     `Panitia SPMB Al-Wildan 29`,
+  ].join('\n');
+}
+
+export const SCHOOL_NAME = 'AL-WILDAN ISLAMIC SCHOOL 29 DEPOK';
+export const SCHOOL_ADDRESS = 'Jl. H. Nawi Malik No.9, Serua, Kec. Bojongsari, Kota Depok, Jawa Barat 16517';
+export const SCHOOL_MAPS_URL = 'https://maps.app.goo.gl/MtkrofBPnCkZG5Un8';
+export const SCHOOL_WHATSAPP_LABEL = '+62 823 12955731';
+export const SCHOOL_WHATSAPP_URL = 'https://wa.me/6282312955731';
+
+/**
+ * Pesan broadcast wali murid untuk satu tanggal/sesi ujian.
+ * Online memakai satu link Zoom, offline memakai alamat sekolah.
+ */
+export function buildPesanWaliMurid(
+  hariTanggal: string,
+  mode: ModeUjian,
+  location: string
+): string {
+  const isOnline = mode === 'Online';
+  const modeLabel = mode.toUpperCase();
+  const tanggal = formatTanggalUjian(hariTanggal);
+  const locationLines = isOnline
+    ? [
+        `*LINK ZOOM TES*`,
+        location || 'Link Zoom belum tersedia',
+        ``,
+        `Link Zoom ini digunakan untuk seluruh peserta pada tanggal tersebut.`,
+      ]
+    : [
+        `*LOKASI TES*`,
+        SCHOOL_NAME,
+        SCHOOL_ADDRESS,
+        `Google Maps: ${SCHOOL_MAPS_URL}`,
+      ];
+  const guideLines = isOnline
+    ? [
+        `*PANDUAN PESERTA ONLINE*`,
+        `• Siapkan laptop/HP dengan kamera dan mikrofon yang berfungsi.`,
+        `• Gunakan koneksi internet yang stabil dan ruangan yang tenang.`,
+        `• Masuk ke link Zoom 15 menit sebelum jadwal.`,
+        `• Gunakan nama lengkap calon siswa saat bergabung.`,
+        `• Tidak dibantu oleh orang lain selama tes berlangsung.`,
+      ]
+    : [
+        `*PANDUAN PESERTA OFFLINE*`,
+        `• Hadir 15 menit sebelum jadwal.`,
+        `• Unduh atau cetak kartu peserta melalui website.`,
+        `• Bawa kartu peserta dan tunjukkan QR Code di meja registrasi.`,
+        `• Ikuti arahan petugas menuju ruangan tes.`,
+        `• Berpakaian rapi dan sopan selama rangkaian tes.`,
+      ];
+
+  return [
+    `*PEMBERITAHUAN TES SPMB - MODE ${modeLabel}*`,
+    `*${SCHOOL_NAME}*`,
+    ``,
+    `Assalamu'alaikum warahmatullahi wabarakatuh`,
+    ``,
+    `Yth. Bapak/Ibu Wali Murid Calon Siswa,`,
+    ``,
+    `Dengan hormat, kami menginformasikan pelaksanaan Tes SPMB:`,
+    ``,
+    `*HARI/TANGGAL*`,
+    tanggal,
+    ``,
+    ...locationLines,
+    ``,
+    `*CEK JADWAL PESERTA*`,
+    APP_LINK,
+    ``,
+    `Silakan cek nama/ID calon siswa untuk melihat waktu tes, ruangan, dan jadwal wawancara orang tua/wali.`,
+    ``,
+    ...guideLines,
+    ``,
+    `*WAWANCARA ORANG TUA/WALI*`,
+    isOnline
+      ? `Wali murid mengikuti jadwal wawancara dan menggunakan link yang tersedia pada website.`
+      : `Wali murid mengikuti jadwal wawancara dan hadir di ruangan yang tertera pada website.`,
+    ``,
+    `*CATATAN*`,
+    `• Informasi resmi hanya melalui website dan kanal panitia SPMB.`,
+    `• Kendala teknis dapat disampaikan ke hotline:`,
+    `WhatsApp: ${SCHOOL_WHATSAPP_LABEL}`,
+    SCHOOL_WHATSAPP_URL,
+    ``,
+    `Demikian informasi ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.`,
+    ``,
+    `Wassalamu'alaikum warahmatullahi wabarakatuh`,
+    ``,
+    `*PANITIA SPMB ${SCHOOL_NAME}*`,
   ].join('\n');
 }
