@@ -48,7 +48,7 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
   const isSuperAdmin = session.activeRole === 'ADMIN';
 
   // Robust jenjang resolution (falls back to parsing "kelas" if grade field is missing/bad)
-  const gradeOf = (s: SiswaJadwal): 'SD' | 'SMP' | 'SMA' => getJenjangFromKelas(s.kelas, s.grade);
+  const gradeOf = (s: SiswaJadwal): 'SD' | 'SMP' | 'SMA' => getJenjangFromKelas(s.kelas);
 
   const myStudents = useMemo(() => {
     return jadwalList.filter((s) => {

@@ -183,7 +183,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           ) : (
             <div className="space-y-4">
               {activeStudents.map((siswa) => {
-                const unit = getJenjangFromKelas(siswa.kelas, siswa.grade);
+                const unit = getJenjangFromKelas(siswa.kelas);
                 const mode = getModeUjianForDate(sesiUjianList, siswa.hari_tanggal);
                 const stations = getSortedSiswaExamStations(siswa, unit);
                 const isOnline = mode === 'Online';

@@ -52,7 +52,7 @@ export const FullSizeStudentCard: React.FC<FullSizeStudentCardProps> = ({
       .catch((err) => console.error("QR code generation error:", err));
   }, [siswa.id]);
 
-  const unit = getJenjangFromKelas(siswa.kelas, siswa.grade);
+  const unit = getJenjangFromKelas(siswa.kelas);
   const sortedStations = getSortedSiswaExamStations(siswa, unit);
 
   // Check student attendance status (override admin > presensi timekeeper)

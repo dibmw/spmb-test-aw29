@@ -5,10 +5,7 @@ export interface SiswaJadwal {
   nama_siswa: string;
   kelas: string; // e.g. "SD 1", "SMP 7", "SMA 10"
   gender: 'L' | 'P';
-  grade: 'SD' | 'SMP' | 'SMA';
   ruangan_siswa: string;
-  ord_alq_arab: string; // e.g. "1"
-  ord_catung_eng: string; // e.g. "2"
   waktu_all: string; // e.g. "07:30 - 11:30"
   waktu_alq_arab: string;
   waktu_catung_eng: string;
@@ -159,15 +156,12 @@ export function formatKelas(rawKelas: string): string {
  * Mendapatkan jenjang unit (SD, SMP, SMA):
  * SD jika < 7, SMP jika 7-9, SMA jika > 9
  */
-export function getJenjangFromKelas(rawKelas: string, fallbackGrade?: string): 'SD' | 'SMP' | 'SMA' {
+export function getJenjangFromKelas(rawKelas: string): 'SD' | 'SMP' | 'SMA' {
   const digits = rawKelas ? parseInt(rawKelas.replace(/\D+/g, ''), 10) : NaN;
   if (!isNaN(digits)) {
     if (digits < 7) return 'SD';
     if (digits >= 7 && digits <= 9) return 'SMP';
     if (digits > 9) return 'SMA';
-  }
-  if (fallbackGrade === 'SD' || fallbackGrade === 'SMP' || fallbackGrade === 'SMA') {
-    return fallbackGrade;
   }
   const upper = (rawKelas || '').toUpperCase();
   if (upper.includes('SMA')) return 'SMA';
@@ -330,7 +324,7 @@ export function getSortedSiswaExamStations(siswa: SiswaJadwal, unit: 'SD' | 'SMP
     id: 'ALQ_ARAB',
     title: unit === 'SD' ? "Ujian Al-Qur'an" : "Ujian Al-Qur'an & Bahasa Arab",
     waktu: siswa.waktu_alq_arab,
-    posBadge: siswa.ord_alq_arab || 'Pos A',
+    posBadge: 'Pos A',
     penguji: siswa.penguji_alq_arab,
     ruangan: siswa.ruangan_siswa,
     startMinutes: parseStartTimeMinutes(siswa.waktu_alq_arab)
@@ -340,7 +334,7 @@ export function getSortedSiswaExamStations(siswa: SiswaJadwal, unit: 'SD' | 'SMP
     id: 'CATUNG_ENG',
     title: unit === 'SD' ? "Ujian Calistung" : "Ujian English",
     waktu: siswa.waktu_catung_eng,
-    posBadge: siswa.ord_catung_eng || 'Pos B',
+    posBadge: 'Pos B',
     penguji: siswa.penguji_catung_eng,
     ruangan: siswa.ruangan_siswa,
     startMinutes: parseStartTimeMinutes(siswa.waktu_catung_eng)
@@ -348,4 +342,3 @@ export function getSortedSiswaExamStations(siswa: SiswaJadwal, unit: 'SD' | 'SMP
 
   return [stationA, stationB].sort((a, b) => a.startMinutes - b.startMinutes);
 }
-

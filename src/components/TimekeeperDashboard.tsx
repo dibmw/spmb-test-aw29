@@ -438,7 +438,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                     {scannedStudent.nama_siswa}
                   </h3>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    <span className="font-bold text-[#1E3A8A]">{getJenjangFromKelas(scannedStudent.kelas, scannedStudent.grade)}</span> • <strong className="text-slate-800">{formatKelas(scannedStudent.kelas)}</strong> ({scannedStudent.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
+                    <span className="font-bold text-[#1E3A8A]">{getJenjangFromKelas(scannedStudent.kelas)}</span> • <strong className="text-slate-800">{formatKelas(scannedStudent.kelas)}</strong> ({scannedStudent.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
                   </p>
                 </div>
 
@@ -458,7 +458,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                     </div>
                     <div className="space-y-1.5">
                       <span className="text-slate-500 block font-bold">Penguji Ujian (sesuai urutan waktu):</span>
-                      {getSortedSiswaExamStations(scannedStudent, scannedStudent.grade).map((st, idx) => (
+                      {getSortedSiswaExamStations(scannedStudent, getJenjangFromKelas(scannedStudent.kelas)).map((st, idx) => (
                         <div key={st.id} className="flex items-center justify-between gap-2">
                           <span className="text-slate-600">
                             <span className="inline-block w-4 font-bold text-[#1E3A8A]">{idx + 1}.</span>
@@ -565,7 +565,7 @@ export const TimekeeperDashboard: React.FC<TimekeeperDashboardProps> = ({
                       <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                       <td className="p-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1E3A8A]">
-                          {getJenjangFromKelas(s.kelas, s.grade)}
+                          {getJenjangFromKelas(s.kelas)}
                         </span>
                       </td>
                       <td className="p-3 text-slate-600">{s.ruangan_siswa}</td>

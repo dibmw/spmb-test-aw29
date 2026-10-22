@@ -20,20 +20,25 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
 
 var ADMIN_EMAIL = "kurikulum.alwildan29@gmail.com";
 
-// Skema terkunci header web_jadwal (kolom A s/d X) dan key kanoniknya
+// Skema terkunci header web_jadwal (kolom A s/d S) dan key kanoniknya
 var JADWAL_HEADERS = [
-  "id", "nama siswa", "kelas", "gender", "nomor walmur", "email walmur", "grade",
-  "ruangan_siswa", "ord_alq_arab", "ord_catung_eng", "waktu_all", "waktu_alq_arab",
+  "id", "nama siswa", "kelas", "gender",
+  "ruangan_siswa", "waktu_all", "waktu_alq_arab",
   "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
   "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
   "hari tanggal", "Status", "status_kehadiran_siswa", "status_kehadiran_walmur"
 ];
 var JADWAL_KEYS = [
-  "id", "nama_siswa", "kelas", "gender", "nomor_walmur", "email_walmur", "grade",
-  "ruangan_siswa", "ord_alq_arab", "ord_catung_eng", "waktu_all", "waktu_alq_arab",
+  "id", "nama_siswa", "kelas", "gender",
+  "ruangan_siswa", "waktu_all", "waktu_alq_arab",
   "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
   "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
   "hari_tanggal", "status", "status_kehadiran_siswa", "status_kehadiran_walmur"
+];
+
+// Kolom lama yang sudah tidak dipakai lagi dan akan dibersihkan otomatis.
+var OBSOLETE_JADWAL_HEADERS = [
+  "nomor walmur", "email walmur", "grade", "ord_alq_arab", "ord_catung_eng"
 ];
 
 // Baca web_jadwal dengan skema terkunci: header dicocokkan case/space-insensitive,
@@ -148,7 +153,27 @@ function initSheets(ss) {
 
   var jadwalSheet = ss.getSheetByName("web_jadwal");
   if (jadwalSheet) {
+    removeObsoleteJadwalColumns(jadwalSheet);
     ensureJadwalHeaderColumns(jadwalSheet);
+  }
+}
+
+// Hapus kolom usang web_jadwal satu kali saat init. Penulisan data memakai nama
+// header, sehingga penghapusan kolom tidak menggeser data lain.
+function removeObsoleteJadwalColumns(sheet) {
+  if (!sheet) return;
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var toDelete = [];
+  for (var c = 0; c < headers.length; c++) {
+    if (OBSOLETE_JADWAL_HEADERS.indexOf(normHeader(headers[c])) !== -1) {
+      toDelete.push(c + 1);
+    }
+  }
+  toDelete.sort(function (a, b) { return b - a; });
+  for (var i = 0; i < toDelete.length; i++) {
+    sheet.deleteColumn(toDelete[i]);
   }
 }
 
@@ -175,6 +200,34 @@ function ensureJadwalHeaderColumns(sheet) {
       .setBackground("#1E3A8A")
       .setFontColor("#FFFFFF");
   }
+}
+
+// Peta nama header web_jadwal (0-based) agar penulisan tidak bergantung posisi kolom.
+function jadwalHeaderIndexMap(sheet) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var map = {};
+  for (var c = 0; c < headers.length; c++) {
+    map[normHeader(headers[c])] = c;
+  }
+  return { map: map, width: headers.length };
+}
+
+// Bangun satu baris sesuai urutan header aktual. existingRow dipakai saat update
+// agar kolom tambahan di luar skema tetap dipertahankan.
+function buildJadwalRow(sheet, siswa, existingRow) {
+  var info = jadwalHeaderIndexMap(sheet);
+  var row = existingRow ? existingRow.slice() : [];
+  while (row.length < info.width) row.push("");
+  for (var k = 0; k < JADWAL_KEYS.length; k++) {
+    var key = JADWAL_KEYS[k];
+    var col = info.map[normHeader(key)];
+    if (col === undefined) continue;
+    var value = siswa[key];
+    if (existingRow && value === undefined) continue;
+    row[col] = (value === undefined || value === null) ? "" : value;
+  }
+  return row;
 }
 
 // Helper output CORS JSON
@@ -361,13 +414,7 @@ function doPost(e) {
     if (action === "adminAddSchedule") {
       var jSheet = ss.getSheetByName("web_jadwal");
       var s = postData.siswa;
-      jSheet.appendRow([
-        s.id, s.nama_siswa, s.kelas, s.gender, "", "", s.grade,
-        s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
-        s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
-        s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
-        s.hari_tanggal, s.status, s.status_kehadiran_siswa || "", s.status_kehadiran_walmur || ""
-      ]);
+      jSheet.appendRow(buildJadwalRow(jSheet, s, null));
       return jsonResponse({ status: "success", message: "Jadwal siswa berhasil ditambahkan." });
     }
 
@@ -379,13 +426,8 @@ function doPost(e) {
       var found = false;
       for (var i = 1; i < vals.length; i++) {
         if (String(vals[i][0]) === String(s.id)) {
-          jSheet.getRange(i + 1, 1, 1, 24).setValues([[
-            s.id, s.nama_siswa, s.kelas, s.gender, vals[i][4], vals[i][5], s.grade,
-            s.ruangan_siswa, s.ord_alq_arab, s.ord_catung_eng, s.waktu_all, s.waktu_alq_arab,
-            s.waktu_catung_eng, s.ruangan_walmur, s.penguji_alq_arab, s.penguji_catung_eng,
-            s.timekeeper_siswa, s.interview_walmur, s.timekeeper_walmur, s.waktu_interview,
-            s.hari_tanggal, s.status, s.status_kehadiran_siswa || "", s.status_kehadiran_walmur || ""
-          ]]);
+          var updatedRow = buildJadwalRow(jSheet, s, vals[i]);
+          jSheet.getRange(i + 1, 1, 1, updatedRow.length).setValues([updatedRow]);
           found = true;
           break;
         }

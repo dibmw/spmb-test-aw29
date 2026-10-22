@@ -17,7 +17,7 @@ const normId = (v: string): string => (v || '').trim().toLowerCase();
  * SD: 3 kategori. SMP/SMA: 4 kategori (Bahasa Arab terpisah, mengikuti alur penguji di RubrikModal).
  */
 export function getRequiredKategori(siswa: SiswaJadwal): KategoriUjian[] {
-  const jenjang = getJenjangFromKelas(siswa.kelas, siswa.grade);
+  const jenjang = getJenjangFromKelas(siswa.kelas);
   if (jenjang === 'SD') {
     return ['Al-Quran SD', 'Calistung', 'Interview Walmur'];
   }

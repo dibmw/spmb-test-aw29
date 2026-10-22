@@ -46,7 +46,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({ siswa, onClo
 
   if (!siswa) return null;
 
-  const unit = getJenjangFromKelas(siswa.kelas, siswa.grade);
+  const unit = getJenjangFromKelas(siswa.kelas);
   const sortedStations = getSortedSiswaExamStations(siswa, unit);
 
   const handleDownload = async () => {

@@ -326,7 +326,7 @@ export const RubrikModal: React.FC<RubrikModalProps> = ({
 
   if (!isOpen || !siswa) return null;
 
-  const unit = getJenjangFromKelas(siswa.kelas, siswa.grade);
+  const unit = getJenjangFromKelas(siswa.kelas);
   const examLinks = getExamLinks(kategori, unit, siswa.kelas);
 
   // Real-time calculation of average score (NaN when incomplete)

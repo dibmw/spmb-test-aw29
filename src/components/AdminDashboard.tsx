@@ -81,19 +81,19 @@ type KehadiranFilter = 'Semua' | 'Hadir' | 'Belum Hadir';
 
 const TIME_FIELDS: TimeField[] = ['waktu_alq_arab', 'waktu_catung_eng', 'waktu_interview'];
 
-const STUDENT_CLASS_OPTIONS: Array<{ value: string; label: string; grade: 'SD' | 'SMP' | 'SMA' }> = [
-  { value: 'SD 1', label: 'SD - Kelas 1', grade: 'SD' },
-  { value: 'SD 2', label: 'SD - Kelas 2', grade: 'SD' },
-  { value: 'SD 3', label: 'SD - Kelas 3', grade: 'SD' },
-  { value: 'SD 4', label: 'SD - Kelas 4', grade: 'SD' },
-  { value: 'SD 5', label: 'SD - Kelas 5', grade: 'SD' },
-  { value: 'SD 6', label: 'SD - Kelas 6', grade: 'SD' },
-  { value: 'SMP 7', label: 'SMP - Kelas 7', grade: 'SMP' },
-  { value: 'SMP 8', label: 'SMP - Kelas 8', grade: 'SMP' },
-  { value: 'SMP 9', label: 'SMP - Kelas 9', grade: 'SMP' },
-  { value: 'SMA 10', label: 'SMA - Kelas 10', grade: 'SMA' },
-  { value: 'SMA 11', label: 'SMA - Kelas 11', grade: 'SMA' },
-  { value: 'SMA 12', label: 'SMA - Kelas 12', grade: 'SMA' }
+const STUDENT_CLASS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'SD 1', label: 'SD - Kelas 1' },
+  { value: 'SD 2', label: 'SD - Kelas 2' },
+  { value: 'SD 3', label: 'SD - Kelas 3' },
+  { value: 'SD 4', label: 'SD - Kelas 4' },
+  { value: 'SD 5', label: 'SD - Kelas 5' },
+  { value: 'SD 6', label: 'SD - Kelas 6' },
+  { value: 'SMP 7', label: 'SMP - Kelas 7' },
+  { value: 'SMP 8', label: 'SMP - Kelas 8' },
+  { value: 'SMP 9', label: 'SMP - Kelas 9' },
+  { value: 'SMA 10', label: 'SMA - Kelas 10' },
+  { value: 'SMA 11', label: 'SMA - Kelas 11' },
+  { value: 'SMA 12', label: 'SMA - Kelas 12' }
 ];
 
 const EMPTY_STUDENT_FORM: StudentFormDraft = {
@@ -101,10 +101,7 @@ const EMPTY_STUDENT_FORM: StudentFormDraft = {
   nama_siswa: '',
   kelas: '',
   gender: '',
-  grade: 'SD',
   ruangan_siswa: '',
-  ord_alq_arab: '',
-  ord_catung_eng: '',
   waktu_all: '',
   waktu_alq_arab: '',
   waktu_catung_eng: '',
@@ -736,7 +733,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return broadcastBaseA.filter((r) => {
       const s = r.siswa;
       const okQ = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas, s.grade) === broadcastJenjang;
+      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas) === broadcastJenjang;
       const okK = broadcastKelas === 'Semua' || s.kelas === broadcastKelas;
       return okQ && okJ && okK;
     });
@@ -747,7 +744,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return broadcastBaseB.filter((r) => {
       const s = r.siswa;
       const okQ = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas, s.grade) === broadcastJenjang;
+      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas) === broadcastJenjang;
       const okK = broadcastKelas === 'Semua' || s.kelas === broadcastKelas;
       return okQ && okJ && okK;
     });
@@ -821,7 +818,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <td className="p-2 font-mono">{idx + 1}</td>
         <td className="p-2 font-mono">{s.id}</td>
         <td className="p-2 font-bold">{s.nama_siswa}</td>
-        <td className="p-2">{getJenjangFromKelas(s.kelas, s.grade)} • {formatKelas(s.kelas)}</td>
+        <td className="p-2">{getJenjangFromKelas(s.kelas)} • {formatKelas(s.kelas)}</td>
         <td className="p-2">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
         <td className="p-2 font-mono">{group === 'siswa' ? s.waktu_all : s.waktu_interview}</td>
       </tr>
@@ -1342,7 +1339,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-3 text-slate-700">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
-                            {getJenjangFromKelas(s.kelas, s.grade)}
+                            {getJenjangFromKelas(s.kelas)}
                           </span>
                           <span className="block mt-1 font-bold text-[#1E3A8A]">
                             {formatKelas(s.kelas)}
@@ -1517,7 +1514,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {activeJadwalList.map((s) => {
-                    const jenjang = getJenjangFromKelas(s.kelas, s.grade);
+                    const jenjang = getJenjangFromKelas(s.kelas);
                     const hadirSiswa = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa');
                     const hadirWalmur = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur');
                     const alqCat: KategoriUjian = jenjang === 'SD' ? 'Al-Quran SD' : 'Al-Quran SMP/SMA';
@@ -1740,7 +1737,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </tr>
                   ) : (
                     broadcastRowsA.map((r) => {
-                      const jenjang = getJenjangFromKelas(r.siswa.kelas, r.siswa.grade);
+                      const jenjang = getJenjangFromKelas(r.siswa.kelas);
                       return (
                         <tr key={r.siswa.id} className="hover:bg-slate-50">
                           <td className="p-3 font-mono font-bold text-[#1E3A8A]">{r.siswa.id}</td>
@@ -1833,7 +1830,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </tr>
                   ) : (
                     broadcastRowsB.map((r) => {
-                      const jenjang = getJenjangFromKelas(r.siswa.kelas, r.siswa.grade);
+                      const jenjang = getJenjangFromKelas(r.siswa.kelas);
                       return (
                         <tr key={r.siswa.id} className="hover:bg-slate-50">
                           <td className="p-3 font-mono font-bold text-[#1E3A8A]">{r.siswa.id}</td>
@@ -2333,11 +2330,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <select
                     value={studentFormData.kelas}
                     onChange={(e) => {
-                      const nextClass = STUDENT_CLASS_OPTIONS.find((option) => option.value === e.target.value);
                       setStudentFormData({
                         ...studentFormData,
-                        kelas: e.target.value,
-                        grade: nextClass?.grade || getJenjangFromKelas(e.target.value, studentFormData.grade)
+                        kelas: e.target.value
                       });
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
