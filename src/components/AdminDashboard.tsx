@@ -62,6 +62,7 @@ import {
   displayKategori,
   hasPresensi,
 } from '../utils/broadcast';
+import { buildRekapPenguji } from '../utils/rekapPenguji';
 import { getMeetingUrl } from '../utils/meeting';
 import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
 import { RubrikModal } from './RubrikModal';
@@ -153,6 +154,16 @@ const timeValueToMinutes = (value: string): number => {
   return hour * 60 + minute;
 };
 
+const formatTanggalSingkat = (iso: string): string => {
+  const [year, month, day] = iso.split('-').map(Number);
+  if (!year || !month || !day) return iso;
+  return new Date(year, month - 1, day).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   session,
   jadwalList,
@@ -162,12 +173,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataChanged,
   showToast
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
+  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'rekap-penguji' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
   const [dateFilter, setDateFilter] = useState('');
   const [kehadiranSiswaFilter, setKehadiranSiswaFilter] = useState<KehadiranFilter>('Semua');
   const [kehadiranWalmurFilter, setKehadiranWalmurFilter] = useState<KehadiranFilter>('Semua');
+  const [rekapDateFrom, setRekapDateFrom] = useState('');
+  const [rekapDateTo, setRekapDateTo] = useState('');
+  const [rekapSearch, setRekapSearch] = useState('');
 
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -490,6 +504,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, [activeJadwalList, presensiList, nilaiList, activeIds]);
 
+  const rekapPenguji = useMemo(
+    () => buildRekapPenguji(jadwalList, nilaiList, {
+      from: rekapDateFrom,
+      to: rekapDateTo,
+      search: rekapSearch
+    }),
+    [jadwalList, nilaiList, rekapDateFrom, rekapDateTo, rekapSearch]
+  );
+
+  const rekapMinDate = rekapPenguji.availableDates[0] || '';
+  const rekapMaxDate = rekapPenguji.availableDates[rekapPenguji.availableDates.length - 1] || '';
+
+  const handleRekapDateFromChange = (value: string) => {
+    setRekapDateFrom(value);
+    if (value && rekapDateTo && value > rekapDateTo) {
+      setRekapDateTo(value);
+    }
+  };
+
+  const handleRekapDateToChange = (value: string) => {
+    setRekapDateTo(value);
+    if (value && rekapDateFrom && value < rekapDateFrom) {
+      setRekapDateFrom(value);
+    }
+  };
+
+  const resetRekapFilters = () => {
+    setRekapDateFrom('');
+    setRekapDateTo('');
+    setRekapSearch('');
+  };
+
+  const hasRekapFilter = Boolean(rekapDateFrom)
+    || Boolean(rekapDateTo)
+    || Boolean(rekapSearch.trim());
+
   // Handle Save Student (Add or Edit)
   const handleSaveStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -741,6 +791,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       // Download
       XLSX.writeFile(wb, `REKAP_SPMB_ALWILDAN29_${Date.now()}.xlsx`);
       showToast('Ekspor Berhasil', `File Excel (.xlsx) lengkap berhasil diunduh (${tidakHadir.length} siswa tidak hadir).`, 'success');
+    } catch (err: any) {
+      showToast('Ekspor Gagal', err.message || 'Gagal membuat file excel.', 'error');
+    }
+  };
+
+  const handleExportRekapPenguji = () => {
+    if (rekapPenguji.rows.length === 0) {
+      showToast('Belum Ada Data', 'Tidak ada nilai pada rentang tanggal yang dipilih.', 'info');
+      return;
+    }
+
+    try {
+      const header = [
+        'Penguji',
+        ...rekapPenguji.dates.map((date) => formatTanggalSingkat(date)),
+        'Total Siswa Unik'
+      ];
+      const body = rekapPenguji.rows.map((row) => [
+        row.nama,
+        ...rekapPenguji.dates.map((date) => row.counts[date] || 0),
+        row.total
+      ]);
+      body.push([
+        'Total Siswa Unik',
+        ...rekapPenguji.dates.map((date) => rekapPenguji.totalByDate[date] || 0),
+        rekapPenguji.grandTotal
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+      ws['!cols'] = [{ wch: 34 }, ...rekapPenguji.dates.map(() => ({ wch: 16 })), { wch: 18 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'rekap_penguji');
+      XLSX.writeFile(wb, `REKAP_PENGUJI_ALWILDAN29_${Date.now()}.xlsx`);
+      showToast(
+        'Ekspor Berhasil',
+        `Rekap ${rekapPenguji.rows.length} penguji berhasil diunduh.`,
+        'success'
+      );
     } catch (err: any) {
       showToast('Ekspor Gagal', err.message || 'Gagal membuat file excel.', 'error');
     }
@@ -1052,6 +1141,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <FileSpreadsheet className="w-4 h-4 text-blue-300" />
           <span>Rekapitulasi Nilai ({nilaiList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('rekap-penguji')}
+          className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+            activeSubTab === 'rekap-penguji'
+              ? 'bg-[#1E3A8A] text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-emerald-300" />
+          <span>Rekap Penguji ({rekapPenguji.rows.length})</span>
         </button>
 
         <button
@@ -1778,6 +1879,220 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* TAB 4A: REKAP PENGUJI (siswa unik per tanggal ujian) */}
+      {activeSubTab === 'rekap-penguji' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Penguji Menilai</span>
+                <Users className="w-5 h-5 text-[#1E3A8A]" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#1E3A8A] font-mono">
+                {rekapPenguji.rows.length}
+              </div>
+              <p className="text-[11px] text-slate-500">Penguji dengan nilai pada rentang terpilih</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Siswa Unik Dinilai</span>
+                <BarChart3 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-extrabold text-emerald-700 font-mono">
+                {rekapPenguji.grandTotal}
+              </div>
+              <p className="text-[11px] text-slate-500">Siswa dihitung sekali walau dinilai beberapa mapel</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Tanggal Ujian</span>
+                <CalendarDays className="w-5 h-5 text-[#D97706]" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#D97706] font-mono">
+                {rekapPenguji.dates.length}
+              </div>
+              <p className="text-[11px] text-slate-500">Tanggal yang memiliki nilai pada rentang terpilih</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={rekapSearch}
+                onChange={(e) => setRekapSearch(e.target.value)}
+                placeholder="Cari nama penguji..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-slate-500" />
+                <input
+                  type="date"
+                  value={rekapDateFrom}
+                  min={rekapMinDate || undefined}
+                  max={rekapDateTo || rekapMaxDate || undefined}
+                  onChange={(e) => handleRekapDateFromChange(e.target.value)}
+                  className="px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer"
+                  title="Tanggal mulai"
+                />
+                <span className="text-[11px] font-semibold text-slate-500">s.d.</span>
+                <input
+                  type="date"
+                  value={rekapDateTo}
+                  min={rekapDateFrom || rekapMinDate || undefined}
+                  max={rekapMaxDate || undefined}
+                  onChange={(e) => handleRekapDateToChange(e.target.value)}
+                  className="px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer"
+                  title="Tanggal akhir"
+                />
+              </div>
+
+              {hasRekapFilter && (
+                <button
+                  type="button"
+                  onClick={resetRekapFilters}
+                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Reset filter rekap"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleExportRekapPenguji}
+                disabled={rekapPenguji.rows.length === 0}
+                className="px-3.5 py-2 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-[#D97706]" />
+                <span>Unduh Rekap</span>
+              </button>
+            </div>
+          </div>
+
+          {rekapPenguji.rows.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#1E3A8A] flex items-center justify-center mx-auto mb-3">
+                <BarChart3 className="w-8 h-8" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">Belum Ada Nilai</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Tidak ada siswa yang sudah dinilai pada rentang tanggal dan pencarian saat ini.
+              </p>
+              {hasRekapFilter && (
+                <button
+                  type="button"
+                  onClick={resetRekapFilters}
+                  className="mt-4 px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                    Jumlah Siswa Unik per Penguji per Tanggal Ujian
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Berdasarkan nilai yang sudah masuk. Tanggal ujian diambil dari jadwal siswa.
+                  </p>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {rekapDateFrom || rekapDateTo
+                    ? `Rentang: ${rekapDateFrom ? formatTanggalSingkat(rekapDateFrom) : 'Awal'} s.d. ${rekapDateTo ? formatTanggalSingkat(rekapDateTo) : 'Akhir'}`
+                    : 'Semua tanggal'}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3 min-w-[220px] sticky left-0 z-20 bg-[#1E3A8A]">Penguji</th>
+                      {rekapPenguji.dates.map((date) => (
+                        <th key={date} className="p-3 text-center min-w-[110px] whitespace-nowrap">
+                          {formatTanggalSingkat(date)}
+                        </th>
+                      ))}
+                      <th className="p-3 text-center min-w-[120px] bg-blue-900/60 whitespace-nowrap">Total Unik</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {rekapPenguji.rows.map((row) => (
+                      <tr key={row.key} className="hover:bg-slate-50">
+                        <td className="p-3 sticky left-0 z-10 bg-white">
+                          <div className="font-bold text-slate-800">{row.nama}</div>
+                          {row.kategori.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {row.kategori.map((kategori) => (
+                                <span
+                                  key={kategori}
+                                  className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-semibold"
+                                >
+                                  {displayKategori(kategori as KategoriUjian)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        {rekapPenguji.dates.map((date) => {
+                          const count = row.counts[date] || 0;
+                          return (
+                            <td key={date} className="p-3 text-center">
+                              {count > 0 ? (
+                                <span className="inline-flex min-w-7 justify-center px-2 py-0.5 rounded-md bg-blue-50 text-[#1E3A8A] font-bold font-mono">
+                                  {count}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="p-3 text-center bg-slate-50">
+                          <span className="inline-flex min-w-8 justify-center px-2 py-0.5 rounded-md bg-[#1E3A8A] text-white font-bold font-mono">
+                            {row.total}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-blue-50 border-t-2 border-blue-200">
+                      <td className="p-3 sticky left-0 z-10 bg-blue-50 font-bold text-[#1E3A8A]">
+                        Total Siswa Unik
+                      </td>
+                      {rekapPenguji.dates.map((date) => (
+                        <td key={date} className="p-3 text-center font-bold text-[#1E3A8A] font-mono">
+                          {rekapPenguji.totalByDate[date] || 0}
+                        </td>
+                      ))}
+                      <td className="p-3 text-center bg-blue-100 text-[#1E3A8A] font-extrabold font-mono">
+                        {rekapPenguji.grandTotal}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <p className="px-4 py-3 text-[11px] leading-relaxed text-slate-500 border-t border-slate-200">
+                Total adalah jumlah siswa unik. Siswa yang dinilai beberapa mapel oleh penguji yang sama tetap dihitung sekali.
+                Total baris bawah adalah siswa unik dari penguji yang tampil pada tanggal tersebut, sehingga tidak selalu sama dengan penjumlahan sel.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
