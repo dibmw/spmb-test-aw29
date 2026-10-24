@@ -173,7 +173,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataChanged,
   showToast
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'presensi' | 'nilai' | 'rekap-penguji' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
+  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'nilai' | 'rekap-penguji' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
   const [dateFilter, setDateFilter] = useState('');
@@ -1148,18 +1148,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('presensi')}
-          className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'presensi'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>Rekap Presensi ({presensiList.length})</span>
-        </button>
-
-        <button
           onClick={() => setActiveSubTab('nilai')}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
             activeSubTab === 'nilai'
@@ -1577,7 +1565,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1500px] text-left text-xs">
+              <table className="w-full min-w-[1900px] text-left text-xs">
                 <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">ID Siswa</th>
@@ -1593,6 +1581,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="p-3">Waktu Ujian (All)</th>
                     <th className="p-3">Kehadiran Siswa</th>
                     <th className="p-3">Kehadiran Wali Murid</th>
+                    <th className="p-3">Status Presensi Siswa</th>
+                    <th className="p-3">Status Presensi Wali Murid</th>
+                    <th className="p-3">Penilaian Al-Qur'an</th>
+                    <th className="p-3">Penilaian Bahasa Arab</th>
+                    <th className="p-3">Penilaian Catung/English</th>
+                    <th className="p-3">Penilaian Interview Walmur</th>
                     <th className="p-3">Status Jadwal</th>
                     <th className="p-3 text-right">Aksi</th>
                   </tr>
@@ -1600,8 +1594,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <tbody className="divide-y divide-slate-200">
                   {filteredJadwalList.map((s) => {
                       const mode = getModeUjianForDate(sesiUjianList, s.hari_tanggal);
+                      const jenjang = getJenjangFromKelas(s.kelas);
                       const kehadiranSiswa = resolveKehadiran(s, presensiList, 'Siswa');
                       const kehadiranWalmur = resolveKehadiran(s, presensiList, 'Walmur');
+                      const alqCat: KategoriUjian = jenjang === 'SD' ? 'Al-Quran SD' : 'Al-Quran SMP/SMA';
+                      const arabCat: KategoriUjian = 'Bahasa Arab';
+                      const calCat: KategoriUjian = jenjang === 'SD' ? 'Calistung' : 'English';
+                      const ivCat: KategoriUjian = 'Interview Walmur';
+                      const alqNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === alqCat);
+                      const arabNilai = jenjang === 'SMP' || jenjang === 'SMA' ? nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === arabCat) : undefined;
+                      const calNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === calCat);
+                      const ivNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === ivCat);
+                      const renderNilaiCell = (rec?: NilaiRecord) => rec ? (
+                        <div className="space-y-0.5">
+                          <span className="block font-mono font-bold text-emerald-700">{rec.skor_akhir_rata2.toFixed(2)}</span>
+                          <span className="block text-[10px] text-slate-500 max-w-[120px] truncate">{rec.nama_penguji}</span>
+                        </div>
+                      ) : <span className="text-[10px] text-slate-400 italic">Belum Dinilai</span>;
+                      const hadirSiswaPresensi = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa');
+                      const hadirWalmurPresensi = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur');
                       return (
                       <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
                         <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-0 lg:z-20">{s.id}</td>
@@ -1609,7 +1620,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[284px] lg:z-20">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                         <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[372px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
-                            {getJenjangFromKelas(s.kelas)}
+                            {jenjang}
                           </span>
                           <span className="block mt-1 font-bold text-[#1E3A8A]">
                             {formatKelas(s.kelas)}
@@ -1652,9 +1663,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
                                 : 'bg-amber-100 text-amber-700 border-amber-300'
                             }`}
-                            title="Status kehadiran siswa (otomatis dari presensi, bisa di-override admin)"
+                            title="Override kehadiran manual. Kosong = ikut data presensi/timekeeper"
                           >
-                            <option value="">Otomatis: {kehadiranSiswa}</option>
+                            <option value="">Ikuti Presensi ({kehadiranSiswa})</option>
                             <option value="Hadir">Hadir</option>
                             <option value="Belum Hadir">Belum Hadir</option>
                           </select>
@@ -1668,13 +1679,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
                                 : 'bg-amber-100 text-amber-700 border-amber-300'
                             }`}
-                            title="Status kehadiran wali murid (otomatis dari presensi, bisa di-override admin)"
+                            title="Override kehadiran manual. Kosong = ikut data presensi/timekeeper"
                           >
-                            <option value="">Otomatis: {kehadiranWalmur}</option>
+                            <option value="">Ikuti Presensi ({kehadiranWalmur})</option>
                             <option value="Hadir">Hadir</option>
                             <option value="Belum Hadir">Belum Hadir</option>
                           </select>
                         </td>
+                        <td className="p-3">
+                          {hadirSiswaPresensi ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                              <Clock className="w-3 h-3" /> Belum Presensi
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {hadirWalmurPresensi ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                              <Clock className="w-3 h-3" /> Belum Presensi
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">{renderNilaiCell(alqNilai)}</td>
+                        <td className="p-3">{(jenjang === 'SMP' || jenjang === 'SMA') ? renderNilaiCell(arabNilai) : <span className="text-[10px] text-slate-400">-</span>}</td>
+                        <td className="p-3">{renderNilaiCell(calNilai)}</td>
+                        <td className="p-3">{renderNilaiCell(ivNilai)}</td>
                         <td className="p-3">
                           <select
                             value={s.status || 'Aktif'}
@@ -1714,7 +1751,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     })}
                   {filteredJadwalList.length === 0 && (
                     <tr>
-                      <td colSpan={15} className="p-8 text-center text-slate-500 text-xs font-semibold">
+                      <td colSpan={22} className="p-8 text-center text-slate-500 text-xs font-semibold">
                         Tidak ada siswa yang sesuai dengan filter.
                       </td>
                     </tr>
@@ -1725,126 +1762,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
-      {/* TAB 3: PRESENSI & NILAI PER SISWA TABLE */}
-      {activeSubTab === 'presensi' && (
-        <div className="space-y-4">
-          {/* Ringkasan cepat */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Siswa</span>
-                <Users className="w-4 h-4 text-rose-500" />
-              </div>
-              <span className="text-2xl font-extrabold text-rose-700 font-mono">
-                {activeJadwalList.filter((s) => !presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa')).length}
-              </span>
-              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
-            </div>
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Walmur</span>
-                <Users className="w-4 h-4 text-amber-500" />
-              </div>
-              <span className="text-2xl font-extrabold text-amber-700 font-mono">
-                {activeJadwalList.filter((s) => !presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur')).length}
-              </span>
-              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
-            </div>
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa Aktif</span>
-                <Users className="w-4 h-4 text-[#1E3A8A]" />
-              </div>
-              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">{activeJadwalList.length}</span>
-              <p className="text-[10px] text-slate-400">siswa terdaftar aktif</p>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                Rekap Presensi & Nilai per Siswa
-              </h3>
-              <span className="text-xs text-slate-500 font-mono">Total: {activeJadwalList.length}</span>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#1E3A8A] text-white uppercase text-[10px]">
-                  <tr>
-                    <th className="p-3">ID</th>
-                    <th className="p-3">Nama Siswa</th>
-                    <th className="p-3">Jenjang & Kelas</th>
-                    <th className="p-3">Presensi Siswa</th>
-                    <th className="p-3">Presensi Walmur</th>
-                    <th className="p-3">Al-Qur'an / Arab</th>
-                    <th className="p-3">Calistung / English</th>
-                    <th className="p-3">Interview Walmur</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {activeJadwalList.map((s) => {
-                    const jenjang = getJenjangFromKelas(s.kelas);
-                    const hadirSiswa = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa');
-                    const hadirWalmur = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur');
-                    const alqCat: KategoriUjian = jenjang === 'SD' ? 'Al-Quran SD' : 'Al-Quran SMP/SMA';
-                    const calCat: KategoriUjian = jenjang === 'SD' ? 'Calistung' : 'English';
-                    const ivCat: KategoriUjian = 'Interview Walmur';
-                    const alqNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === alqCat);
-                    const calNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === calCat);
-                    const ivNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === ivCat);
-                    const renderNilai = (rec?: NilaiRecord) => rec ? (
-                      <div className="space-y-0.5">
-                        <span className="block font-mono font-bold text-emerald-700">{rec.skor_akhir_rata2.toFixed(2)}</span>
-                        <span className="block text-[10px] text-slate-500 max-w-[140px] truncate">{rec.nama_penguji}</span>
-                      </div>
-                    ) : <span className="text-[10px] text-slate-400 italic">Belum Dinilai</span>;
-                    return (
-                      <tr key={s.id} className="hover:bg-slate-50">
-                        <td className="p-3 font-mono font-bold text-[#1E3A8A]">{s.id}</td>
-                        <td className="p-3 font-bold text-slate-800">{s.nama_siswa}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === 'SD' ? 'bg-sky-100 text-sky-700' : jenjang === 'SMP' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-purple-100 text-purple-800'}`}>
-                            {jenjang}
-                          </span>
-                          <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">{formatKelas(s.kelas)}</span>
-                        </td>
-                        <td className="p-3">
-                          {hadirSiswa ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
-                              <CheckCircle2 className="w-3 h-3" /> Hadir
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
-                              <Clock className="w-3 h-3" /> Belum
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {hadirWalmur ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
-                              <CheckCircle2 className="w-3 h-3" /> Hadir
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
-                              <Clock className="w-3 h-3" /> Belum
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3">{renderNilai(alqNilai)}</td>
-                        <td className="p-3">{renderNilai(calNilai)}</td>
-                        <td className="p-3">{renderNilai(ivNilai)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: NILAI TABLE (WITH EDIT GRADE) */}
+      {/* TAB 3: NILAI TABLE (WITH EDIT GRADE) */}
       {activeSubTab === 'nilai' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
@@ -1910,7 +1830,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB 4A: REKAP PENGUJI (siswa unik per tanggal ujian) */}
+      {/* TAB 4: REKAP PENGUJI (siswa unik per tanggal ujian) */}
       {activeSubTab === 'rekap-penguji' && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -2546,7 +2466,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB 5: EXPORT DATA */}
+      {/* TAB 6: EXPORT DATA */}
       {activeSubTab === 'export' && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
