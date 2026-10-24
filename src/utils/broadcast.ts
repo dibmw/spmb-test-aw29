@@ -10,6 +10,7 @@ import {
   ModeUjian,
   getJenjangFromKelas,
   formatTanggalUjian,
+  resolveKehadiran,
 } from '../types/spmb';
 
 const normId = (v: string): string => (v || '').trim().toLowerCase();
@@ -94,8 +95,8 @@ export function buildPresentIncompleteRows(
   return jadwalList
     .filter((s) => s.status === 'Aktif')
     .map((s): PresentIncompleteRow => {
-      const presensiSiswa = hasPresensi(presensiList, s.id, 'Siswa');
-      const presensiWalmur = hasPresensi(presensiList, s.id, 'Walmur');
+      const presensiSiswa = resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir';
+      const presensiWalmur = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
       const requiredCount = getRequiredKategori(s).length;
       const missing = getMissingKategori(s, nilaiList);
       return {
@@ -142,8 +143,8 @@ export function buildGradedButAbsentRows(
   return jadwalList
     .filter((s) => s.status === 'Aktif')
     .map((s): GradedAbsentRow => {
-      const presensiSiswa = hasPresensi(presensiList, s.id, 'Siswa');
-      const presensiWalmur = hasPresensi(presensiList, s.id, 'Walmur');
+      const presensiSiswa = resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir';
+      const presensiWalmur = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
       const filled: KategoriUjian[] = [];
       nilaiList.forEach((n) => {
         if (normId(n.id_siswa) === normId(s.id) && !filled.includes(n.kategori_ujian)) {

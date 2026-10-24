@@ -1478,6 +1478,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
+          {/* Ringkasan Belum Presensi */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Siswa</span>
+                <Users className="w-4 h-4 text-rose-500" />
+              </div>
+              <span className="text-2xl font-extrabold text-rose-700 font-mono">
+                {activeJadwalList.filter((s) => resolveKehadiran(s, presensiList, 'Siswa') !== 'Hadir').length}
+              </span>
+              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Wali Murid</span>
+                <Users className="w-4 h-4 text-amber-500" />
+              </div>
+              <span className="text-2xl font-extrabold text-amber-700 font-mono">
+                {activeJadwalList.filter((s) => resolveKehadiran(s, presensiList, 'Walmur') !== 'Hadir').length}
+              </span>
+              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa Aktif</span>
+                <Users className="w-4 h-4 text-[#1E3A8A]" />
+              </div>
+              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">{activeJadwalList.length}</span>
+              <p className="text-[10px] text-slate-400">siswa terdaftar aktif</p>
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -1611,8 +1643,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="block text-[10px] text-slate-500 max-w-[120px] truncate">{rec.nama_penguji}</span>
                         </div>
                       ) : <span className="text-[10px] text-slate-400 italic">Belum Dinilai</span>;
-                      const hadirSiswaPresensi = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Siswa');
-                      const hadirWalmurPresensi = presensiList.some((p) => p.id_siswa.toLowerCase() === s.id.toLowerCase() && p.tipe_presensi === 'Walmur');
+                      const hadirSiswaPresensi = resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir';
+                      const hadirWalmurPresensi = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
                       return (
                       <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
                         <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-0 lg:z-20">{s.id}</td>
