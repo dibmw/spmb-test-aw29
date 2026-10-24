@@ -16,7 +16,7 @@ import {
   Video,
   ExternalLink
 } from 'lucide-react';
-import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, SesiUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran, getModeUjianForDate, formatTanggalUjian } from '../types/spmb';
+import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, SesiUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran, getModeUjianForDate, formatTanggalUjian, toISODate } from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { getMeetingUrl } from '../utils/meeting';
 import { RubrikModal } from './RubrikModal';
@@ -151,6 +151,11 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
   const tableRows = useMemo(() => {
     return [...myStudents]
       .sort((a, b) => {
+        const dateA = toISODate(a.hari_tanggal);
+        const dateB = toISODate(b.hari_tanggal);
+        const dateCompare = dateA.localeCompare(dateB);
+        if (dateCompare !== 0) return dateCompare;
+
         const ta = parseStartTimeMinutes(getExaminerSessionTime(a, getExaminerCategoriesForStudent(a)));
         const tb = parseStartTimeMinutes(getExaminerSessionTime(b, getExaminerCategoriesForStudent(b)));
         return ta - tb;
