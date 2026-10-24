@@ -1611,7 +1611,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1900px] text-left text-xs">
+                  <table className="w-full min-w-[1700px] text-left text-xs">
                 <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">ID Siswa</th>
@@ -1627,8 +1627,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="p-3">Waktu Ujian (All)</th>
                     <th className="p-3">Kehadiran Siswa</th>
                     <th className="p-3">Kehadiran Wali Murid</th>
-                    <th className="p-3">Status Presensi Siswa</th>
-                    <th className="p-3">Status Presensi Wali Murid</th>
                     <th className="p-3">Penilaian Al-Qur'an</th>
                     <th className="p-3">Penilaian Bahasa Arab</th>
                     <th className="p-3">Penilaian Catung/English</th>
@@ -1700,59 +1698,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="block text-[10px] text-slate-400 font-normal">{s.ruangan_walmur}</span>
                         </td>
                         <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all || '-'}</td>
-                        <td className="p-3">
+                        <td className="p-3 space-y-1.5">
+                          <div>
+                            {hadirSiswaPresensi ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                                <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                                <Clock className="w-3 h-3" /> Belum Presensi
+                              </span>
+                            )}
+                          </div>
                           <select
                             value={s.status_kehadiran_siswa || ''}
                             onChange={(e) => handleChangeKehadiran(s, 'Siswa', e.target.value as '' | 'Hadir' | 'Belum Hadir')}
-                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
+                            className={`w-full px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
                               kehadiranSiswa === 'Hadir'
                                 ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
                                 : 'bg-amber-100 text-amber-700 border-amber-300'
                             }`}
                             title="Override kehadiran manual. Kosong = ikut data presensi/timekeeper"
                           >
-                            <option value="">Ikuti Presensi ({kehadiranSiswa})</option>
-                            <option value="Hadir">Hadir</option>
-                            <option value="Belum Hadir">Belum Hadir</option>
+                            <option value="">Ikuti ({kehadiranSiswa})</option>
+                            <option value="Hadir">Paksa Hadir</option>
+                            <option value="Belum Hadir">Paksa Belum</option>
                           </select>
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 space-y-1.5">
+                          <div>
+                            {hadirWalmurPresensi ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                                <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
+                                <Clock className="w-3 h-3" /> Belum Presensi
+                              </span>
+                            )}
+                          </div>
                           <select
                             value={s.status_kehadiran_walmur || ''}
                             onChange={(e) => handleChangeKehadiran(s, 'Walmur', e.target.value as '' | 'Hadir' | 'Belum Hadir')}
-                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
+                            className={`w-full px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
                               kehadiranWalmur === 'Hadir'
                                 ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
                                 : 'bg-amber-100 text-amber-700 border-amber-300'
                             }`}
                             title="Override kehadiran manual. Kosong = ikut data presensi/timekeeper"
                           >
-                            <option value="">Ikuti Presensi ({kehadiranWalmur})</option>
-                            <option value="Hadir">Hadir</option>
-                            <option value="Belum Hadir">Belum Hadir</option>
+                            <option value="">Ikuti ({kehadiranWalmur})</option>
+                            <option value="Hadir">Paksa Hadir</option>
+                            <option value="Belum Hadir">Paksa Belum</option>
                           </select>
-                        </td>
-                        <td className="p-3">
-                          {hadirSiswaPresensi ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
-                              <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
-                              <Clock className="w-3 h-3" /> Belum Presensi
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {hadirWalmurPresensi ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
-                              <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
-                              <Clock className="w-3 h-3" /> Belum Presensi
-                            </span>
-                          )}
                         </td>
                         <td className="p-3">{renderNilaiCell(alqNilai)}</td>
                         <td className="p-3">{(jenjang === 'SMP' || jenjang === 'SMA') ? renderNilaiCell(arabNilai) : <span className="text-[10px] text-slate-400">-</span>}</td>
@@ -1797,7 +1795,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     })}
                   {filteredJadwalList.length === 0 && (
                     <tr>
-                      <td colSpan={22} className="p-8 text-center text-slate-500 text-xs font-semibold">
+                      <td colSpan={19} className="p-8 text-center text-slate-500 text-xs font-semibold">
                         Tidak ada siswa yang sesuai dengan filter.
                       </td>
                     </tr>
