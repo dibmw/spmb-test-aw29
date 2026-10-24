@@ -54,6 +54,40 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
   // Robust jenjang resolution (falls back to parsing "kelas" if grade field is missing/bad)
   const gradeOf = (s: SiswaJadwal): 'SD' | 'SMP' | 'SMA' => getJenjangFromKelas(s.kelas);
 
+  // Determine what exam categories this examiner handles for a given student
+  const getExaminerCategoriesForStudent = (s: SiswaJadwal): KategoriUjian[] => {
+    const examinerName = session.nama.trim().toLowerCase();
+    const categories: KategoriUjian[] = [];
+    const unit = gradeOf(s);
+
+    const isAlqExaminer = isSuperAdmin || s.penguji_alq_arab.trim().toLowerCase() === examinerName;
+    const isCatungExaminer = isSuperAdmin || s.penguji_catung_eng.trim().toLowerCase() === examinerName;
+    const isInterviewExaminer = isSuperAdmin || s.interview_walmur.trim().toLowerCase() === examinerName;
+
+    if (isAlqExaminer) {
+      if (unit === 'SD') {
+        categories.push('Al-Quran SD');
+      } else {
+        categories.push('Al-Quran SMP/SMA');
+        categories.push('Bahasa Arab');
+      }
+    }
+
+    if (isCatungExaminer) {
+      if (unit === 'SD') {
+        categories.push('Calistung');
+      } else {
+        categories.push('English');
+      }
+    }
+
+    if (isInterviewExaminer) {
+      categories.push('Interview Walmur');
+    }
+
+    return categories;
+  };
+
   const myStudents = useMemo(() => {
     return jadwalList.filter((s) => {
       if (s.status !== 'Aktif' && s.status !== 'Selesai') return false;
@@ -98,40 +132,6 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
     }, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // Determine what exam categories this examiner handles for a given student
-  const getExaminerCategoriesForStudent = (s: SiswaJadwal): KategoriUjian[] => {
-    const examinerName = session.nama.trim().toLowerCase();
-    const categories: KategoriUjian[] = [];
-    const unit = gradeOf(s);
-
-    const isAlqExaminer = isSuperAdmin || s.penguji_alq_arab.trim().toLowerCase() === examinerName;
-    const isCatungExaminer = isSuperAdmin || s.penguji_catung_eng.trim().toLowerCase() === examinerName;
-    const isInterviewExaminer = isSuperAdmin || s.interview_walmur.trim().toLowerCase() === examinerName;
-
-    if (isAlqExaminer) {
-      if (unit === 'SD') {
-        categories.push('Al-Quran SD');
-      } else {
-        categories.push('Al-Quran SMP/SMA');
-        categories.push('Bahasa Arab');
-      }
-    }
-
-    if (isCatungExaminer) {
-      if (unit === 'SD') {
-        categories.push('Calistung');
-      } else {
-        categories.push('English');
-      }
-    }
-
-    if (isInterviewExaminer) {
-      categories.push('Interview Walmur');
-    }
-
-    return categories;
-  };
 
   // Session time for a student based on the categories handled by THIS examiner
   const getExaminerSessionTime = (s: SiswaJadwal, cats: KategoriUjian[]): string => {
