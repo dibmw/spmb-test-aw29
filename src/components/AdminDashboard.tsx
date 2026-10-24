@@ -337,16 +337,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const filteredJadwalList = useMemo(() => {
     const query = searchFilter.trim().toLowerCase();
-    return jadwalList.filter((siswa) => {
-      if (statusFilter !== 'Semua' && siswa.status !== statusFilter) return false;
-      if (dateFilter && toISODate(siswa.hari_tanggal) !== dateFilter) return false;
-      if (kehadiranSiswaFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Siswa') !== kehadiranSiswaFilter) return false;
-      if (kehadiranWalmurFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Walmur') !== kehadiranWalmurFilter) return false;
-      if (!query) return true;
-      return siswa.nama_siswa.toLowerCase().includes(query)
-        || siswa.id.toLowerCase().includes(query)
-        || siswa.kelas.toLowerCase().includes(query);
-    });
+    return jadwalList
+      .filter((siswa) => {
+        if (statusFilter !== 'Semua' && siswa.status !== statusFilter) return false;
+        if (dateFilter && toISODate(siswa.hari_tanggal) !== dateFilter) return false;
+        if (kehadiranSiswaFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Siswa') !== kehadiranSiswaFilter) return false;
+        if (kehadiranWalmurFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Walmur') !== kehadiranWalmurFilter) return false;
+        if (!query) return true;
+        return siswa.nama_siswa.toLowerCase().includes(query)
+          || siswa.id.toLowerCase().includes(query)
+          || siswa.kelas.toLowerCase().includes(query);
+      })
+      .sort((a, b) => {
+        const dateA = toISODate(a.hari_tanggal);
+        const dateB = toISODate(b.hari_tanggal);
+        if (dateA && dateB && dateA !== dateB) return dateA.localeCompare(dateB);
+        if (dateA && !dateB) return -1;
+        if (!dateA && dateB) return 1;
+
+        const timeA = parseStartTimeMinutes(a.waktu_all);
+        const timeB = parseStartTimeMinutes(b.waktu_all);
+        if (timeA !== timeB) return timeA - timeB;
+
+        return (a.id || '').localeCompare(b.id || '');
+      });
   }, [
     jadwalList,
     statusFilter,
