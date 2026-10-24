@@ -16,7 +16,7 @@ import {
   Video,
   ExternalLink
 } from 'lucide-react';
-import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, SesiUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran, getModeUjianForDate } from '../types/spmb';
+import { SiswaJadwal, NilaiRecord, PresensiRecord, UserSession, KategoriUjian, SesiUjian, formatKelas, getJenjangFromKelas, parseStartTimeMinutes, resolveKehadiran, getModeUjianForDate, formatTanggalUjian } from '../types/spmb';
 import { apiService } from '../services/apiService';
 import { getMeetingUrl } from '../utils/meeting';
 import { RubrikModal } from './RubrikModal';
@@ -56,16 +56,34 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
 
   const myStudents = useMemo(() => {
     return jadwalList.filter((s) => {
-      if (s.status !== 'Aktif') return false;
-      if (isSuperAdmin) return true;
+      if (s.status !== 'Aktif' && s.status !== 'Selesai') return false;
+      if (isSuperAdmin) {
+        if (s.status === 'Selesai') {
+          const cats = getExaminerCategoriesForStudent(s);
+          const studentGrades = nilaiList.filter(n => n.id_siswa.toUpperCase() === s.id.toUpperCase());
+          return cats.some(cat => !studentGrades.some(g => g.kategori_ujian === cat));
+        }
+        return true;
+      }
       const examinerName = session.nama.trim().toLowerCase();
-      return (
+      const isAssigned = (
         s.penguji_alq_arab.trim().toLowerCase() === examinerName ||
         s.penguji_catung_eng.trim().toLowerCase() === examinerName ||
         s.interview_walmur.trim().toLowerCase() === examinerName
       );
+      if (!isAssigned) return false;
+
+      if (s.status === 'Aktif') return true;
+
+      if (s.status === 'Selesai') {
+        const cats = getExaminerCategoriesForStudent(s);
+        const studentGrades = nilaiList.filter(n => n.id_siswa.toUpperCase() === s.id.toUpperCase());
+        return cats.some(cat => !studentGrades.some(g => g.kategori_ujian === cat));
+      }
+
+      return false;
     });
-  }, [jadwalList, session.nama, isSuperAdmin]);
+  }, [jadwalList, session.nama, isSuperAdmin, nilaiList]);
 
   // Live presensi auto-refresh (sync from localStorage periodically)
   const [livePresensi, setLivePresensi] = useState<PresensiRecord[]>(presensiList);
@@ -329,6 +347,9 @@ export const PengujiDashboard: React.FC<PengujiDashboardProps> = ({
                     </td>
                     <td className="px-3 py-3">
                       <div className="space-y-1.5">
+                        <div className="text-[10px] text-slate-500 font-medium mb-1">
+                          {formatTanggalUjian(row.siswa.hari_tanggal)}
+                        </div>
                         {row.categories.map((category) => (
                           <div key={category.kategori} className="min-h-[30px] flex items-center">
                             <span className="font-mono text-[11px] font-bold text-[#1E3A8A]">{category.categoryTime || '-'}</span>
