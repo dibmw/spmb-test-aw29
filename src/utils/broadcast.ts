@@ -16,6 +16,17 @@ import {
 const normId = (v: string): string => (v || '').trim().toLowerCase();
 
 /**
+ * Status siswa yang tetap dimonitor pada cek silang presensi <-> nilai.
+ * `Selesai` ikut dipantau agar siswa yang sudah ditandai selesai namun
+ * masih ada nilai belum terisi (atau presensi pasangan belum tercatat)
+ * tetap muncul sebagai anomali.
+ */
+const MONITORED_STATUSES: SiswaJadwal['status'][] = ['Aktif', 'Selesai'];
+
+const isMonitoredStatus = (status: SiswaJadwal['status']): boolean =>
+  MONITORED_STATUSES.includes(status);
+
+/**
  * Kategori ujian yang WAJIB dinilai per jenjang siswa.
  * SD: 3 kategori. SMP/SMA: 4 kategori (Bahasa Arab terpisah, mengikuti alur penguji di RubrikModal).
  */
@@ -93,7 +104,7 @@ export function buildPresentIncompleteRows(
   nilaiList: NilaiRecord[]
 ): PresentIncompleteRow[] {
   return jadwalList
-    .filter((s) => s.status === 'Aktif')
+    .filter((s) => isMonitoredStatus(s.status))
     .map((s): PresentIncompleteRow => {
       const presensiSiswa = resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir';
       const presensiWalmur = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
@@ -141,7 +152,7 @@ export function buildGradedButAbsentRows(
   nilaiList: NilaiRecord[]
 ): GradedAbsentRow[] {
   return jadwalList
-    .filter((s) => s.status === 'Aktif')
+    .filter((s) => isMonitoredStatus(s.status))
     .map((s): GradedAbsentRow => {
       const presensiSiswa = resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir';
       const presensiWalmur = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
