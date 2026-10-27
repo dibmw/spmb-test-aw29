@@ -1014,15 +1014,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .catch(() => showToast('Gagal Menyalin', 'Clipboard tidak tersedia di browser ini. Salin manual dari kolom preview.', 'error'));
   };
 
-  const handleSendWhatsAppText = (text: string, label: string) => {
-    if (!text.trim()) return;
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(text)}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    showToast('WhatsApp Dibuka', `${label} siap dikirim. Silakan pilih kontak wali murid.`, 'info');
-  };
 
   const handleCopyAllPenguji = () => {
     const all = broadcastPengujiGroups.map((g) => buildPesanPenguji(g.penguji, g.items)).join('\n\n———————————\n\n');
@@ -1527,30 +1518,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                  </button>
                                  <button
                                    type="button"
-                                   onClick={() => handleSendWhatsAppText(broadcast?.message || '', broadcastLabel)}
-                                   disabled={!broadcast?.message || missingOnlineLink}
-                                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
-                                   title="Kirim WA Wali Murid"
-                                 >
-                                   <Send className="w-3 h-3" /> WA Walmur
-                                 </button>
-                                 <button
-                                   type="button"
                                    onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
                                    disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
                                    className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
                                    title="Salin pesan WA Penguji"
                                  >
                                    <Copy className="w-3 h-3" /> Salin Penguji
-                                 </button>
-                                 <button
-                                   type="button"
-                                   onClick={() => handleSendWhatsAppText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
-                                   disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
-                                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
-                                   title="Kirim WA Penguji"
-                                 >
-                                   <Send className="w-3 h-3" /> WA Penguji
                                  </button>
                                  {row.count === 0 && (
                                    <button
