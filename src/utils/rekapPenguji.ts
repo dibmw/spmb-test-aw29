@@ -3,6 +3,7 @@ import { NilaiRecord, PresensiRecord, SiswaJadwal, toISODate } from '../types/sp
 const TANPA_PENGUJI = 'Tanpa Nama Penguji';
 const TANPA_TIMEKEEPER = 'Tanpa Nama Timekeeper';
 const KETERANGAN_PRESENSI = 'Presensi Siswa + Walmur';
+const TANPA_GELOMBANG = 'Tanpa Gelombang';
 
 const ADMIN_NAME_OVERRIDE = 'ADIB MEIDITHA WIBOWO, S.Si.';
 
@@ -79,6 +80,7 @@ export interface RekapPengujiOptions {
   to?: string;
   search?: string;
   peran?: 'Semua' | PeranRekap;
+  gelombang?: string[];
 }
 
 interface RowAccumulator {
@@ -101,16 +103,32 @@ export function buildRekapPenguji(
   presensiList: PresensiRecord[],
   options: RekapPengujiOptions = {}
 ): RekapPengujiResult {
-  const jadwalDateById = new Map<string, string>();
-  const availableDates = new Set<string>();
+   const jadwalDateById = new Map<string, string>();
+   const gelombangById = new Map<string, string>();
+   const availableDates = new Set<string>();
 
-  jadwalList.forEach((siswa) => {
-    const iso = toISODate(siswa.hari_tanggal);
-    if (!iso) return;
-    availableDates.add(iso);
-    const id = normalizeKey(siswa.id);
-    if (id) jadwalDateById.set(id, iso);
-  });
+   jadwalList.forEach((siswa) => {
+     const iso = toISODate(siswa.hari_tanggal);
+     if (!iso) return;
+     availableDates.add(iso);
+     const id = normalizeKey(siswa.id);
+     const gel = String(siswa.gelombang || '').trim() || TANPA_GELOMBANG;
+     if (id) {
+       jadwalDateById.set(id, iso);
+       gelombangById.set(id, gel);
+     }
+     const nama = normalizeKey(siswa.nama_siswa);
+     if (nama) {
+       gelombangById.set(nama, gel);
+     }
+   });
+
+   const selectedGelombang = (options.gelombang || []).map((g) => normalizeKey(g));
+   const matchesGelombang = (siswaKey: string): boolean => {
+     if (selectedGelombang.length === 0) return true;
+     const gel = gelombangById.get(siswaKey) || normalizeKey(TANPA_GELOMBANG);
+     return selectedGelombang.includes(gel);
+   };
 
   const accumulators = new Map<string, RowAccumulator>();
 
@@ -143,11 +161,12 @@ export function buildRekapPenguji(
     set.add(keterangan);
   };
 
-  nilaiList.forEach((nilai) => {
-    const siswaKey = normalizeKey(nilai.id_siswa) || normalizeKey(nilai.nama_siswa);
-    if (!siswaKey) return;
+   nilaiList.forEach((nilai) => {
+     const siswaKey = normalizeKey(nilai.id_siswa) || normalizeKey(nilai.nama_siswa);
+     if (!siswaKey) return;
+     if (!matchesGelombang(siswaKey)) return;
 
-    const date = jadwalDateById.get(siswaKey) || tanggalDariTimestamp(nilai.timestamp);
+     const date = jadwalDateById.get(siswaKey) || tanggalDariTimestamp(nilai.timestamp);
     if (!date) return;
     availableDates.add(date);
 
@@ -163,13 +182,14 @@ export function buildRekapPenguji(
     addKeterangan(acc, date, cleanKategori(nilai.kategori_ujian));
   });
 
-  presensiList.forEach((presensi) => {
-    if (presensi.status && presensi.status !== 'Hadir') return;
+   presensiList.forEach((presensi) => {
+     if (presensi.status && presensi.status !== 'Hadir') return;
 
-    const siswaKey = normalizeKey(presensi.id_siswa) || normalizeKey(presensi.nama_siswa);
-    if (!siswaKey) return;
+     const siswaKey = normalizeKey(presensi.id_siswa) || normalizeKey(presensi.nama_siswa);
+     if (!siswaKey) return;
+     if (!matchesGelombang(siswaKey)) return;
 
-    const date = jadwalDateById.get(siswaKey) || tanggalDariTimestamp(presensi.timestamp);
+     const date = jadwalDateById.get(siswaKey) || tanggalDariTimestamp(presensi.timestamp);
     if (!date) return;
     availableDates.add(date);
 

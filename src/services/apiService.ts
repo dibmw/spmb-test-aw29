@@ -156,10 +156,11 @@ class ApiService {
             status_kehadiran_siswa: item.status_kehadiran_siswa === 'Hadir' || item.status_kehadiran_siswa === 'Belum Hadir'
               ? item.status_kehadiran_siswa
               : '',
-            status_kehadiran_walmur: item.status_kehadiran_walmur === 'Hadir' || item.status_kehadiran_walmur === 'Belum Hadir'
-              ? item.status_kehadiran_walmur
-              : '',
-          } as SiswaJadwal;
+             status_kehadiran_walmur: item.status_kehadiran_walmur === 'Hadir' || item.status_kehadiran_walmur === 'Belum Hadir'
+               ? item.status_kehadiran_walmur
+               : '',
+             gelombang: String(item.gelombang || '').trim(),
+           } as SiswaJadwal;
           });
           localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(normalizedJadwal));
           jCount = normalizedJadwal.length;

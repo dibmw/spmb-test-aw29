@@ -120,7 +120,8 @@ const EMPTY_STUDENT_FORM: StudentFormDraft = {
   hari_tanggal: '',
   status: 'Aktif',
   status_kehadiran_siswa: '',
-  status_kehadiran_walmur: ''
+  status_kehadiran_walmur: '',
+  gelombang: ''
 };
 
 const createEmptyTimeInputs = (): StudentTimeInputs => ({
@@ -207,50 +208,94 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [studentFormData, setStudentFormData] = useState<StudentFormDraft>({ ...EMPTY_STUDENT_FORM });
   const [studentTimeInputs, setStudentTimeInputs] = useState<StudentTimeInputs>(createEmptyTimeInputs);
 
-  const [isSessionDateModalOpen, setIsSessionDateModalOpen] = useState(false);
-  const [sessionDateForm, setSessionDateForm] = useState<{ date: string; mode: ModeUjian }>({
-    date: '',
-    mode: 'Offline'
-  });
+   const [isSessionDateModalOpen, setIsSessionDateModalOpen] = useState(false);
+   const [sessionDateForm, setSessionDateForm] = useState<{ date: string; mode: ModeUjian }>({
+     date: '',
+     mode: 'Offline'
+   });
+   const [sessionDateSearch, setSessionDateSearch] = useState('');
 
-  const pengujiList = apiService.getPengujiList();
+   const rekapGelombangOptions = useMemo(() => {
+     const from = toISODate(rekapDateFrom);
+     const to = toISODate(rekapDateTo);
+     const set = new Set<string>();
+     let hasTanpa = false;
 
-  const sessionDateRows = useMemo(() => {
-    const map = new Map<string, { date: string; count: number; mode: ModeUjian; id_sesi: string }>();
-    jadwalList.forEach((siswa) => {
-      const iso = toISODate(siswa.hari_tanggal);
-      if (!iso) return;
-      const existing = map.get(iso);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        const sesi = pickSesiUjianForDate(sesiUjianList, iso);
-        map.set(iso, {
-          date: iso,
-          count: 1,
-          mode: sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline',
-          id_sesi: sesi?.id_sesi || ''
-        });
-      }
-    });
-    const sessionDates = new Set<string>();
-    sesiUjianList.forEach((sesi) => {
-      const iso = toISODate(sesi.hari_tanggal);
-      if (iso) sessionDates.add(iso);
-    });
-    sessionDates.forEach((iso) => {
-      const sesi = pickSesiUjianForDate(sesiUjianList, iso);
-      if (!sesi) return;
-      const existing = map.get(iso);
-      if (existing) {
-        existing.mode = sesi.mode_ujian;
-        existing.id_sesi = sesi.id_sesi;
-      } else {
-        map.set(iso, { date: iso, count: 0, mode: sesi.mode_ujian, id_sesi: sesi.id_sesi });
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [jadwalList, sesiUjianList]);
+     jadwalList.forEach((s) => {
+       const iso = toISODate(s.hari_tanggal);
+       if (from && iso && iso < from) return;
+       if (to && iso && iso > to) return;
+
+       const g = (s.gelombang || '').trim();
+       if (g) {
+         set.add(g);
+       } else {
+         hasTanpa = true;
+       }
+     });
+
+     const arr = Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+     if (hasTanpa) arr.push('Tanpa Gelombang');
+     return arr;
+   }, [jadwalList, rekapDateFrom, rekapDateTo]);
+
+   const [rekapGelombangFilter, setRekapGelombangFilter] = useState<string[]>([]);
+
+   useEffect(() => {
+     if (rekapGelombangFilter.length === 0) return;
+     const valid = rekapGelombangFilter.filter((g) => rekapGelombangOptions.includes(g));
+     if (valid.length !== rekapGelombangFilter.length) {
+       setRekapGelombangFilter(valid);
+     }
+   }, [rekapGelombangOptions, rekapGelombangFilter]);
+
+   const pengujiList = apiService.getPengujiList();
+
+   const sessionDateRows = useMemo(() => {
+     const map = new Map<string, { date: string; count: number; mode: ModeUjian; id_sesi: string }>();
+     jadwalList.forEach((siswa) => {
+       const iso = toISODate(siswa.hari_tanggal);
+       if (!iso) return;
+       const existing = map.get(iso);
+       if (existing) {
+         existing.count += 1;
+       } else {
+         const sesi = pickSesiUjianForDate(sesiUjianList, iso);
+         map.set(iso, {
+           date: iso,
+           count: 1,
+           mode: sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline',
+           id_sesi: sesi?.id_sesi || ''
+         });
+       }
+     });
+     const sessionDates = new Set<string>();
+     sesiUjianList.forEach((sesi) => {
+       const iso = toISODate(sesi.hari_tanggal);
+       if (iso) sessionDates.add(iso);
+     });
+     sessionDates.forEach((iso) => {
+       const sesi = pickSesiUjianForDate(sesiUjianList, iso);
+       if (!sesi) return;
+       const existing = map.get(iso);
+       if (existing) {
+         existing.mode = sesi.mode_ujian;
+         existing.id_sesi = sesi.id_sesi;
+       } else {
+         map.set(iso, { date: iso, count: 0, mode: sesi.mode_ujian, id_sesi: sesi.id_sesi });
+       }
+     });
+     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+   }, [jadwalList, sesiUjianList]);
+
+   const filteredSessionDateRows = useMemo(() => {
+     const q = sessionDateSearch.trim().toLowerCase();
+     if (!q) return sessionDateRows;
+     return sessionDateRows.filter((row) => {
+       const formatted = formatTanggalUjian(row.date).toLowerCase();
+       return row.date.includes(q) || formatted.includes(q);
+     });
+   }, [sessionDateRows, sessionDateSearch]);
 
   const waliBroadcastByDate = useMemo(() => {
     const map = new Map<string, { onlineUrl: string; message: string }>();
@@ -519,44 +564,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, [activeJadwalList, presensiList, nilaiList, activeIds]);
 
-  const rekapPenguji = useMemo(
-    () => buildRekapPenguji(jadwalList, nilaiList, presensiList, {
-      from: rekapDateFrom,
-      to: rekapDateTo,
-      search: rekapSearch,
-      peran: rekapPeranFilter
-    }),
-    [jadwalList, nilaiList, presensiList, rekapDateFrom, rekapDateTo, rekapSearch, rekapPeranFilter]
-  );
+   const rekapPenguji = useMemo(
+     () => buildRekapPenguji(jadwalList, nilaiList, presensiList, {
+       from: rekapDateFrom,
+       to: rekapDateTo,
+       search: rekapSearch,
+       peran: rekapPeranFilter,
+       gelombang: rekapGelombangFilter
+     }),
+     [jadwalList, nilaiList, presensiList, rekapDateFrom, rekapDateTo, rekapSearch, rekapPeranFilter, rekapGelombangFilter]
+   );
 
-  const rekapMinDate = rekapPenguji.availableDates[0] || '';
-  const rekapMaxDate = rekapPenguji.availableDates[rekapPenguji.availableDates.length - 1] || '';
+   const rekapMinDate = rekapPenguji.availableDates[0] || '';
+   const rekapMaxDate = rekapPenguji.availableDates[rekapPenguji.availableDates.length - 1] || '';
 
-  const handleRekapDateFromChange = (value: string) => {
-    setRekapDateFrom(value);
-    if (value && rekapDateTo && value > rekapDateTo) {
-      setRekapDateTo(value);
-    }
-  };
+   const handleRekapDateFromChange = (value: string) => {
+     setRekapDateFrom(value);
+     if (value && rekapDateTo && value > rekapDateTo) {
+       setRekapDateTo(value);
+     }
+   };
 
-  const handleRekapDateToChange = (value: string) => {
-    setRekapDateTo(value);
-    if (value && rekapDateFrom && value < rekapDateFrom) {
-      setRekapDateFrom(value);
-    }
-  };
+   const handleRekapDateToChange = (value: string) => {
+     setRekapDateTo(value);
+     if (value && rekapDateFrom && value < rekapDateFrom) {
+       setRekapDateFrom(value);
+     }
+   };
 
-  const resetRekapFilters = () => {
-    setRekapDateFrom('');
-    setRekapDateTo('');
-    setRekapSearch('');
-    setRekapPeranFilter('Semua');
-  };
+   const resetRekapFilters = () => {
+     setRekapDateFrom('');
+     setRekapDateTo('');
+     setRekapSearch('');
+     setRekapPeranFilter('Semua');
+     setRekapGelombangFilter([]);
+   };
 
-  const hasRekapFilter = Boolean(rekapDateFrom)
-    || Boolean(rekapDateTo)
-    || Boolean(rekapSearch.trim())
-    || rekapPeranFilter !== 'Semua';
+   const hasRekapFilter = Boolean(rekapDateFrom)
+     || Boolean(rekapDateTo)
+     || Boolean(rekapSearch.trim())
+     || rekapPeranFilter !== 'Semua'
+     || rekapGelombangFilter.length > 0;
 
   // Handle Save Student (Add or Edit)
   const handleSaveStudent = (e: React.FormEvent) => {
@@ -1366,131 +1414,165 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 2: JADWAL CRUD */}
       {activeSubTab === 'jadwal' && (
         <div className="space-y-4">
-          {/* Mode Ujian per Tanggal */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mode Ujian per Tanggal</h3>
-                  <p className="text-[11px] text-slate-500">Satu tanggal/sesi berlaku untuk semua peserta di tanggal tersebut.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={openSessionDateModal}
-                className="px-3 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white text-[11px] font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Tambah Tanggal
-              </button>
-            </div>
-            <div className="p-4">
-              {sessionDateRows.length === 0 ? (
-                <p className="text-xs text-slate-500">Belum ada tanggal ujian pada jadwal.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {sessionDateRows.map((row) => {
-                    const broadcast = waliBroadcastByDate.get(row.date);
-                    const pengujiBroadcast = pengujiBroadcastByDate.get(row.date);
-                    const missingOnlineLink = row.mode === 'Online' && !broadcast?.onlineUrl;
-                    const missingPenguji = !pengujiBroadcast || pengujiBroadcast.count === 0;
-                    const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
-                    const pengujiBroadcastLabel = `Broadcast penguji ${formatTanggalUjian(row.date)}`;
+           {/* Mode Ujian per Tanggal */}
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+             <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+               <div className="flex items-center gap-2">
+                 <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
+                 <div>
+                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mode Ujian per Tanggal</h3>
+                   <p className="text-[11px] text-slate-500">Satu tanggal/sesi berlaku untuk semua peserta di tanggal tersebut.</p>
+                 </div>
+               </div>
+               <div className="flex items-center gap-2 flex-wrap">
+                 <div className="relative">
+                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                   <input
+                     type="text"
+                     value={sessionDateSearch}
+                     onChange={(e) => setSessionDateSearch(e.target.value)}
+                     placeholder="Cari tanggal..."
+                     className="pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                   />
+                 </div>
+                 <button
+                   type="button"
+                   onClick={openSessionDateModal}
+                   className="px-3 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white text-[11px] font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                 >
+                   <Plus className="w-3.5 h-3.5" />
+                   Tambah Tanggal
+                 </button>
+               </div>
+             </div>
+             <div className="p-4">
+               {sessionDateRows.length === 0 ? (
+                 <p className="text-xs text-slate-500">Belum ada tanggal ujian pada jadwal.</p>
+               ) : filteredSessionDateRows.length === 0 ? (
+                 <p className="text-xs text-slate-500">Tidak ada tanggal yang cocok dengan pencarian "{sessionDateSearch}".</p>
+               ) : (
+                 <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-slate-200">
+                   <table className="w-full text-left text-xs">
+                     <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider sticky top-0 z-20">
+                       <tr>
+                         <th className="p-3">Tanggal Ujian</th>
+                         <th className="p-3">Mode Ujian</th>
+                         <th className="p-3 text-center">Jumlah Siswa</th>
+                         <th className="p-3">Status / Peringatan</th>
+                         <th className="p-3 text-right">Aksi & Broadcast</th>
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-200 bg-white">
+                       {filteredSessionDateRows.map((row) => {
+                         const broadcast = waliBroadcastByDate.get(row.date);
+                         const pengujiBroadcast = pengujiBroadcastByDate.get(row.date);
+                         const missingOnlineLink = row.mode === 'Online' && !broadcast?.onlineUrl;
+                         const missingPenguji = !pengujiBroadcast || pengujiBroadcast.count === 0;
+                         const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
+                         const pengujiBroadcastLabel = `Broadcast penguji ${formatTanggalUjian(row.date)}`;
 
-                    return (
-                      <div key={row.date} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col gap-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-800 truncate">{formatTanggalUjian(row.date)}</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              {row.mode === 'Online' ? (
-                                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <WifiOff className="w-3.5 h-3.5 text-slate-500" />
-                              )}
-                              <span className="text-[10px] text-slate-500">{row.count} siswa</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {row.count === 0 && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSessionDate(row)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Hapus tanggal"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <select
-                              value={row.mode}
-                              onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
-                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
-                                row.mode === 'Online'
-                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                                  : 'bg-slate-200 text-slate-700 border-slate-300'
-                              }`}
-                              title="Ubah mode ujian sesi ini"
-                            >
-                              <option value="Offline">Offline</option>
-                              <option value="Online">Online</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(broadcast?.message || '', broadcastLabel)}
-                            disabled={!broadcast?.message || missingOnlineLink}
-                            className="px-2.5 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <Copy className="w-3 h-3" />
-                            Salin
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSendWhatsAppText(broadcast?.message || '', broadcastLabel)}
-                            disabled={!broadcast?.message || missingOnlineLink}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <Send className="w-3 h-3" />
-                            Kirim WA
-                          </button>
-                          {missingOnlineLink && (
-                            <span className="text-[9px] font-semibold text-amber-700">Link Zoom belum tersedia</span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-dashed border-slate-200">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
-                            disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
-                            className="px-2.5 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <Copy className="w-3 h-3" />
-                            Salin Penguji
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSendWhatsAppText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
-                            disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <Send className="w-3 h-3" />
-                            Kirim WA Penguji
-                          </button>
-                          {missingPenguji && (
-                            <span className="text-[9px] font-semibold text-slate-500">Belum ada penguji</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+                         return (
+                           <tr key={row.date} className="hover:bg-slate-50">
+                             <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
+                               {formatTanggalUjian(row.date)}
+                             </td>
+                             <td className="p-3 whitespace-nowrap">
+                               <div className="flex items-center gap-2">
+                                 <select
+                                   value={row.mode}
+                                   onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
+                                   className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
+                                     row.mode === 'Online'
+                                       ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                                       : 'bg-slate-200 text-slate-700 border-slate-300'
+                                   }`}
+                                   title="Ubah mode ujian sesi ini"
+                                 >
+                                   <option value="Offline">Offline</option>
+                                   <option value="Online">Online</option>
+                                 </select>
+                                 {row.mode === 'Online' ? (
+                                   <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                                 ) : (
+                                   <WifiOff className="w-3.5 h-3.5 text-slate-400" />
+                                 )}
+                               </div>
+                             </td>
+                             <td className="p-3 text-center font-mono font-bold text-slate-700">
+                               {row.count} siswa
+                             </td>
+                             <td className="p-3">
+                               <div className="flex flex-col gap-0.5 text-[10px]">
+                                 {missingOnlineLink && (
+                                   <span className="font-semibold text-amber-700">⚠ Link Zoom belum tersedia</span>
+                                 )}
+                                 {missingPenguji && (
+                                   <span className="font-semibold text-slate-500">⚠ Belum ada penguji</span>
+                                 )}
+                                 {!missingOnlineLink && !missingPenguji && (
+                                   <span className="text-emerald-600 font-semibold">Siap broadcast</span>
+                                 )}
+                               </div>
+                             </td>
+                             <td className="p-3 text-right whitespace-nowrap">
+                               <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                                 <button
+                                   type="button"
+                                   onClick={() => handleCopyText(broadcast?.message || '', broadcastLabel)}
+                                   disabled={!broadcast?.message || missingOnlineLink}
+                                   className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                                   title="Salin pesan WA Wali Murid"
+                                 >
+                                   <Copy className="w-3 h-3" /> Salin Walmur
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleSendWhatsAppText(broadcast?.message || '', broadcastLabel)}
+                                   disabled={!broadcast?.message || missingOnlineLink}
+                                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                                   title="Kirim WA Wali Murid"
+                                 >
+                                   <Send className="w-3 h-3" /> WA Walmur
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
+                                   disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
+                                   className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                                   title="Salin pesan WA Penguji"
+                                 >
+                                   <Copy className="w-3 h-3" /> Salin Penguji
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleSendWhatsAppText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
+                                   disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
+                                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                                   title="Kirim WA Penguji"
+                                 >
+                                   <Send className="w-3 h-3" /> WA Penguji
+                                 </button>
+                                 {row.count === 0 && (
+                                   <button
+                                     type="button"
+                                     onClick={() => handleDeleteSessionDate(row)}
+                                     className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-1"
+                                     title="Hapus tanggal"
+                                   >
+                                     <Trash2 className="w-3.5 h-3.5" />
+                                   </button>
+                                 )}
+                               </div>
+                             </td>
+                           </tr>
+                         );
+                       })}
+                     </tbody>
+                   </table>
+                 </div>
+               )}
+             </div>
+           </div>
 
           {/* Ringkasan Belum Presensi */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1611,13 +1693,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1700px] text-left text-xs">
+                  <table className="w-full min-w-[1900px] text-left text-xs">
                 <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">ID Siswa</th>
                     <th className="p-3 w-[180px] min-w-[180px] bg-[#1E3A8A] lg:sticky lg:left-[104px] lg:z-30">Nama Siswa</th>
                     <th className="p-3 w-[88px] min-w-[88px] bg-[#1E3A8A] lg:sticky lg:left-[284px] lg:z-30">Gender</th>
                     <th className="p-3 w-[112px] min-w-[112px] bg-[#1E3A8A] border-r border-blue-700/60 lg:sticky lg:left-[372px] lg:z-30 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">Unit & Kelas</th>
+                    <th className="p-3 min-w-[130px]">Gelombang</th>
                     <th className="p-3">Tanggal Ujian</th>
                     <th className="p-3">Mode</th>
                     <th className="p-3">Ruang Siswa</th>
@@ -1662,15 +1745,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-0 lg:z-20">{s.id}</td>
                         <td className="p-3 font-bold text-slate-900 bg-white group-hover:bg-slate-50 w-[180px] min-w-[180px] lg:sticky lg:left-[104px] lg:z-20">{s.nama_siswa}</td>
                         <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[284px] lg:z-20">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                        <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[372px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
-                          <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
-                            {jenjang}
-                          </span>
-                          <span className="block mt-1 font-bold text-[#1E3A8A]">
-                            {formatKelas(s.kelas)}
-                          </span>
-                        </td>
-                        <td className="p-3 text-slate-700 font-medium whitespace-nowrap">
+                         <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[372px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
+                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
+                             {jenjang}
+                           </span>
+                           <span className="block mt-1 font-bold text-[#1E3A8A]">
+                             {formatKelas(s.kelas)}
+                           </span>
+                         </td>
+                         <td className="p-3 font-semibold text-slate-700 whitespace-nowrap">
+                           {s.gelombang || '-'}
+                         </td>
+                         <td className="p-3 text-slate-700 font-medium whitespace-nowrap">
                           {formatTanggalUjian(s.hari_tanggal)}
                         </td>
                         <td className="p-3">
@@ -1946,7 +2032,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+             <div className="flex flex-wrap items-center gap-2">
+              {/* Multi-select Gelombang Dropdown */}
+              <div className="relative inline-block text-left">
+                <details className="group relative">
+                  <summary className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer flex items-center gap-1.5 list-none">
+                    <span>
+                      Gelombang: {rekapGelombangFilter.length === 0 ? 'Semua' : `${rekapGelombangFilter.length} dipilih`}
+                    </span>
+                    <span className="text-slate-400 text-[10px]">▼</span>
+                  </summary>
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 space-y-2 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <span className="font-bold text-slate-800">Filter Gelombang</span>
+                      {rekapGelombangFilter.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setRekapGelombangFilter([])}
+                          className="text-[10px] text-blue-600 hover:underline font-semibold"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-1.5">
+                      <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={rekapGelombangFilter.length === 0}
+                          onChange={() => setRekapGelombangFilter([])}
+                          className="rounded border-slate-300 text-[#1E3A8A] focus:ring-[#1E3A8A]"
+                        />
+                        <span className="font-bold text-slate-800">Semua Gelombang</span>
+                      </label>
+                      {rekapGelombangOptions.map((opt) => {
+                        const checked = rekapGelombangFilter.includes(opt);
+                        return (
+                          <label key={opt} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded-lg">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setRekapGelombangFilter([...rekapGelombangFilter, opt]);
+                                } else {
+                                  setRekapGelombangFilter(rekapGelombangFilter.filter(item => item !== opt));
+                                }
+                              }}
+                              className="rounded border-slate-300 text-[#1E3A8A] focus:ring-[#1E3A8A]"
+                            />
+                            <span className="text-slate-700 font-medium">{opt}</span>
+                          </label>
+                        );
+                      })}
+                      {rekapGelombangOptions.length === 0 && (
+                        <p className="text-[11px] text-slate-400 text-center py-2">Tidak ada gelombang</p>
+                      )}
+                    </div>
+                  </div>
+                </details>
+              </div>
+
               <select
                 value={rekapPeranFilter}
                 onChange={(e) => setRekapPeranFilter(e.target.value as 'Semua' | 'Penguji' | 'Timekeeper')}
@@ -2862,6 +3008,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">Gelombang</label>
+                  <input
+                    type="text"
+                    list="gelombang-options-list"
+                    value={studentFormData.gelombang || ''}
+                    onChange={(e) => setStudentFormData({ ...studentFormData, gelombang: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold focus:bg-white focus:outline-none"
+                    placeholder="Contoh: Gel. 1 2027/2028"
+                  />
+                  <datalist id="gelombang-options-list">
+                    {Array.from(new Set(jadwalList.map(s => (s.gelombang || '').trim()).filter(Boolean))).map(g => (
+                      <option key={g} value={g} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>

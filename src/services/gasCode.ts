@@ -20,20 +20,20 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
 
 var ADMIN_EMAIL = "kurikulum.alwildan29@gmail.com";
 
-// Skema terkunci header web_jadwal (kolom A s/d S) dan key kanoniknya
+// Skema terkunci header web_jadwal (kolom A s/d T) dan key kanoniknya
 var JADWAL_HEADERS = [
   "id", "nama siswa", "kelas", "gender",
   "ruangan_siswa", "waktu_all", "waktu_alq_arab",
   "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
   "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
-  "hari tanggal", "Status", "status_kehadiran_siswa", "status_kehadiran_walmur"
+  "hari tanggal", "Status", "status_kehadiran_siswa", "status_kehadiran_walmur", "gelombang"
 ];
 var JADWAL_KEYS = [
   "id", "nama_siswa", "kelas", "gender",
   "ruangan_siswa", "waktu_all", "waktu_alq_arab",
   "waktu_catung_eng", "ruangan_walmur", "penguji_alq_arab", "penguji_catung_eng",
   "timekeeper_siswa", "interview_walmur", "timekeeper_walmur", "waktu_interview",
-  "hari_tanggal", "status", "status_kehadiran_siswa", "status_kehadiran_walmur"
+  "hari_tanggal", "status", "status_kehadiran_siswa", "status_kehadiran_walmur", "gelombang"
 ];
 
 // Kolom lama yang sudah tidak dipakai lagi dan akan dibersihkan otomatis.

@@ -18,9 +18,10 @@ export interface SiswaJadwal {
   waktu_interview: string;
   hari_tanggal: string;
   status: 'Aktif' | 'Reschedule' | 'Selesai';
-  status_kehadiran_siswa?: 'Hadir' | 'Belum Hadir' | '';
-  status_kehadiran_walmur?: 'Hadir' | 'Belum Hadir' | '';
-}
+   status_kehadiran_siswa?: 'Hadir' | 'Belum Hadir' | '';
+   status_kehadiran_walmur?: 'Hadir' | 'Belum Hadir' | '';
+   gelombang?: string;
+ }
 
 export type ModeUjian = 'Online' | 'Offline';
 
