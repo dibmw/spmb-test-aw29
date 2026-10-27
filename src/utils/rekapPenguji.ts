@@ -112,7 +112,7 @@ export function buildRekapPenguji(
      if (!iso) return;
      availableDates.add(iso);
      const id = normalizeKey(siswa.id);
-     const gel = String(siswa.gelombang || '').trim() || TANPA_GELOMBANG;
+     const gel = normalizeKey(siswa.gelombang) || normalizeKey(TANPA_GELOMBANG);
      if (id) {
        jadwalDateById.set(id, iso);
        gelombangById.set(id, gel);
