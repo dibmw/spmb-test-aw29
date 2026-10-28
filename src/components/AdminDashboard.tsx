@@ -1729,13 +1729,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1900px] text-left text-xs">
+                  <table className="w-full min-w-[1948px] text-left text-xs">
                 <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">ID Siswa</th>
-                    <th className="p-3 w-[180px] min-w-[180px] bg-[#1E3A8A] lg:sticky lg:left-[104px] lg:z-30">Nama Siswa</th>
-                    <th className="p-3 w-[88px] min-w-[88px] bg-[#1E3A8A] lg:sticky lg:left-[284px] lg:z-30">Gender</th>
-                    <th className="p-3 w-[112px] min-w-[112px] bg-[#1E3A8A] border-r border-blue-700/60 lg:sticky lg:left-[372px] lg:z-30 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">Unit & Kelas</th>
+                    <th className="p-3 w-[48px] min-w-[48px] text-center whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">No</th>
+                    <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-[48px] lg:z-30">ID Siswa</th>
+                    <th className="p-3 w-[180px] min-w-[180px] bg-[#1E3A8A] lg:sticky lg:left-[152px] lg:z-30">Nama Siswa</th>
+                    <th className="p-3 w-[88px] min-w-[88px] bg-[#1E3A8A] lg:sticky lg:left-[332px] lg:z-30">Gender</th>
+                    <th className="p-3 w-[112px] min-w-[112px] bg-[#1E3A8A] border-r border-blue-700/60 lg:sticky lg:left-[420px] lg:z-30 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">Unit & Kelas</th>
                     <th className="p-3 min-w-[130px]">Gelombang</th>
                     <th className="p-3">Tanggal Ujian</th>
                     <th className="p-3">Mode</th>
@@ -1755,7 +1756,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filteredJadwalList.map((s) => {
+                  {filteredJadwalList.map((s, index) => {
                       const mode = getModeUjianForDate(sesiUjianList, s.hari_tanggal);
                       const jenjang = getJenjangFromKelas(s.kelas);
                       const kehadiranSiswa = resolveKehadiran(s, presensiList, 'Siswa');
@@ -1778,10 +1779,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       const hadirWalmurPresensi = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
                       return (
                       <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
-                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-0 lg:z-20">{s.id}</td>
-                        <td className="p-3 font-bold text-slate-900 bg-white group-hover:bg-slate-50 w-[180px] min-w-[180px] lg:sticky lg:left-[104px] lg:z-20">{s.nama_siswa}</td>
-                        <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[284px] lg:z-20">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                         <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[372px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
+                        <td className="p-3 text-center font-mono font-bold text-slate-500 bg-white group-hover:bg-slate-50 w-[48px] min-w-[48px] lg:sticky lg:left-0 lg:z-20">{index + 1}</td>
+                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-[48px] lg:z-20">{s.id}</td>
+                        <td className="p-3 font-bold text-slate-900 bg-white group-hover:bg-slate-50 w-[180px] min-w-[180px] lg:sticky lg:left-[152px] lg:z-20">{s.nama_siswa}</td>
+                        <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[332px] lg:z-20">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+                         <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[420px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
                            <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
                              {jenjang}
                            </span>
@@ -1917,7 +1919,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     })}
                   {filteredJadwalList.length === 0 && (
                     <tr>
-                      <td colSpan={19} className="p-8 text-center text-slate-500 text-xs font-semibold">
+                      <td colSpan={21} className="p-8 text-center text-slate-500 text-xs font-semibold">
                         Tidak ada siswa yang sesuai dengan filter.
                       </td>
                     </tr>
