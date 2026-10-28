@@ -550,6 +550,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // KPI Calculations
   const activeJadwalList = useMemo(() => jadwalList.filter(s => s.status === 'Aktif'), [jadwalList]);
+  const activeJadwalByDate = useMemo(() => {
+    if (!dateFilter) return activeJadwalList;
+    return activeJadwalList.filter((s) => toISODate(s.hari_tanggal) === dateFilter);
+  }, [activeJadwalList, dateFilter]);
   const activeIds = useMemo(() => new Set(activeJadwalList.map(s => s.id)), [activeJadwalList]);
 
   const kpiData = useMemo(() => {
@@ -1610,9 +1614,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Users className="w-4 h-4 text-rose-500" />
               </div>
               <span className="text-2xl font-extrabold text-rose-700 font-mono">
-                {activeJadwalList.filter((s) => resolveKehadiran(s, presensiList, 'Siswa') !== 'Hadir').length}
+                {activeJadwalByDate.filter((s) => resolveKehadiran(s, presensiList, 'Siswa') !== 'Hadir').length}
               </span>
-              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
+              <p className="text-[10px] text-slate-400">
+                dari {activeJadwalByDate.length} siswa aktif{dateFilter ? ' pada tanggal terpilih' : ''}
+              </p>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
@@ -1620,17 +1626,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Users className="w-4 h-4 text-amber-500" />
               </div>
               <span className="text-2xl font-extrabold text-amber-700 font-mono">
-                {activeJadwalList.filter((s) => resolveKehadiran(s, presensiList, 'Walmur') !== 'Hadir').length}
+                {activeJadwalByDate.filter((s) => resolveKehadiran(s, presensiList, 'Walmur') !== 'Hadir').length}
               </span>
-              <p className="text-[10px] text-slate-400">dari {activeJadwalList.length} siswa aktif</p>
+              <p className="text-[10px] text-slate-400">
+                dari {activeJadwalByDate.length} siswa aktif{dateFilter ? ' pada tanggal terpilih' : ''}
+              </p>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa Aktif</span>
                 <Users className="w-4 h-4 text-[#1E3A8A]" />
               </div>
-              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">{activeJadwalList.length}</span>
-              <p className="text-[10px] text-slate-400">siswa terdaftar aktif</p>
+              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">{activeJadwalByDate.length}</span>
+              <p className="text-[10px] text-slate-400">siswa terdaftar aktif{dateFilter ? ' pada tanggal terpilih' : ''}</p>
             </div>
           </div>
 
