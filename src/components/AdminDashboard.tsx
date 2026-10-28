@@ -84,6 +84,16 @@ type StudentTimeInputs = Record<TimeField, TimeInputPair>;
 type StudentFormDraft = Omit<SiswaJadwal, 'gender'> & { gender: 'L' | 'P' | '' };
 type KehadiranFilter = 'Semua' | 'Hadir' | 'Belum Hadir';
 
+type SessionDateRow = {
+  date: string;
+  count: number;
+  activeCount: number;
+  selesaiCount: number;
+  rescheduleCount: number;
+  mode: ModeUjian;
+  id_sesi: string;
+};
+
 const TIME_FIELDS: TimeField[] = ['waktu_alq_arab', 'waktu_catung_eng', 'waktu_interview'];
 
 const STUDENT_CLASS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -252,21 +262,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
    const pengujiList = apiService.getPengujiList();
 
    const sessionDateRows = useMemo(() => {
-     const map = new Map<string, { date: string; count: number; mode: ModeUjian; id_sesi: string }>();
+     const map = new Map<string, SessionDateRow>();
      jadwalList.forEach((siswa) => {
        const iso = toISODate(siswa.hari_tanggal);
        if (!iso) return;
-       const existing = map.get(iso);
-       if (existing) {
-         existing.count += 1;
-       } else {
+       let row = map.get(iso);
+       if (!row) {
          const sesi = pickSesiUjianForDate(sesiUjianList, iso);
-         map.set(iso, {
+         row = {
            date: iso,
-           count: 1,
+           count: 0,
+           activeCount: 0,
+           selesaiCount: 0,
+           rescheduleCount: 0,
            mode: sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline',
            id_sesi: sesi?.id_sesi || ''
-         });
+         };
+         map.set(iso, row);
+       }
+       row.count += 1;
+       if (siswa.status === 'Selesai') {
+         row.selesaiCount += 1;
+       } else if (siswa.status === 'Reschedule') {
+         row.rescheduleCount += 1;
+       } else {
+         row.activeCount += 1;
        }
      });
      const sessionDates = new Set<string>();
@@ -282,7 +302,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
          existing.mode = sesi.mode_ujian;
          existing.id_sesi = sesi.id_sesi;
        } else {
-         map.set(iso, { date: iso, count: 0, mode: sesi.mode_ujian, id_sesi: sesi.id_sesi });
+         map.set(iso, {
+           date: iso,
+           count: 0,
+           activeCount: 0,
+           selesaiCount: 0,
+           rescheduleCount: 0,
+           mode: sesi.mode_ujian,
+           id_sesi: sesi.id_sesi
+         });
        }
      });
      return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
@@ -323,7 +351,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [sessionDateRows, jadwalList]);
 
   const pengujiBroadcastByDate = useMemo(() => {
-    const map = new Map<string, { count: number; message: string }>();
+    const map = new Map<string, { count: number; message: string; missingRoles: string[] }>();
     sessionDateRows.forEach((row) => {
       const students = jadwalList.filter(
         (siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === row.date
@@ -352,11 +380,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const pengujiItems = Array.from(pengujiMap.values())
         .map((item) => ({ nama: item.nama, peran: Array.from(item.peran) }))
         .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+      const missingRoles = roleFields
+        .filter(({ field }) => !students.some((siswa) => {
+          const nama = (siswa[field] || '').trim();
+          return Boolean(nama) && nama !== '-';
+        }))
+        .map(({ label }) => label);
       const onlineUrl = waliBroadcastByDate.get(row.date)?.onlineUrl || '';
 
       map.set(row.date, {
         count: pengujiItems.length,
         message: buildPesanPengujiTanggal(row.date, row.mode, onlineUrl, pengujiItems, students.length),
+        missingRoles,
       });
     });
     return map;
@@ -489,11 +524,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleDeleteSessionDate = (row: { date: string; id_sesi: string }) => {
+  const handleDeleteSessionDate = (row: SessionDateRow) => {
     if (!row.id_sesi) return;
     setConfirmDialog({
       title: 'Hapus Tanggal Ujian?',
-      message: `Tanggal ${formatTanggalUjian(row.date)} belum memiliki siswa. Hapus tanggal ini dari daftar?`,
+      message: row.count === 0
+        ? `Tanggal ${formatTanggalUjian(row.date)} belum memiliki siswa. Hapus tanggal ini dari daftar?`
+        : `Tanggal ${formatTanggalUjian(row.date)} tidak memiliki siswa aktif. Hapus konfigurasi sesi tanggal ini? Data siswa yang selesai/reschedule tidak akan terhapus.`,
       confirmLabel: 'Hapus',
       variant: 'danger',
       onConfirm: () => {
@@ -1457,8 +1494,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        {filteredSessionDateRows.map((row) => {
                          const broadcast = waliBroadcastByDate.get(row.date);
                          const pengujiBroadcast = pengujiBroadcastByDate.get(row.date);
+                         const hasNoStudents = row.count === 0;
+                         const hasNoActiveStudents = row.activeCount === 0;
                          const missingOnlineLink = row.mode === 'Online' && !broadcast?.onlineUrl;
-                         const missingPenguji = !pengujiBroadcast || pengujiBroadcast.count === 0;
+                         const hasNoPenguji = !pengujiBroadcast || pengujiBroadcast.count === 0;
+                         const missingPengujiRoles = pengujiBroadcast?.missingRoles || [];
                          const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
                          const pengujiBroadcastLabel = `Broadcast penguji ${formatTanggalUjian(row.date)}`;
 
@@ -1490,18 +1530,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                </div>
                              </td>
                              <td className="p-3 text-center font-mono font-bold text-slate-700">
-                               {row.count} siswa
+                               <span className="block">{row.activeCount} siswa aktif</span>
+                               {row.count > row.activeCount && (
+                                 <span className="block text-[10px] font-normal text-slate-400">dari {row.count} total</span>
+                               )}
                              </td>
                              <td className="p-3">
                                <div className="flex flex-col gap-0.5 text-[10px]">
-                                 {missingOnlineLink && (
-                                   <span className="font-semibold text-amber-700">⚠ Link Zoom belum tersedia</span>
-                                 )}
-                                 {missingPenguji && (
-                                   <span className="font-semibold text-slate-500">⚠ Belum ada penguji</span>
-                                 )}
-                                 {!missingOnlineLink && !missingPenguji && (
-                                   <span className="text-emerald-600 font-semibold">Siap broadcast</span>
+                                 {hasNoStudents ? (
+                                   <span className="font-semibold text-slate-500">Belum ada siswa</span>
+                                 ) : hasNoActiveStudents ? (
+                                   <span className="font-semibold text-rose-600">
+                                     ⚠ Tidak ada siswa aktif ({row.selesaiCount} selesai, {row.rescheduleCount} reschedule)
+                                   </span>
+                                 ) : (
+                                   <>
+                                     {missingOnlineLink && (
+                                       <span className="font-semibold text-amber-700">⚠ Link Zoom belum tersedia</span>
+                                     )}
+                                     {missingPengujiRoles.length === 3 ? (
+                                       <span className="font-semibold text-slate-500">⚠ Belum ada penguji</span>
+                                     ) : (
+                                       missingPengujiRoles.map((role) => (
+                                         <span key={role} className="font-semibold text-slate-500">⚠ Penguji {role} belum diisi</span>
+                                       ))
+                                     )}
+                                     {!missingOnlineLink && missingPengujiRoles.length === 0 && (
+                                       <span className="text-emerald-600 font-semibold">Siap broadcast</span>
+                                     )}
+                                   </>
                                  )}
                                </div>
                              </td>
@@ -1510,22 +1567,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                  <button
                                    type="button"
                                    onClick={() => handleCopyText(broadcast?.message || '', broadcastLabel)}
-                                   disabled={!broadcast?.message || missingOnlineLink}
+                                   disabled={hasNoActiveStudents || !broadcast?.message || missingOnlineLink}
                                    className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
-                                   title="Salin pesan WA Wali Murid"
+                                   title={hasNoActiveStudents ? 'Tidak ada siswa aktif pada tanggal ini' : missingOnlineLink ? 'Link Zoom belum tersedia' : 'Salin pesan WA Wali Murid'}
                                  >
                                    <Copy className="w-3 h-3" /> Salin Walmur
                                  </button>
                                  <button
                                    type="button"
                                    onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
-                                   disabled={!pengujiBroadcast?.message || missingOnlineLink || missingPenguji}
+                                   disabled={hasNoActiveStudents || !pengujiBroadcast?.message || missingOnlineLink || hasNoPenguji}
                                    className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
-                                   title="Salin pesan WA Penguji"
+                                   title={hasNoActiveStudents ? 'Tidak ada siswa aktif pada tanggal ini' : hasNoPenguji ? 'Belum ada penguji pada tanggal ini' : missingOnlineLink ? 'Link Zoom belum tersedia' : 'Salin pesan WA Penguji'}
                                  >
                                    <Copy className="w-3 h-3" /> Salin Penguji
                                  </button>
-                                 {row.count === 0 && (
+                                 {row.activeCount === 0 && row.id_sesi && (
                                    <button
                                      type="button"
                                      onClick={() => handleDeleteSessionDate(row)}
