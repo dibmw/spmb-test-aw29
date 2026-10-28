@@ -528,9 +528,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!row.id_sesi) return;
     setConfirmDialog({
       title: 'Hapus Tanggal Ujian?',
-      message: row.count === 0
-        ? `Tanggal ${formatTanggalUjian(row.date)} belum memiliki siswa. Hapus tanggal ini dari daftar?`
-        : `Tanggal ${formatTanggalUjian(row.date)} tidak memiliki siswa aktif. Hapus konfigurasi sesi tanggal ini? Data siswa yang selesai/reschedule tidak akan terhapus.`,
+      message: `Tanggal ${formatTanggalUjian(row.date)} belum memiliki siswa. Hapus tanggal ini dari daftar?`,
       confirmLabel: 'Hapus',
       variant: 'danger',
       onConfirm: () => {
@@ -1582,7 +1580,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                  >
                                    <Copy className="w-3 h-3" /> Salin Penguji
                                  </button>
-                                 {row.activeCount === 0 && row.id_sesi && (
+                                 {row.count === 0 && row.id_sesi && (
                                    <button
                                      type="button"
                                      onClick={() => handleDeleteSessionDate(row)}
