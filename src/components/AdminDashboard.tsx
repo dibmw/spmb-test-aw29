@@ -202,6 +202,23 @@ const buildGradeDetailRows = (
   return rows;
 };
 
+const formatWaktuInput = (timestamp: string): string => {
+  if (!timestamp) return '-';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return timestamp;
+  return date
+    .toLocaleString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+    .replace(/\./g, ':');
+};
+
 const createEmptyTimeInputs = (): StudentTimeInputs => ({
   waktu_alq_arab: { start: '', end: '' },
   waktu_catung_eng: { start: '', end: '' },
@@ -908,7 +925,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       `📝 Kategori   : ${nilai.kategori_ujian}`,
       `⭐ Skor Akhir : ${nilai.skor_akhir_rata2.toFixed(2)}`,
       `👨‍🏫 Penguji    : ${nilai.nama_penguji}`,
-      `📅 Waktu      : ${nilai.timestamp}`
+      `📅 Waktu Input: ${formatWaktuInput(nilai.timestamp)}`
     ];
 
     if (rows.length > 0) {
@@ -2061,7 +2078,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-[#1E3A8A] text-white uppercase text-[10px]">
                 <tr>
-                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Waktu Input</th>
                   <th className="p-3">ID Siswa</th>
                   <th className="p-3">Nama Siswa</th>
                   <th className="p-3">Kategori Ujian</th>
@@ -2074,7 +2091,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <tbody className="divide-y divide-slate-200">
                 {nilaiList.map((n) => (
                   <tr key={n.id || `${n.id_siswa}-${n.kategori_ujian}`} className="hover:bg-slate-50">
-                    <td className="p-3 font-mono text-slate-500">{n.timestamp}</td>
+                    <td className="p-3 font-mono text-slate-500">{formatWaktuInput(n.timestamp)}</td>
                     <td className="p-3 font-mono font-bold text-[#1E3A8A]">{n.id_siswa}</td>
                     <td className="p-3 font-bold text-slate-800">{n.nama_siswa}</td>
                     <td className="p-3 font-semibold text-slate-700">{n.kategori_ujian}</td>
@@ -3514,8 +3531,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.nama_penguji}</p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Waktu Penilaian</p>
-                  <p className="text-sm font-semibold text-slate-800">{viewingGradeRecord.timestamp}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Waktu Input</p>
+                  <p className="text-sm font-semibold text-slate-800">{formatWaktuInput(viewingGradeRecord.timestamp)}</p>
                 </div>
               </div>
 
