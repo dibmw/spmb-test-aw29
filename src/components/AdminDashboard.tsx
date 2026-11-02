@@ -7,6 +7,7 @@ import {
   Download, 
   Plus, 
   Edit, 
+  Eye,
   Trash2, 
   Search, 
   ExternalLink, 
@@ -132,6 +133,73 @@ const EMPTY_STUDENT_FORM: StudentFormDraft = {
   status_kehadiran_siswa: '',
   status_kehadiran_walmur: '',
   gelombang: ''
+};
+
+const SCORE_LABELS: Record<string, string> = {
+  baca_indo: 'Membaca Bahasa Indonesia',
+  paham_indo: 'Memahami Teks Bahasa Indonesia',
+  baca_inggris: 'Membaca Bahasa Inggris',
+  paham_inggris: 'Memahami Teks Bahasa Inggris',
+  fluency: 'Fluency',
+  vocab_grammar: 'Vocabulary & Grammar',
+  critical_thinking: 'Critical Thinking',
+  expression_clarity: 'Expression & Clarity',
+  tilawah: 'Tilawah',
+  makhorijul_huruf: 'Makhorijul Huruf',
+  sifatul_huruf: 'Sifatul Huruf',
+  kelancaran: 'Kelancaran',
+  percaya_diri: 'Percaya Diri',
+  kejelasan: 'Kejelasan',
+  adab: 'Adab',
+  kelekatan_skor: 'Kelekatan Anak & Orang Tua',
+  asertif_skor: 'Asertif Anak',
+  kognitif_skor: 'Perkembangan Kognitif',
+  peran_skor: 'Keterlibatan Peran Ayah & Bunda',
+  sentuhan_skor: 'Sentuhan Perkembangan',
+  kebutuhan_khusus_skor: 'Kebutuhan Khusus / Perilaku Spesial',
+  pantauan_ibadah_skor: 'Pantauan Ibadah & Hafalan',
+  pertemanan_skor: 'Pantauan Pertemanan',
+  nilai_karakter_skor: 'Nilai Karakter & Kolaborasi',
+  kesulitan_skor: 'Respons terhadap Kesulitan'
+};
+
+type GradeDetailRow = { key: string; label: string; score: string; note?: string };
+
+const isNoteKey = (key: string): boolean =>
+  key === 'catatan' || key.startsWith('catatan_') || key.endsWith('_catatan');
+
+const getScoreNote = (
+  detail: Record<string, number | string>,
+  scoreKey: string
+): string | undefined => {
+  const candidates = [
+    detail[`${scoreKey}_catatan`],
+    detail[`catatan_${scoreKey}`],
+    detail[scoreKey.replace(/_skor$/, '_catatan')]
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  return undefined;
+};
+
+const buildGradeDetailRows = (
+  detail?: Record<string, number | string> | null
+): GradeDetailRow[] => {
+  if (!detail) return [];
+  const rows: GradeDetailRow[] = [];
+  Object.entries(detail).forEach(([key, value]) => {
+    if (isNoteKey(key)) return;
+    const isScore = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value)));
+    if (!isScore) return;
+    rows.push({
+      key,
+      label: SCORE_LABELS[key] || key.replace(/_/g, ' '),
+      score: String(value),
+      note: getScoreNote(detail, key)
+    });
+  });
+  return rows;
 };
 
 const createEmptyTimeInputs = (): StudentTimeInputs => ({
@@ -547,6 +615,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingGradeStudent, setEditingGradeStudent] = useState<SiswaJadwal | null>(null);
   const [editingGradeKategori, setEditingGradeKategori] = useState<KategoriUjian>('Calistung');
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
+  const [viewingGradeRecord, setViewingGradeRecord] = useState<NilaiRecord | null>(null);
 
   // KPI Calculations
   const activeJadwalList = useMemo(() => jadwalList.filter(s => s.status === 'Aktif'), [jadwalList]);
@@ -814,6 +883,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
     setIsEditMode(true);
     setIsStudentModalOpen(true);
+  };
+
+  // Handle View Grade from Admin
+  const openViewGrade = (nilai: NilaiRecord) => {
+    setViewingGradeRecord(nilai);
+  };
+
+  const getStudentKelas = (idSiswa: string): string => {
+    const siswa = jadwalList.find(s => s.id.toUpperCase() === idSiswa.toUpperCase());
+    return siswa ? formatKelas(siswa.kelas) : '-';
+  };
+
+  const handleCopyExamResult = async (nilai: NilaiRecord) => {
+    const kelas = getStudentKelas(nilai.id_siswa);
+    const rows = buildGradeDetailRows(nilai.detail_skor_json);
+    const catatanUmum = nilai.catatan_umum || nilai.detail_skor_json?.catatan || '-';
+
+    const lines: string[] = [
+      '📋 *HASIL UJIAN SPMB AL-WILDAN 29*',
+      '----------------------------------------',
+      `👤 Nama Siswa : ${nilai.nama_siswa} (${nilai.id_siswa})`,
+      `🏫 Kelas      : ${kelas}`,
+      `📝 Kategori   : ${nilai.kategori_ujian}`,
+      `⭐ Skor Akhir : ${nilai.skor_akhir_rata2.toFixed(2)}`,
+      `👨‍🏫 Penguji    : ${nilai.nama_penguji}`,
+      `📅 Waktu      : ${nilai.timestamp}`
+    ];
+
+    if (rows.length > 0) {
+      lines.push('', '*Rincian Skor & Catatan:*');
+      rows.forEach((row) => {
+        lines.push(`- ${row.label}: ${row.score}`);
+        if (row.note) lines.push(`  └ Catatan: ${row.note}`);
+      });
+    }
+
+    lines.push('', '*Catatan Umum:*', String(catatanUmum));
+
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      showToast('Tersalin', 'Hasil ujian berhasil disalin ke clipboard.', 'success');
+    } catch {
+      showToast('Gagal Menyalin', 'Browser menolak akses clipboard.', 'error');
+    }
   };
 
   // Handle Edit Grade from Admin
@@ -1955,7 +2068,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th className="p-3">Skor Rata2</th>
                   <th className="p-3">Penguji</th>
                   <th className="p-3">Catatan</th>
-                  <th className="p-3 text-right">Koreksi</th>
+                  <th className="p-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -1974,11 +2087,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="p-3 text-slate-500 italic truncate max-w-[160px]">{n.catatan_umum || '-'}</td>
                     <td className="p-3 text-right whitespace-nowrap">
                       <button
-                        onClick={() => openEditGrade(n)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg mr-1"
-                        title="Koreksi Nilai Sebagai Admin"
+                        onClick={() => openViewGrade(n)}
+                        className="p-1.5 text-[#1E3A8A] hover:bg-blue-50 rounded-lg mr-1"
+                        title="Melihat Nilai"
                       >
-                        <Edit className="w-3.5 h-3.5" />
+                        <Eye className="w-3.5 h-3.5" />
                       </button>
                       {n.id && (
                         <button
@@ -3357,6 +3470,115 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             action();
           }}
         />
+      )}
+
+      {/* Admin View Grade Modal */}
+      {viewingGradeRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 my-8">
+            <div className="bg-[#1E3A8A] text-white p-5 flex items-start justify-between border-b-4 border-[#D97706]">
+              <div>
+                <h3 className="font-bold text-lg">Detail Hasil Penilaian</h3>
+                <p className="text-xs text-blue-100 mt-1">Rekapitulasi nilai siswa</p>
+              </div>
+              <button
+                onClick={() => setViewingGradeRecord(null)}
+                className="p-1.5 hover:bg-white/10 rounded-lg"
+                title="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Nama Siswa</p>
+                  <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.nama_siswa}</p>
+                  <p className="text-xs font-mono text-[#1E3A8A]">{viewingGradeRecord.id_siswa}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Kelas</p>
+                  <p className="text-sm font-bold text-slate-800">{getStudentKelas(viewingGradeRecord.id_siswa)}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Kategori Ujian</p>
+                  <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.kategori_ujian}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Skor Akhir</p>
+                  <p className="text-sm font-bold font-mono text-emerald-700">{viewingGradeRecord.skor_akhir_rata2.toFixed(2)}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Penguji</p>
+                  <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.nama_penguji}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Waktu Penilaian</p>
+                  <p className="text-sm font-semibold text-slate-800">{viewingGradeRecord.timestamp}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Rincian Skor & Catatan</h4>
+                {buildGradeDetailRows(viewingGradeRecord.detail_skor_json).length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Tidak ada rincian skor.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {buildGradeDetailRows(viewingGradeRecord.detail_skor_json).map((row) => (
+                      <div key={row.key} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-xs font-semibold text-slate-700">{row.label}</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-bold font-mono text-xs rounded">
+                            {row.score}
+                          </span>
+                        </div>
+                        {row.note && (
+                          <p className="mt-1.5 text-xs text-slate-500 italic">
+                            <span className="font-semibold not-italic text-slate-600">Catatan: </span>
+                            {row.note}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Catatan Umum</h4>
+                <p className="text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded-xl p-3 whitespace-pre-line">
+                  {viewingGradeRecord.catatan_umum || viewingGradeRecord.detail_skor_json?.catatan || '-'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-end gap-2">
+              <button
+                onClick={() => handleCopyExamResult(viewingGradeRecord)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" /> Salin ke Clipboard
+              </button>
+              <button
+                onClick={() => {
+                  const record = viewingGradeRecord;
+                  setViewingGradeRecord(null);
+                  openEditGrade(record);
+                }}
+                className="px-4 py-2 bg-[#D97706] hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5"
+              >
+                <Edit className="w-3.5 h-3.5" /> Edit Nilai
+              </button>
+              <button
+                onClick={() => setViewingGradeRecord(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Admin Grade Edit Modal */}
