@@ -422,7 +422,8 @@ export function buildPesanPengujiTanggal(
   mode: ModeUjian,
   location: string,
   pengujiItems: PengujiTanggalBroadcastItem[],
-  totalSiswa: number
+  totalSiswa: number,
+  waktuRange = ''
 ): string {
   const isOnline = mode === 'Online';
   const modeLabel = mode.toUpperCase();
@@ -471,6 +472,7 @@ export function buildPesanPengujiTanggal(
     ``,
     `*HARI/TANGGAL*`,
     tanggal,
+    ...(waktuRange ? [`Waktu: ${waktuRange}`] : []),
     ``,
     `*MODE UJIAN*`,
     modeLabel,

@@ -301,6 +301,33 @@ export function summarizeWaktuAll(
 }
 
 /**
+ * Rentang waktu ujian seluruh siswa aktif pada satu tanggal:
+ * jam mulai paling awal hingga jam selesai paling akhir.
+ */
+export function getWaktuRangeForDate(jadwalList: SiswaJadwal[], hariTanggal: string): string {
+  const iso = toISODate(hariTanggal);
+  if (!iso) return '';
+
+  const ranges = jadwalList
+    .filter((siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === iso)
+    .flatMap((siswa) => [
+      siswa.waktu_all,
+      siswa.waktu_alq_arab,
+      siswa.waktu_catung_eng,
+      siswa.waktu_interview,
+    ])
+    .map(parseTimeRange)
+    .filter((range): range is { start: number; end: number } => range !== null);
+
+  if (ranges.length === 0) return '';
+
+  const start = Math.min(...ranges.map((range) => range.start));
+  const end = Math.max(...ranges.map((range) => range.end));
+
+  return `${formatMinutes(start)} - ${formatMinutes(end)}`;
+}
+
+/**
  * Pilih data sesi terbaik untuk satu tanggal.
  */
 export function pickSesiUjianForDate(sesiList: SesiUjian[], hariTanggal: string): SesiUjian | undefined {

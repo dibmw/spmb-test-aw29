@@ -43,6 +43,7 @@ import {
   parseStartTimeMinutes,
   parseTimeRange,
   summarizeWaktuAll,
+  getWaktuRangeForDate,
   toISODate,
   formatTanggalUjian,
   getModeUjianForDate,
@@ -93,6 +94,7 @@ type SessionDateRow = {
   rescheduleCount: number;
   mode: ModeUjian;
   id_sesi: string;
+  waktuRange: string;
 };
 
 const TIME_FIELDS: TimeField[] = ['waktu_alq_arab', 'waktu_catung_eng', 'waktu_interview'];
@@ -361,7 +363,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
            selesaiCount: 0,
            rescheduleCount: 0,
            mode: sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline',
-           id_sesi: sesi?.id_sesi || ''
+           id_sesi: sesi?.id_sesi || '',
+           waktuRange: ''
          };
          map.set(iso, row);
        }
@@ -394,11 +397,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
            selesaiCount: 0,
            rescheduleCount: 0,
            mode: sesi.mode_ujian,
-           id_sesi: sesi.id_sesi
+           id_sesi: sesi.id_sesi,
+           waktuRange: ''
          });
        }
      });
-     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+     return Array.from(map.values())
+       .map((row) => ({ ...row, waktuRange: getWaktuRangeForDate(jadwalList, row.date) }))
+       .sort((a, b) => a.date.localeCompare(b.date));
    }, [jadwalList, sesiUjianList]);
 
    const filteredSessionDateRows = useMemo(() => {
@@ -475,7 +481,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       map.set(row.date, {
         count: pengujiItems.length,
-        message: buildPesanPengujiTanggal(row.date, row.mode, onlineUrl, pengujiItems, students.length),
+        message: buildPesanPengujiTanggal(row.date, row.mode, onlineUrl, pengujiItems, students.length, row.waktuRange),
         missingRoles,
       });
     });
@@ -1638,6 +1644,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                            <tr key={row.date} className="hover:bg-slate-50">
                              <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
                                {formatTanggalUjian(row.date)}
+                               {row.waktuRange && (
+                                 <span className="block text-[10px] font-medium text-slate-500 font-mono">{row.waktuRange}</span>
+                               )}
                              </td>
                              <td className="p-3 whitespace-nowrap">
                                <div className="flex items-center gap-2">
