@@ -18,7 +18,10 @@ import {
   ADMIN_EMAIL 
 } from '../data/mockData';
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzq3IHLcodfvYCSuD8j4beiH30pdLV1zNMBWOcXMKUAHN8OEc5KENttMEmo7cDjBZaz/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyCOLKJEtL480pr5f3YJP4nNq80OiBgeInZI6XWVNvQC1prD4K-8LX7K85UjxiEjOFJ/exec';
+const PREV_DEFAULT_GAS_URLS = [
+  'https://script.google.com/macros/s/AKfycbzq3IHLcodfvYCSuD8j4beiH30pdLV1zNMBWOcXMKUAHN8OEc5KENttMEmo7cDjBZaz/exec'
+];
 export const DEFAULT_APP_SECRET_KEY =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_SECRET_KEY)
     ? String(import.meta.env.VITE_APP_SECRET_KEY).trim()
@@ -40,9 +43,11 @@ class ApiService {
   constructor() {
     this.initStorage();
     const stored = localStorage.getItem(STORAGE_KEYS.GAS_URL);
-    this.gasUrl = stored && stored.trim() ? stored.trim() : DEFAULT_GAS_URL;
-    if (!stored) {
+    if (!stored || PREV_DEFAULT_GAS_URLS.includes(stored.trim())) {
+      this.gasUrl = DEFAULT_GAS_URL;
       localStorage.setItem(STORAGE_KEYS.GAS_URL, DEFAULT_GAS_URL);
+    } else {
+      this.gasUrl = stored.trim();
     }
   }
 
