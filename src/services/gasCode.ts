@@ -19,6 +19,19 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  */
 
 var ADMIN_EMAIL = "kurikulum.alwildan29@gmail.com";
+var DEFAULT_APP_SECRET_KEY = "aa84e8445d76e5a72a983e78826fdb87";
+
+function getExpectedSecret() {
+  var prop = PropertiesService.getScriptProperties().getProperty("APP_SECRET_KEY");
+  return prop && prop.trim() ? prop.trim() : DEFAULT_APP_SECRET_KEY;
+}
+
+function verifyRequestAuth(e, postData) {
+  var expected = getExpectedSecret();
+  if (!expected) return true;
+  var provided = (e && e.parameter && e.parameter.secret_key) || (postData && postData.secret_key) || "";
+  return String(provided).trim() === expected;
+}
 
 // Skema terkunci header web_jadwal (kolom A s/d T) dan key kanoniknya
 var JADWAL_HEADERS = [
@@ -257,6 +270,9 @@ function jsonResponse(data) {
 // GET Handler
 function doGet(e) {
   try {
+    if (!verifyRequestAuth(e, null)) {
+      return jsonResponse({ status: "error", message: "Akses Ditolak: Kunci otentikasi (secret_key) tidak valid atau tidak disediakan." });
+    }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     initSheets(ss);
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "getAllData";
@@ -339,6 +355,10 @@ function doPost(e) {
     var postData = {};
     if (e && e.postData && e.postData.contents) {
       postData = JSON.parse(e.postData.contents);
+    }
+
+    if (!verifyRequestAuth(e, postData)) {
+      return jsonResponse({ status: "error", message: "Akses Ditolak: Kunci otentikasi (secret_key) tidak valid atau tidak disediakan." });
     }
 
     var action = postData.action;

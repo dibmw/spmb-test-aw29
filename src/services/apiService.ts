@@ -19,6 +19,10 @@ import {
 } from '../data/mockData';
 
 export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzq3IHLcodfvYCSuD8j4beiH30pdLV1zNMBWOcXMKUAHN8OEc5KENttMEmo7cDjBZaz/exec';
+export const DEFAULT_APP_SECRET_KEY =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_SECRET_KEY)
+    ? String(import.meta.env.VITE_APP_SECRET_KEY).trim()
+    : 'aa84e8445d76e5a72a983e78826fdb87';
 
 const STORAGE_KEYS = {
   JADWAL: 'spmb29_jadwal',
@@ -79,13 +83,16 @@ class ApiService {
 
   // Kirim POST ke GAS dengan retry (background, fire-and-forget agar tidak menahan UI)
   private async pushWithRetry(body: unknown, attempts = 3): Promise<void> {
+    const payload = (body && typeof body === 'object')
+      ? { ...(body as Record<string, unknown>), secret_key: DEFAULT_APP_SECRET_KEY }
+      : body;
     for (let i = 0; i < attempts; i++) {
       try {
         await fetch(this.gasUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify(payload)
         });
         return;
       } catch (err) {
@@ -110,7 +117,8 @@ class ApiService {
     try {
       const session = this.getCurrentSession();
       const emailParam = session && session.email ? `&email=${encodeURIComponent(session.email)}` : '';
-      const res = await fetch(`${this.gasUrl}?action=getAllData${emailParam}`, {
+      const secretParam = `&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}`;
+      const res = await fetch(`${this.gasUrl}?action=getAllData${emailParam}${secretParam}`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
         redirect: 'follow'
@@ -309,7 +317,7 @@ class ApiService {
     // Try Google Apps Script if URL provided
     if (this.gasUrl) {
       try {
-        const res = await fetch(`${this.gasUrl}?action=verifyLogin&email=${encodeURIComponent(email)}`, {
+        const res = await fetch(`${this.gasUrl}?action=verifyLogin&email=${encodeURIComponent(email)}&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}`, {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         });
@@ -556,15 +564,10 @@ class ApiService {
 
     // GAS sync
     if (this.gasUrl) {
-      fetch(this.gasUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: isEdit ? 'adminUpdateSchedule' : 'adminAddSchedule',
-          siswa
-        })
-      }).catch(err => console.warn('GAS schedule sync notice:', err));
+      void this.pushWithRetry({
+        action: isEdit ? 'adminUpdateSchedule' : 'adminAddSchedule',
+        siswa
+      });
     }
 
     return { success: true, message: isEdit ? 'Data jadwal berhasil diperbarui.' : 'Siswa baru berhasil ditambahkan ke jadwal.' };
@@ -580,12 +583,7 @@ class ApiService {
     localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(current));
 
     if (this.gasUrl) {
-      fetch(this.gasUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'adminDeleteSchedule', id })
-      }).catch(err => console.warn('GAS delete schedule sync notice:', err));
+      void this.pushWithRetry({ action: 'adminDeleteSchedule', id });
     }
 
     return { success: true, message: 'Data jadwal berhasil dihapus.' };
