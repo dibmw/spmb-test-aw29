@@ -25,7 +25,7 @@ const PREV_DEFAULT_GAS_URLS = [
 export const DEFAULT_APP_SECRET_KEY =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_SECRET_KEY)
     ? String(import.meta.env.VITE_APP_SECRET_KEY).trim()
-    : 'aa84e8445d76e5a72a983e78826fdb87';
+    : '';
 
 const STORAGE_KEYS = {
   JADWAL: 'spmb29_jadwal',
@@ -86,22 +86,22 @@ class ApiService {
     localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(INITIAL_SESI_UJIAN));
   }
 
-  // Kirim POST ke GAS dengan retry (background, fire-and-forget agar tidak menahan UI)
+  // Kirim POST ke GAS melalui serverless proxy dengan retry
   private async pushWithRetry(body: unknown, attempts = 3): Promise<void> {
-    const payload = (body && typeof body === 'object')
-      ? { ...(body as Record<string, unknown>), secret_key: DEFAULT_APP_SECRET_KEY }
-      : body;
     for (let i = 0; i < attempts; i++) {
       try {
-        await fetch(this.gasUrl, {
+        const res = await fetch('/api/sheets-proxy', {
           method: 'POST',
-          mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            url: this.gasUrl,
+            method: 'POST',
+            body: body
+          })
         });
-        return;
+        if (res.ok) return;
       } catch (err) {
-        console.warn(`GAS push gagal (percobaan ${i + 1}/${attempts}):`, err);
+        console.warn(`Proxy push gagal (percobaan ${i + 1}/${attempts}):`, err);
         if (i < attempts - 1) {
           await new Promise((res) => setTimeout(res, 1500 * (i + 1)));
         }
@@ -109,7 +109,7 @@ class ApiService {
     }
   }
 
-  // Sync all sheets from live Google Apps Script endpoint
+  // Sync all sheets from live Google Apps Script endpoint via proxy
   public async syncFromGas(): Promise<{ 
     success: boolean; 
     message: string; 
@@ -122,11 +122,15 @@ class ApiService {
     try {
       const session = this.getCurrentSession();
       const emailParam = session && session.email ? `&email=${encodeURIComponent(session.email)}` : '';
-      const secretParam = `&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}`;
-      const res = await fetch(`${this.gasUrl}?action=getAllData${emailParam}${secretParam}`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        redirect: 'follow'
+      const targetUrl = `${this.gasUrl}?action=getAllData${emailParam}`;
+
+      const res = await fetch('/api/sheets-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: targetUrl,
+          method: 'GET'
+        })
       });
 
       if (!res.ok) {
@@ -319,12 +323,17 @@ class ApiService {
       return { success: false, message: 'Harap masukkan alamat email petugas.' };
     }
 
-    // Try Google Apps Script if URL provided
+    // Try Google Apps Script via secure serverless proxy if URL provided
     if (this.gasUrl) {
       try {
-        const res = await fetch(`${this.gasUrl}?action=verifyLogin&email=${encodeURIComponent(email)}&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}`, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
+        const targetUrl = `${this.gasUrl}?action=verifyLogin&email=${encodeURIComponent(email)}`;
+        const res = await fetch('/api/sheets-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: targetUrl,
+            method: 'GET'
+          })
         });
         const json = await res.json();
         if (json.status === 'success' && json.data) {
@@ -333,7 +342,7 @@ class ApiService {
           return { success: true, session, message: `Selamat datang, ${session.nama}` };
         }
       } catch (err) {
-        console.warn('GAS login failed, falling back to local database verify:', err);
+        console.warn('Proxy login failed, falling back to local database verify:', err);
       }
     }
 
