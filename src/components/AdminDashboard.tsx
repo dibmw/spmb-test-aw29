@@ -57,7 +57,6 @@ import {
 import { apiService } from '../services/apiService';
 import { isFirebaseConfigured } from '../services/firebase';
 import { downloadJadwalCsvTemplate, parseJadwalFile } from '../utils/csvJadwal';
-import { GOOGLE_APPS_SCRIPT_CODE } from '../services/gasCode';
 import {
   buildPresentIncompleteRows,
   buildGradedButAbsentRows,
@@ -302,12 +301,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [cetakSearch, setCetakSearch] = useState('');
   const [cetakViewFilter, setCetakViewFilter] = useState<'all' | 'siswa' | 'walmur'>('all');
   
-  // GAS Web App URL state
-  const [gasUrl, setGasUrl] = useState(apiService.getGasUrl());
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [savingGasUrl, setSavingGasUrl] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-
   // Student CRUD Modal State
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1213,42 +1206,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Copy Code.gs
-  const handleCopyGasCode = () => {
-    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
-    setCopiedCode(true);
-    showToast('Tersalin!', 'Script Code.gs berhasil disalin ke clipboard.', 'success');
-    setTimeout(() => setCopiedCode(false), 3000);
-  };
-
-  // Save GAS Endpoint URL
-  const handleSaveGasUrl = () => {
-    setSavingGasUrl(true);
-    apiService.setGasUrl(gasUrl);
-    setTimeout(() => {
-      setSavingGasUrl(false);
-      showToast('Tersimpan', 'URL Web App Google Apps Script berhasil diperbarui.', 'success');
-    }, 400);
-  };
-
-  // Live Sync with Google Spreadsheet
-  const handleSyncFromSpreadsheet = async () => {
-    setIsSyncing(true);
-    try {
-      const res = await apiService.syncFromGas();
-      if (res.success) {
-        showToast('Sinkronisasi Berhasil', res.message, 'success');
-        onDataChanged();
-      } else {
-        showToast('Sinkronisasi Info', res.message, 'info');
-      }
-    } catch (err: any) {
-      showToast('Gagal Sinkron', err.message || 'Terjadi kesalahan saat mengambil data.', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   // 1-Click Migration from Spreadsheet to Firebase Firestore
   const [isMigratingFirebase, setIsMigratingFirebase] = useState(false);
   const handleMigrateToFirebase = async () => {
@@ -1533,23 +1490,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handleSyncFromSpreadsheet}
-            disabled={isSyncing}
-            className="px-3 py-2 bg-[#D97706] hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-75"
-            title="Sinkronkan data terbaru langsung dari Google Spreadsheet"
+            onClick={handleSyncPengujiFromSheet}
+            disabled={isSyncingPenguji}
+            className="px-3.5 py-2 bg-[#D97706] hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-75"
+            title="Sinkronkan daftar petugas penguji dari Google Spreadsheet (sheet web_penguji)"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Spreadsheet'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPenguji ? 'animate-spin' : ''}`} />
+            <span>{isSyncingPenguji ? 'Menyinkronkan...' : 'Sinkronkan Penguji'}</span>
           </button>
 
           <a
-            href={SPREADSHEET_URL}
+            href="https://docs.google.com/spreadsheets/d/1HWv5c9qK1VckVO533mFHrhGGNFFLtl8a0KKiIyTfxrk/edit#gid=819476442"
             target="_blank"
             rel="noopener noreferrer"
             className="px-3 py-2 bg-blue-900/80 hover:bg-blue-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-blue-700/60 transition-colors"
+            title="Buka Sheet web_penguji di Google Spreadsheet"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Buka Sheet</span>
+            <span>Buka Sheet web_penguji</span>
             <ExternalLink className="w-3.5 h-3.5 text-blue-300" />
           </a>
         </div>
@@ -3233,52 +3191,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Pengaturan Lanjutan (Collapsible) */}
-          <details className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-            <summary className="cursor-pointer font-bold text-xs text-slate-700 select-none flex items-center justify-between">
-              <span>Pengaturan Lanjutan: Web App URL & Script Deployment (Opsional)</span>
-              <span className="text-slate-400 text-[10px]">Klik untuk membuka / menutup</span>
-            </summary>
-
-            <div className="pt-4 space-y-4 border-t border-slate-100">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                URL Google Apps Script berikut digunakan secara khusus untuk membaca sheet penguji dari spreadsheet:
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="url"
-                  value={gasUrl}
-                  onChange={(e) => setGasUrl(e.target.value)}
-                  placeholder="https://script.google.com/macros/s/.../exec"
-                  className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
-                />
-                <button
-                  onClick={handleSaveGasUrl}
-                  disabled={savingGasUrl}
-                  className="px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70"
-                >
-                  <Save className="w-4 h-4 text-[#D97706]" />
-                  <span>{savingGasUrl ? 'Menyimpan...' : 'Simpan URL'}</span>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-xs font-bold text-slate-800">Script Code.gs:</span>
-                <button
-                  onClick={handleCopyGasCode}
-                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-[#D97706]" />}
-                  <span>{copiedCode ? 'Tersalin!' : 'Salin Script Code.gs'}</span>
-                </button>
-              </div>
-
-              <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 border border-slate-800">
-                {GOOGLE_APPS_SCRIPT_CODE}
-              </pre>
-            </div>
-          </details>
+          {/* Card Arsitektur & Sinkronisasi Penguji */}
+          <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-xs text-slate-600 space-y-2">
+            <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Arsitektur Sistem: Full Firebase Firestore & Spreadsheet Sync</span>
+            </h4>
+            <p className="leading-relaxed">
+              Seluruh operasi harian seperti input nilai penguji, presensi timekeeper, dan manajemen jadwal siswa kini berjalan 100% langsung di <strong>Firebase Cloud Firestore</strong> dengan kecepatan instan (&lt;100ms) dan sinkronisasi real-time tanpa jeda antrean.
+            </p>
+            <p className="leading-relaxed text-slate-500 text-[11px]">
+              Google Spreadsheet difungsikan secara khusus sebagai master data untuk sheet <strong className="text-slate-700">web_penguji</strong> (daftar petugas penguji). Script lama (Code.gs) sudah tidak lagi menangani operasi tulis untuk menjamin integritas data dan mencegah konflik antar perangkat.
+            </p>
+          </div>
         </div>
       )}
 
