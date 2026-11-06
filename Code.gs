@@ -5,7 +5,7 @@
  * Spreadsheet ID: Dihubungkan ke Spreadsheet penampung data SPMB
  */
 
-var ADMIN_EMAIL = "kurikulum.alwildan29@gmail.com";
+var ADMIN_EMAIL = PropertiesService.getScriptProperties().getProperty("ADMIN_EMAIL") || "kurikulum.alwildan29@gmail.com";
 var DEFAULT_APP_SECRET_KEY = "aa84e8445d76e5a72a983e78826fdb87";
 
 function getExpectedSecret() {

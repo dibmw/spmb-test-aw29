@@ -1,56 +1,56 @@
 import { SiswaJadwal, PengujiAccount, PresensiRecord, NilaiRecord, SesiUjian } from '../types/spmb';
 
-export const ADMIN_EMAIL = 'kurikulum.alwildan29@gmail.com';
+export const ADMIN_EMAIL = 'admin@example.local';
 
 export const INITIAL_PENGUJI_LIST: PengujiAccount[] = [
   {
     penguji: 'Ustadz Ahmad Fauzan, Lc.',
-    email_penguji: 'ahmad.fauzan@alwildan29.sch.id',
+    email_penguji: 'penguji1@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Ustadzah Siti Maryam, S.Pd.',
-    email_penguji: 'siti.maryam@alwildan29.sch.id',
+    email_penguji: 'penguji2@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Ustadz Muhammad Rizqi, B.A.',
-    email_penguji: 'muhammad.rizqi@alwildan29.sch.id',
+    email_penguji: 'penguji3@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Ustadzah Nurul Hidayah, M.Pd.',
-    email_penguji: 'nurul.hidayah@alwildan29.sch.id',
+    email_penguji: 'penguji4@example.local',
     assignedRoles: ['PENGUJI', 'TIMEKEEPER']
   },
   {
     penguji: 'Ustadz Abdullah Said, S.Pd.I',
-    email_penguji: 'abdullah.said@alwildan29.sch.id',
+    email_penguji: 'penguji5@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Mr. David Wilson, B.Ed.',
-    email_penguji: 'david.wilson@alwildan29.sch.id',
+    email_penguji: 'penguji6@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Ustadz Ihsan Al-Hafidz',
-    email_penguji: 'ihsan.hafidz@alwildan29.sch.id',
+    email_penguji: 'penguji7@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Ustadzah Dewi Sartika, S.Psi.',
-    email_penguji: 'dewi.sartika@alwildan29.sch.id',
+    email_penguji: 'penguji8@example.local',
     assignedRoles: ['PENGUJI']
   },
   {
     penguji: 'Ustadz Bambang Hermanto',
-    email_penguji: 'bambang.timekeeper@alwildan29.sch.id',
+    email_penguji: 'timekeeper1@example.local',
     assignedRoles: ['TIMEKEEPER']
   },
   {
     penguji: 'Ustadzah Fatimah Zahra',
-    email_penguji: 'fatimah.timekeeper@alwildan29.sch.id',
+    email_penguji: 'timekeeper2@example.local',
     assignedRoles: ['TIMEKEEPER']
   },
   {
