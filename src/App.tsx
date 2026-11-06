@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Component, useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
 import { TimekeeperDashboard } from './components/TimekeeperDashboard';
@@ -8,9 +8,52 @@ import { LoginModal } from './components/LoginModal';
 import { StudentCardModal } from './components/StudentCardModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { apiService } from './services/apiService';
+import { 
+  isFirebaseConfigured, 
+  subscribeToJadwal, 
+  subscribeToPresensi, 
+  subscribeToNilai, 
+  subscribeToSesiUjian,
+  subscribeToPenguji
+} from './services/firebase';
 import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, Role, SesiUjian } from './types/spmb';
 import { SCHOOL_LOGO_URL } from './data/mockData';
 import { MapPin, ShieldCheck, MessageCircle, ExternalLink } from 'lucide-react';
+
+class ErrorBoundary extends (Component as any) {
+  constructor(props: any) {
+    super(props);
+    (this as any).state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('ErrorBoundary caught error:', error, errorInfo);
+  }
+  render() {
+    if ((this as any).state.hasError) {
+      return (
+        <div className="p-8 max-w-xl mx-auto my-12 bg-white border border-rose-200 rounded-2xl shadow-lg text-center space-y-4">
+          <div className="w-12 h-12 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-xl">!</div>
+          <h2 className="text-lg font-bold text-slate-800">Terjadi Kendala Memuat Tampilan</h2>
+          <p className="text-xs text-slate-600 font-mono bg-slate-50 p-3 rounded-xl border border-slate-200 text-left overflow-auto">
+            {(this as any).state.error?.message || 'Unknown error'}
+          </p>
+          <button
+            onClick={() => {
+              window.location.reload();
+            }}
+            className="px-4 py-2 bg-[#1E3A8A] text-white rounded-xl text-xs font-bold cursor-pointer"
+          >
+            Muat Ulang Halaman
+          </button>
+        </div>
+      );
+    }
+    return (this as any).props.children;
+  }
+}
 
 export default function App() {
   const [session, setSession] = useState<UserSession | null>(null);
@@ -65,19 +108,56 @@ export default function App() {
       }
     }
 
-    // Background sync with live Google Apps Script if available
-    apiService.syncFromGas().then((res) => {
-      if (res.success) {
-        refreshData();
-      }
-    }).catch(() => {
-      // Keep local data gracefully
-    });
+    if (isFirebaseConfigured) {
+      // Real-time Firestore Listeners (Instant CRUD sync across all devices)
+      const unsubJadwal = subscribeToJadwal((data) => {
+        if (data.length > 0) {
+          setJadwalList(data);
+          localStorage.setItem('spmb29_jadwal', JSON.stringify(data));
+        }
+      });
+      const unsubPresensi = subscribeToPresensi((data) => {
+        setPresensiList(data);
+        localStorage.setItem('spmb29_presensi', JSON.stringify(data));
+      });
+      const unsubNilai = subscribeToNilai((data) => {
+        setNilaiList(data);
+        localStorage.setItem('spmb29_nilai', JSON.stringify(data));
+      });
+      const unsubSesi = subscribeToSesiUjian((data) => {
+        if (data.length > 0) {
+          setSesiUjianList(data);
+          localStorage.setItem('spmb29_sesi_ujian', JSON.stringify(data));
+        }
+      });
+      const unsubPenguji = subscribeToPenguji((data) => {
+        if (data.length > 0) {
+          localStorage.setItem('spmb29_penguji', JSON.stringify(data));
+        }
+      });
+
+      return () => {
+        if (unsubJadwal) unsubJadwal();
+        if (unsubPresensi) unsubPresensi();
+        if (unsubNilai) unsubNilai();
+        if (unsubSesi) unsubSesi();
+        if (unsubPenguji) unsubPenguji();
+      };
+    } else {
+      // Background sync with live Google Apps Script if Firebase not yet configured
+      apiService.syncFromGas().then((res) => {
+        if (res.success) {
+          refreshData();
+        }
+      }).catch(() => {
+        // Keep local data gracefully
+      });
+    }
   }, []);
 
-  // Auto-sync ringan agar perubahan admin (mode/kehadiran) cepat terlihat di perangkat lain.
+  // Auto-sync ringan untuk GAS fallback jika Firebase belum aktif.
   useEffect(() => {
-    if (!session) return;
+    if (!session || isFirebaseConfigured) return;
 
     const timer = window.setInterval(async () => {
       if (document.hidden || !navigator.onLine || syncInFlight.current) return;
@@ -146,66 +226,68 @@ export default function App() {
       />
 
       {/* Main View Container */}
-      <main className="flex-1">
-        {currentTab === 'landing' && (
-          <LandingPage
-            jadwalList={jadwalList}
-            presensiList={presensiList}
-            sesiUjianList={sesiUjianList}
-            onSelectStudentForCard={(s) => setSelectedStudentForCard(s)}
-            onOpenLogin={() => setIsLoginOpen(true)}
-          />
-        )}
+      <ErrorBoundary>
+        <main className="flex-1">
+          {currentTab === 'landing' && (
+            <LandingPage
+              jadwalList={jadwalList}
+              presensiList={presensiList}
+              sesiUjianList={sesiUjianList}
+              onSelectStudentForCard={(s) => setSelectedStudentForCard(s)}
+              onOpenLogin={() => setIsLoginOpen(true)}
+            />
+          )}
 
-        {currentTab === 'timekeeper' && session && (
-          <TimekeeperDashboard
-            session={session}
-            jadwalList={jadwalList}
-            presensiList={presensiList}
-            onAttendanceSubmitted={(newRecord) => {
-              setPresensiList(prev => [newRecord, ...prev]);
-            }}
-            showToast={showToast}
-          />
-        )}
+          {currentTab === 'timekeeper' && session && (
+            <TimekeeperDashboard
+              session={session}
+              jadwalList={jadwalList}
+              presensiList={presensiList}
+              onAttendanceSubmitted={(newRecord) => {
+                setPresensiList(prev => [newRecord, ...prev]);
+              }}
+              showToast={showToast}
+            />
+          )}
 
-        {currentTab === 'penguji' && session && (
-          <PengujiDashboard
-            session={session}
-            jadwalList={jadwalList}
-            nilaiList={nilaiList}
-            presensiList={presensiList}
-            sesiUjianList={sesiUjianList}
-            onGradeSaved={(newRecord) => {
-              setNilaiList(prev => {
-                const idx = prev.findIndex(
-                  n => n.id_siswa.toUpperCase() === newRecord.id_siswa.toUpperCase() && 
-                       n.kategori_ujian === newRecord.kategori_ujian
-                );
-                if (idx >= 0) {
-                  const copy = [...prev];
-                  copy[idx] = newRecord;
-                  return copy;
-                }
-                return [newRecord, ...prev];
-              });
-            }}
-            showToast={showToast}
-          />
-        )}
+          {currentTab === 'penguji' && session && (
+            <PengujiDashboard
+              session={session}
+              jadwalList={jadwalList}
+              nilaiList={nilaiList}
+              presensiList={presensiList}
+              sesiUjianList={sesiUjianList}
+              onGradeSaved={(newRecord) => {
+                setNilaiList(prev => {
+                  const idx = prev.findIndex(
+                    n => n.id_siswa.toUpperCase() === newRecord.id_siswa.toUpperCase() && 
+                         n.kategori_ujian === newRecord.kategori_ujian
+                  );
+                  if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = newRecord;
+                    return copy;
+                  }
+                  return [newRecord, ...prev];
+                });
+              }}
+              showToast={showToast}
+            />
+          )}
 
-        {currentTab === 'admin' && session && (
-          <AdminDashboard
-            session={session}
-            jadwalList={jadwalList}
-            presensiList={presensiList}
-            nilaiList={nilaiList}
-            sesiUjianList={sesiUjianList}
-            onDataChanged={refreshData}
-            showToast={showToast}
-          />
-        )}
-      </main>
+          {currentTab === 'admin' && session && (
+            <AdminDashboard
+              session={session}
+              jadwalList={jadwalList}
+              presensiList={presensiList}
+              nilaiList={nilaiList}
+              sesiUjianList={sesiUjianList}
+              onDataChanged={refreshData}
+              showToast={showToast}
+            />
+          )}
+        </main>
+      </ErrorBoundary>
 
       {/* Official Footer */}
       <footer className="bg-slate-900 text-slate-300 border-t-4 border-[#D97706] py-8">

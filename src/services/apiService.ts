@@ -17,6 +17,21 @@ import {
   INITIAL_SESI_UJIAN,
   ADMIN_EMAIL 
 } from '../data/mockData';
+import {
+  isFirebaseConfigured,
+  firestoreSaveJadwal,
+  firestoreDeleteJadwal,
+  firestoreSubmitPresensi,
+  firestoreDeletePresensi,
+  firestoreSubmitGrade,
+  firestoreDeleteGrade,
+  firestoreSaveSesiUjian,
+  firestoreDeleteSesiUjian,
+  firestoreBulkMigrate,
+  firestoreVerifyOfficer,
+  firestoreBulkUpsertJadwal,
+  firestoreBulkUpsertPenguji
+} from './firebase';
 
 export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyCOLKJEtL480pr5f3YJP4nNq80OiBgeInZI6XWVNvQC1prD4K-8LX7K85UjxiEjOFJ/exec';
 const PREV_DEFAULT_GAS_URLS = [
@@ -323,8 +338,8 @@ class ApiService {
       return { success: false, message: 'Harap masukkan alamat email petugas.' };
     }
 
-    // Try Google Apps Script via secure serverless proxy if URL provided
-    if (this.gasUrl) {
+    // Try Google Apps Script via secure serverless proxy only if Firebase is not configured
+    if (this.gasUrl && !isFirebaseConfigured) {
       try {
         const targetUrl = `${this.gasUrl}?action=verifyLogin&email=${encodeURIComponent(email)}`;
         const res = await fetch('/api/sheets-proxy', {
@@ -346,12 +361,30 @@ class ApiService {
       }
     }
 
-    // Local Verification
-    const pengujiList = this.getPengujiList();
-    const jadwalList = this.getJadwalList();
+    // Verification (Local Cache + Firestore Direct Check)
+    const SUPER_ADMIN_EMAILS = [
+      ADMIN_EMAIL.toLowerCase(),
+      'kurikulum.alwildan29@gmail.com',
+      'admin@alwildan29.sch.id'
+    ];
+    const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(email);
 
-    const isSuperAdmin = (email === ADMIN_EMAIL.toLowerCase());
-    const matchedOfficer = pengujiList.find(p => p.email_penguji.trim().toLowerCase() === email);
+    let pengujiList = this.getPengujiList();
+    let matchedOfficer = pengujiList.find(p => p.email_penguji.trim().toLowerCase() === email);
+
+    // Jika belum ada di cache browser lokal, verifikasi langsung ke Firestore
+    if (!matchedOfficer && isFirebaseConfigured) {
+      try {
+        const remoteOfficer = await firestoreVerifyOfficer(email);
+        if (remoteOfficer) {
+          matchedOfficer = remoteOfficer;
+          pengujiList.push(remoteOfficer);
+          localStorage.setItem(STORAGE_KEYS.PENGUJI, JSON.stringify(pengujiList));
+        }
+      } catch (err) {
+        console.warn('Firestore direct officer verification error:', err);
+      }
+    }
 
     if (!matchedOfficer && !isSuperAdmin) {
       return {
@@ -361,6 +394,7 @@ class ApiService {
     }
 
     const officialName = matchedOfficer ? matchedOfficer.penguji : 'Tim Kurikulum Al-Wildan 29 (Super Admin)';
+    const jadwalList = this.getJadwalList();
 
     // Determine roles from schedule sheet
     const isTimekeeper = isSuperAdmin || jadwalList.some(
@@ -476,8 +510,13 @@ class ApiService {
     currentPresensi.unshift(newRecord);
     localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(currentPresensi));
 
-    // Async push to GAS if configured (dengan retry)
-    if (this.gasUrl) {
+    // Instant save to Firestore
+    if (isFirebaseConfigured) {
+      firestoreSubmitPresensi(newRecord).catch((err) => {
+        console.error('Firestore submit presensi error:', err);
+      });
+    } else if (this.gasUrl) {
+      // Fallback legacy GAS jika Firebase tidak aktif
       void this.pushWithRetry({
         action: 'submitAttendance',
         id_siswa: siswa.id,
@@ -539,8 +578,13 @@ class ApiService {
 
     localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(currentNilai));
 
-    // Push to GAS if configured (dengan retry)
-    if (this.gasUrl) {
+    // Instant save to Firestore
+    if (isFirebaseConfigured) {
+      firestoreSubmitGrade(newRecord).catch((err) => {
+        console.error('Firestore submit grade error:', err);
+      });
+    } else if (this.gasUrl) {
+      // Fallback legacy GAS
       void this.pushWithRetry({
         action: 'submitGrade',
         id_siswa: siswa.id,
@@ -576,8 +620,12 @@ class ApiService {
     }
     localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(current));
 
-    // GAS sync
-    if (this.gasUrl) {
+    // Instant save to Firestore
+    if (isFirebaseConfigured) {
+      firestoreSaveJadwal(siswa).catch((err) => {
+        console.error('Firestore save jadwal error:', err);
+      });
+    } else if (this.gasUrl) {
       void this.pushWithRetry({
         action: isEdit ? 'adminUpdateSchedule' : 'adminAddSchedule',
         siswa
@@ -596,7 +644,11 @@ class ApiService {
     }
     localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(current));
 
-    if (this.gasUrl) {
+    if (isFirebaseConfigured) {
+      firestoreDeleteJadwal(id).catch((err) => {
+        console.error('Firestore delete jadwal error:', err);
+      });
+    } else if (this.gasUrl) {
       void this.pushWithRetry({ action: 'adminDeleteSchedule', id });
     }
 
@@ -610,10 +662,11 @@ class ApiService {
     const next = current.filter(n => n.id !== id);
     localStorage.setItem(STORAGE_KEYS.NILAI, JSON.stringify(next));
 
-    // Sinkron hapus ke GAS agar entri tidak muncul lagi setelah sync ulang.
-    // Sheet web_nilai tidak punya kolom id stabil, jadi hapus by composite key
-    // id_siswa + kategori_ujian (konsisten dgn pencocokan submitGrade).
-    if (target && this.gasUrl) {
+    if (isFirebaseConfigured) {
+      firestoreDeleteGrade(id).catch((err) => {
+        console.error('Firestore delete grade error:', err);
+      });
+    } else if (target && this.gasUrl) {
       void this.pushWithRetry({
         action: 'deleteGrade',
         id_siswa: target.id_siswa,
@@ -629,6 +682,11 @@ class ApiService {
     let current = this.getPresensiList();
     current = current.filter(p => p.id !== id);
     localStorage.setItem(STORAGE_KEYS.PRESENSI, JSON.stringify(current));
+    if (isFirebaseConfigured) {
+      firestoreDeletePresensi(id).catch((err) => {
+        console.error('Firestore delete presensi error:', err);
+      });
+    }
     return { success: true, message: 'Data presensi berhasil dihapus.' };
   }
 
@@ -660,7 +718,11 @@ class ApiService {
 
     localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(current));
 
-    if (this.gasUrl) {
+    if (isFirebaseConfigured) {
+      firestoreSaveSesiUjian(next).catch((err) => {
+        console.error('Firestore save sesi error:', err);
+      });
+    } else if (this.gasUrl) {
       void this.pushWithRetry({ action: 'adminSaveSession', sesi: next });
     }
 
@@ -675,11 +737,158 @@ class ApiService {
     }
     localStorage.setItem(STORAGE_KEYS.SESI_UJIAN, JSON.stringify(next));
 
-    if (this.gasUrl) {
+    if (isFirebaseConfigured) {
+      firestoreDeleteSesiUjian(id).catch((err) => {
+        console.error('Firestore delete sesi error:', err);
+      });
+    } else if (this.gasUrl) {
       void this.pushWithRetry({ action: 'adminDeleteSession', id_sesi: id });
     }
 
     return { success: true, message: 'Sesi ujian berhasil dihapus.' };
+  }
+
+  // Migrasi Spreadsheet langsung ke Firebase melalui Frontend
+  public async migrateSpreadsheetToFirestore(): Promise<{ success: boolean; message: string }> {
+    if (!isFirebaseConfigured) {
+      return { success: false, message: 'Firebase belum dikonfigurasi. Silakan isi kredensial di file .env terlebih dahulu.' };
+    }
+
+    // Ambil data terbaru dari Spreadsheet
+    const res = await this.syncFromGas();
+    if (!res.success) {
+      return { success: false, message: `Gagal membaca spreadsheet: ${res.message}` };
+    }
+
+    const payload = {
+      jadwal: this.getJadwalList(),
+      penguji: this.getPengujiList(),
+      presensi: this.getPresensiList(),
+      nilai: this.getNilaiList(),
+      sesi: this.getSesiUjianList()
+    };
+
+    try {
+      const result = await firestoreBulkMigrate(payload);
+      return { success: true, message: result.message };
+    } catch (err: any) {
+      return { success: false, message: `Gagal migrasi ke Firestore: ${err.message}` };
+    }
+  }
+
+  // Bulk import & upsert data calon siswa (jika ID sama, timpa data lama)
+  public async bulkUpsertJadwal(
+    newJadwals: SiswaJadwal[]
+  ): Promise<{ success: boolean; total: number; updated: number; added: number; message: string }> {
+    if (!newJadwals || newJadwals.length === 0) {
+      return { success: false, total: 0, updated: 0, added: 0, message: 'Tidak ada data calon siswa yang diimpor.' };
+    }
+
+    const current = this.getJadwalList();
+    const currentMap = new Map<string, number>();
+    current.forEach((s, idx) => {
+      currentMap.set(String(s.id).trim().toUpperCase(), idx);
+    });
+
+    let added = 0;
+    let updated = 0;
+
+    newJadwals.forEach((siswa) => {
+      const cleanId = String(siswa.id).trim().toUpperCase();
+      const existingIdx = currentMap.get(cleanId);
+      if (existingIdx !== undefined) {
+        // Timpa data lama dengan data baru
+        current[existingIdx] = siswa;
+        updated++;
+      } else {
+        // Tambahkan data baru
+        current.push(siswa);
+        currentMap.set(cleanId, current.length - 1);
+        added++;
+      }
+    });
+
+    // Simpan ke cache lokal
+    localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(current));
+
+    // Simpan ke Firestore secara batch
+    if (isFirebaseConfigured) {
+      try {
+        await firestoreBulkUpsertJadwal(newJadwals);
+      } catch (err) {
+        console.error('Firestore bulk upsert error:', err);
+      }
+    }
+
+    return {
+      success: true,
+      total: newJadwals.length,
+      updated,
+      added,
+      message: `Berhasil mengimpor ${newJadwals.length} calon siswa (${added} data baru, ${updated} data lama diperbarui/ditimpa).`
+    };
+  }
+
+  // Sinkronisasi otomatis data Penguji dari Spreadsheet (web_penguji) ke Firebase Firestore
+  public async syncPengujiFromSpreadsheet(): Promise<{ success: boolean; count: number; message: string }> {
+    try {
+      const targetUrl = `${this.gasUrl}?action=getAllData`;
+      let rawData: any = null;
+
+      // Coba fetch melalui serverless proxy atau direct
+      try {
+        const res = await fetch('/api/sheets-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: targetUrl,
+            method: 'GET'
+          })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'success' && json.data) {
+            rawData = json.data;
+          }
+        }
+      } catch (proxyErr) {
+        console.warn('Proxy fetch penguji gagal, mencoba direct fetch:', proxyErr);
+      }
+
+      if (!rawData) {
+        const res = await fetch(`${targetUrl}&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}`);
+        const json = await res.json();
+        if (json.status === 'success' && json.data) {
+          rawData = json.data;
+        }
+      }
+
+      if (!rawData || !Array.isArray(rawData.penguji)) {
+        return { success: false, count: 0, message: 'Gagal mengambil data penguji dari Google Spreadsheet.' };
+      }
+
+      const normalizedPenguji: PengujiAccount[] = rawData.penguji.map((item: any) => ({
+        penguji: String(item.penguji || item.nama || '').trim(),
+        email_penguji: String(item.email_penguji || item['email penguji'] || item.email || '').trim().toLowerCase()
+      })).filter((p: PengujiAccount) => Boolean(p.penguji && p.email_penguji));
+
+      // Simpan ke Firestore jika Firebase terkonfigurasi
+      if (isFirebaseConfigured) {
+        await firestoreBulkUpsertPenguji(normalizedPenguji);
+      }
+
+      // Update cache lokal
+      localStorage.setItem(STORAGE_KEYS.PENGUJI, JSON.stringify(normalizedPenguji));
+
+      return {
+        success: true,
+        count: normalizedPenguji.length,
+        message: `Sinkronisasi berhasil! ${normalizedPenguji.length} penguji dari sheet web_penguji telah diperbarui.`
+      };
+    } catch (err: any) {
+      console.error('syncPengujiFromSpreadsheet error:', err);
+      return { success: false, count: 0, message: `Gagal sinkron penguji: ${err.message || 'Jaringan bermasalah'}` };
+    }
   }
 }
 

@@ -27,7 +27,11 @@ import {
   CalendarDays,
   Wifi,
   WifiOff,
-  RotateCcw
+  RotateCcw,
+  Flame,
+  Zap,
+  Upload,
+  FileDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -51,6 +55,8 @@ import {
   resolveKehadiran
 } from '../types/spmb';
 import { apiService } from '../services/apiService';
+import { isFirebaseConfigured } from '../services/firebase';
+import { downloadJadwalCsvTemplate, parseJadwalFile } from '../utils/csvJadwal';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../services/gasCode';
 import {
   buildPresentIncompleteRows,
@@ -292,6 +298,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Print target state untuk cetak jadwal per ruangan
   const [printTarget, setPrintTarget] = useState<null | { group: 'siswa' | 'walmur'; room: string | null }>(null);
+  const [cetakDateFilter, setCetakDateFilter] = useState('');
+  const [cetakSearch, setCetakSearch] = useState('');
+  const [cetakViewFilter, setCetakViewFilter] = useState<'all' | 'siswa' | 'walmur'>('all');
   
   // GAS Web App URL state
   const [gasUrl, setGasUrl] = useState(apiService.getGasUrl());
@@ -304,6 +313,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const [studentFormData, setStudentFormData] = useState<StudentFormDraft>({ ...EMPTY_STUDENT_FORM });
   const [studentTimeInputs, setStudentTimeInputs] = useState<StudentTimeInputs>(createEmptyTimeInputs);
+
+  // Bulk Import CSV/Excel State
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkParsedData, setBulkParsedData] = useState<SiswaJadwal[]>([]);
+  const [bulkParseErrors, setBulkParseErrors] = useState<string[]>([]);
+  const [bulkOverlapCount, setBulkOverlapCount] = useState<number>(0);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Sync Penguji from Spreadsheet State
+  const [isSyncingPenguji, setIsSyncingPenguji] = useState(false);
 
    const [isSessionDateModalOpen, setIsSessionDateModalOpen] = useState(false);
    const [sessionDateForm, setSessionDateForm] = useState<{ date: string; mode: ModeUjian }>({
@@ -337,6 +357,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
    }, [jadwalList, rekapDateFrom, rekapDateTo]);
 
    const [rekapGelombangFilter, setRekapGelombangFilter] = useState<string[]>([]);
+
+   useEffect(() => {
+     // Otomatis sinkronkan daftar penguji dari Google Spreadsheet sheet web_penguji di background
+     apiService.syncPengujiFromSpreadsheet().catch((err) => {
+       console.warn('Background auto-sync penguji sheet info:', err);
+     });
+   }, []);
 
    useEffect(() => {
      if (rekapGelombangFilter.length === 0) return;
@@ -908,6 +935,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsStudentModalOpen(true);
   };
 
+  // Bulk Import Handlers
+  const handleDownloadTemplate = () => {
+    downloadJadwalCsvTemplate();
+    showToast('Template Diunduh', 'File template_jadwal_spmb.csv berhasil diunduh.', 'success');
+  };
+
+  const openBulkImportModal = () => {
+    setBulkImportFile(null);
+    setBulkParsedData([]);
+    setBulkParseErrors([]);
+    setBulkOverlapCount(0);
+    setIsBulkImportOpen(true);
+  };
+
+  const handleSelectBulkFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const res = await parseJadwalFile(file);
+      setBulkImportFile(file);
+      setBulkParsedData(res.valid);
+      setBulkParseErrors(res.errors);
+
+      const existingIds = new Set(jadwalList.map((s) => String(s.id).trim().toUpperCase()));
+      let overlaps = 0;
+      res.valid.forEach((s) => {
+        if (existingIds.has(String(s.id).trim().toUpperCase())) {
+          overlaps++;
+        }
+      });
+      setBulkOverlapCount(overlaps);
+
+      if (res.valid.length === 0) {
+        showToast('File Tidak Valid', 'Tidak ditemukan baris data yang valid dalam file.', 'error');
+      } else {
+        showToast('File Terbaca', `${res.valid.length} data calon siswa berhasil diurai.`, 'info');
+      }
+    } catch (err: any) {
+      showToast('Gagal Membaca File', err.message || 'Format file tidak didukung.', 'error');
+      setBulkImportFile(null);
+      setBulkParsedData([]);
+      setBulkParseErrors([]);
+    }
+  };
+
+  const handleConfirmBulkImport = async () => {
+    if (bulkParsedData.length === 0) return;
+    setIsImporting(true);
+    try {
+      const res = await apiService.bulkUpsertJadwal(bulkParsedData);
+      if (res.success) {
+        showToast('Import Berhasil', res.message, 'success');
+        setIsBulkImportOpen(false);
+        setBulkImportFile(null);
+        setBulkParsedData([]);
+        setBulkParseErrors([]);
+        onDataChanged();
+      } else {
+        showToast('Import Gagal', res.message, 'error');
+      }
+    } catch (err: any) {
+      showToast('Error Import', err.message || 'Terjadi kesalahan saat menyimpan ke database.', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Sync Penguji dari Spreadsheet web_penguji
+  const handleSyncPengujiFromSheet = async () => {
+    setIsSyncingPenguji(true);
+    try {
+      const res = await apiService.syncPengujiFromSpreadsheet();
+      if (res.success) {
+        showToast('Penguji Tersinkron', res.message, 'success');
+        onDataChanged();
+      } else {
+        showToast('Sinkronisasi Gagal', res.message, 'error');
+      }
+    } catch (err: any) {
+      showToast('Error', err.message || 'Gagal sinkron data penguji.', 'error');
+    } finally {
+      setIsSyncingPenguji(false);
+    }
+  };
+
   // Handle View Grade from Admin
   const openViewGrade = (nilai: NilaiRecord) => {
     setViewingGradeRecord(nilai);
@@ -1136,6 +1249,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // 1-Click Migration from Spreadsheet to Firebase Firestore
+  const [isMigratingFirebase, setIsMigratingFirebase] = useState(false);
+  const handleMigrateToFirebase = async () => {
+    if (!isFirebaseConfigured) {
+      showToast(
+        'Firebase Belum Dikonfigurasi',
+        'Silakan masukkan kredensial Firebase di file .env terlebih dahulu.',
+        'error'
+      );
+      return;
+    }
+    setIsMigratingFirebase(true);
+    try {
+      const res = await apiService.migrateSpreadsheetToFirestore();
+      if (res.success) {
+        showToast('Migrasi Berhasil', res.message, 'success');
+        onDataChanged();
+      } else {
+        showToast('Migrasi Gagal', res.message, 'error');
+      }
+    } catch (err: any) {
+      showToast('Error Migrasi', err.message || 'Terjadi kesalahan saat migrasi ke Firebase.', 'error');
+    } finally {
+      setIsMigratingFirebase(false);
+    }
+  };
+
+  // Unduh Cadangan JSON Lengkap dari Data Firestore
+  const handleDownloadDatabaseBackup = () => {
+    try {
+      const backupPayload = {
+        title: "Backup Database SPMB Al-Wildan 29 Depok",
+        createdAt: new Date().toISOString(),
+        stats: {
+          totalSiswa: jadwalList.length,
+          totalPenguji: pengujiList.length,
+          totalPresensi: presensiList.length,
+          totalNilai: nilaiList.length,
+          totalSesiUjian: sesiUjianList.length,
+        },
+        collections: {
+          spmb_jadwal: jadwalList,
+          spmb_penguji: pengujiList,
+          spmb_presensi: presensiList,
+          spmb_nilai: nilaiList,
+          spmb_sesi_ujian: sesiUjianList,
+        }
+      };
+
+      const jsonStr = JSON.stringify(backupPayload, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      a.href = url;
+      a.download = `backup-spmb-aw29-${dateStr}-${timeStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('Cadangan Database Berhasil', 'File backup JSON telah diunduh.', 'success');
+    } catch (err: any) {
+      showToast('Gagal Mengunduh Cadangan', err.message || 'Terjadi kesalahan.', 'error');
+    }
+  };
+
   // ====== MONITORING & BROADCAST WA (cek silang presensi <-> nilai) ======
   const [broadcastSearch, setBroadcastSearch] = useState('');
   const [broadcastJenjang, setBroadcastJenjang] = useState<'Semua' | 'SD' | 'SMP' | 'SMA'>('Semua');
@@ -1207,11 +1389,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   ): { room: string; date: string; siswa: SiswaJadwal[] }[] => {
     const map = new Map<string, SiswaJadwal[]>();
     activeJadwalList.forEach(s => {
+      if (cetakDateFilter) {
+        const iso = toISODate(s.hari_tanggal);
+        if (iso !== cetakDateFilter) return;
+      }
       const key = getRoom(s) || 'Tanpa Ruangan';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     });
-    return Array.from(map.entries())
+
+    let groups = Array.from(map.entries())
       .map(([room, siswa]) => ({
         room,
         date: siswa[0]?.hari_tanggal || '',
@@ -1223,10 +1410,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }),
       }))
       .sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true, sensitivity: 'base' }));
+
+    if (cetakSearch.trim()) {
+      const q = cetakSearch.trim().toLowerCase();
+      groups = groups.filter(g => {
+        const matchRoom = g.room.toLowerCase().includes(q);
+        const matchOfficer = g.siswa.some(s =>
+          (s.penguji_alq_arab || '').toLowerCase().includes(q) ||
+          (s.penguji_catung_eng || '').toLowerCase().includes(q) ||
+          (s.timekeeper_siswa || '').toLowerCase().includes(q) ||
+          (s.interview_walmur || '').toLowerCase().includes(q) ||
+          (s.timekeeper_walmur || '').toLowerCase().includes(q) ||
+          s.nama_siswa.toLowerCase().includes(q) ||
+          s.id.toLowerCase().includes(q)
+        );
+        return matchRoom || matchOfficer;
+      });
+    }
+
+    return groups;
   };
 
-  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa, s => s.waktu_all), [activeJadwalList]);
-  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur, s => s.waktu_interview), [activeJadwalList]);
+  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa, s => s.waktu_all), [activeJadwalList, cetakDateFilter, cetakSearch]);
+  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur, s => s.waktu_interview), [activeJadwalList, cetakDateFilter, cetakSearch]);
 
   const triggerPrint = (group: 'siswa' | 'walmur', room: string | null) => {
     setPrintTarget({ group, room });
@@ -1439,12 +1645,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onClick={() => setActiveSubTab('gas')}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
             activeSubTab === 'gas'
-              ? 'bg-[#D97706] text-white shadow'
-              : 'text-amber-800 hover:bg-amber-50'
+              ? 'bg-[#1E3A8A] text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Code className="w-4 h-4" />
-          <span>Backend GAS & Setup</span>
+          <Database className="w-4 h-4 text-[#D97706]" />
+          <span>Database & Sync</span>
         </button>
       </div>
 
@@ -1781,88 +1987,137 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Cari siswa, nomor pendaftaran, ruangan..."
-                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <CalendarDays className="w-4 h-4 text-slate-500" />
-                <select
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
-                  title="Filter tanggal ujian"
-                >
-                  <option value="">Tanggal: Semua</option>
-                  {jadwalDateOptions.map((option) => (
-                    <option key={option.date} value={option.date}>
-                      {formatTanggalUjian(option.date)} ({option.count})
-                    </option>
-                  ))}
-                </select>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            {/* Row 1: Search & Action Buttons */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px] max-w-lg">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Cari nama siswa, nomor pendaftaran, ruangan..."
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-[#1E3A8A] rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 transition-all placeholder:text-slate-400"
+                />
+                {searchFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchFilter('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
+                    title="Hapus pencarian"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <select
-                value={kehadiranSiswaFilter}
-                onChange={(e) => setKehadiranSiswaFilter(e.target.value as KehadiranFilter)}
-                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
-                title="Filter kehadiran siswa"
-              >
-                <option value="Semua">Siswa: Semua Kehadiran</option>
-                <option value="Hadir">Siswa: Hadir</option>
-                <option value="Belum Hadir">Siswa: Belum Hadir</option>
-              </select>
-
-              <select
-                value={kehadiranWalmurFilter}
-                onChange={(e) => setKehadiranWalmurFilter(e.target.value as KehadiranFilter)}
-                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
-                title="Filter kehadiran wali murid"
-              >
-                <option value="Semua">Wali: Semua Kehadiran</option>
-                <option value="Hadir">Wali: Hadir</option>
-                <option value="Belum Hadir">Wali: Belum Hadir</option>
-              </select>
-
-              {hasJadwalFilter && (
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-start md:justify-end">
                 <button
                   type="button"
-                  onClick={resetJadwalFilters}
-                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Reset filter tanggal dan kehadiran"
+                  onClick={handleDownloadTemplate}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+                  title="Unduh format template CSV resmi untuk bulk import jadwal"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <FileDown className="w-4 h-4 text-emerald-600" />
+                  <span>Template CSV</span>
                 </button>
-              )}
 
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as SiswaJadwal['status'] | 'Semua')}
-                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
-                title="Filter status siswa"
-              >
-                <option value="Aktif">Status: Aktif</option>
-                <option value="Reschedule">Status: Reschedule</option>
-                <option value="Selesai">Status: Selesai</option>
-                <option value="Semua">Status: Semua</option>
-              </select>
+                <button
+                  type="button"
+                  onClick={openBulkImportModal}
+                  className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                  title="Import banyak data jadwal sekaligus dari file CSV atau Excel"
+                >
+                  <Upload className="w-4 h-4 text-[#D97706]" />
+                  <span>Bulk Import</span>
+                </button>
 
-              <button
-                onClick={openAddStudentModal}
-                className="px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-[#D97706]" />
-                <span>Tambah Calon Siswa</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={openAddStudentModal}
+                  className="px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4 text-[#D97706]" />
+                  <span>Tambah Siswa</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Filter Controls & Counter */}
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                  <Filter className="w-3.5 h-3.5 text-[#1E3A8A]" />
+                  <span>Filter:</span>
+                </div>
+
+                <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5">
+                  <CalendarDays className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="bg-transparent py-1.5 pr-2 text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    title="Filter tanggal ujian"
+                  >
+                    <option value="">Tanggal: Semua</option>
+                    {jadwalDateOptions.map((option) => (
+                      <option key={option.date} value={option.date}>
+                        {formatTanggalUjian(option.date)} ({option.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <select
+                  value={kehadiranSiswaFilter}
+                  onChange={(e) => setKehadiranSiswaFilter(e.target.value as KehadiranFilter)}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 cursor-pointer"
+                  title="Filter kehadiran siswa"
+                >
+                  <option value="Semua">Siswa: Semua Kehadiran</option>
+                  <option value="Hadir">Siswa: Hadir</option>
+                  <option value="Belum Hadir">Siswa: Belum Hadir</option>
+                </select>
+
+                <select
+                  value={kehadiranWalmurFilter}
+                  onChange={(e) => setKehadiranWalmurFilter(e.target.value as KehadiranFilter)}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 cursor-pointer"
+                  title="Filter kehadiran wali murid"
+                >
+                  <option value="Semua">Wali: Semua Kehadiran</option>
+                  <option value="Hadir">Wali: Hadir</option>
+                  <option value="Belum Hadir">Wali: Belum Hadir</option>
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as SiswaJadwal['status'] | 'Semua')}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 cursor-pointer"
+                  title="Filter status siswa"
+                >
+                  <option value="Aktif">Status: Aktif</option>
+                  <option value="Reschedule">Status: Reschedule</option>
+                  <option value="Selesai">Status: Selesai</option>
+                  <option value="Semua">Status: Semua</option>
+                </select>
+
+                {hasJadwalFilter && (
+                  <button
+                    type="button"
+                    onClick={resetJadwalFilters}
+                    className="px-2.5 py-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Reset filter tanggal dan kehadiran"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Filter</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                Menampilkan <strong className="text-slate-800 font-mono font-bold">{filteredJadwalList.length}</strong> dari {activeJadwalByDate.length} siswa
+              </div>
             </div>
           </div>
 
@@ -2873,245 +3128,504 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* TAB 6: GOOGLE APPS SCRIPT BACKEND & DEPLOYMENT */}
       {activeSubTab === 'gas' && (
         <div className="space-y-6">
-          {/* Endpoint URL configuration */}
+          {/* Firebase Firestore Realtime Card */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-[#1E3A8A]" />
+                <Flame className="w-5 h-5 text-amber-500" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Konfigurasi Web App URL Google Apps Script
+                  Firebase Cloud Firestore (Real-Time CRUD Instan)
                 </h3>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded">
-                Hybrid Cloud Sync
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
+                isFirebaseConfigured 
+                  ? 'bg-emerald-100 text-emerald-800' 
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                <Zap className="w-3 h-3" />
+                {isFirebaseConfigured ? 'Aktif Real-Time' : 'Menunggu Konfigurasi .env'}
               </span>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Aplikasi ini beroperasi dengan persistensi lokal berkinerja tinggi dan dapat disinkronkan secara langsung ke Google Spreadsheet Al-Wildan 29 melalui Web App URL Google Apps Script di bawah ini:
+              Dengan Firebase Firestore, seluruh aksi penilaian dan presensi tersimpan secara instan (&lt;100ms) tanpa jeda reload antarmuka dan otomatis tersinkron ke semua perangkat petugas secara real-time.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="url"
-                value={gasUrl}
-                onChange={(e) => setGasUrl(e.target.value)}
-                placeholder="https://script.google.com/macros/s/.../exec"
-                className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
-              />
-              <button
-                onClick={handleSaveGasUrl}
-                disabled={savingGasUrl}
-                className="px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70"
-              >
-                <Save className="w-4 h-4 text-[#D97706]" />
-                <span>{savingGasUrl ? 'Menyimpan...' : 'Simpan URL'}</span>
-              </button>
-              <button
-                onClick={handleSyncFromSpreadsheet}
-                disabled={isSyncing}
-                className="px-4 py-2.5 bg-[#D97706] hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70"
-              >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Menyinkronkan...' : 'Tarik Data Sheet'}</span>
-              </button>
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="text-xs text-slate-700">
+                <strong>Status Database:</strong>{' '}
+                {isFirebaseConfigured ? (
+                  <span className="text-emerald-700 font-semibold">Tersambung ke Firestore. Real-time listener aktif.</span>
+                ) : (
+                  <span className="text-amber-700 font-semibold">Menggunakan Spreadsheet/Lokal. Masukkan kredensial Firebase di .env untuk mengaktifkan.</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleDownloadDatabaseBackup}
+                  className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
+                  title="Unduh seluruh koleksi data Firestore ke file JSON untuk backup offline"
+                >
+                  <Download className="w-4 h-4 text-emerald-600" />
+                  <span>Cadangkan ke JSON</span>
+                </button>
+
+                <button
+                  onClick={handleMigrateToFirebase}
+                  disabled={isMigratingFirebase || !isFirebaseConfigured}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                  title={!isFirebaseConfigured ? 'Konfigurasikan Firebase di .env terlebih dahulu' : 'Salin seluruh data spreadsheet ke Firestore'}
+                >
+                  <Flame className={`w-4 h-4 ${isMigratingFirebase ? 'animate-bounce' : ''}`} />
+                  <span>{isMigratingFirebase ? 'Memigrasikan Data...' : '⚡ Migrasi Spreadsheet (1-Click)'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Deployment Step-by-Step Guide */}
+          {/* Card Sinkronisasi Penguji Otomatis dari Spreadsheet */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Code className="w-5 h-5 text-[#D97706]" />
+                <Users className="w-5 h-5 text-[#1E3A8A]" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Instruksi Deployment Google Apps Script (Code.gs)
+                  Sinkronisasi Petugas Penguji (Google Spreadsheet: web_penguji)
                 </h3>
               </div>
-              <button
-                onClick={handleCopyGasCode}
-                className="px-3.5 py-1.5 bg-[#1E3A8A] hover:bg-blue-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-              >
-                {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-[#D97706]" />}
-                <span>{copiedCode ? 'Tersalin!' : 'Salin Script Code.gs'}</span>
-              </button>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-[#1E3A8A] rounded flex items-center gap-1">
+                Auto Sync Aktif
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-slate-600">
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="w-5 h-5 rounded-full bg-[#1E3A8A] text-white flex items-center justify-center font-bold text-[10px]">
-                  1
-                </span>
-                <strong className="block text-slate-800">Buka Spreadsheet</strong>
-                <p>Buka Spreadsheet SPMB Al-Wildan, lalu klik menu <strong>Extensions &gt; Apps Script</strong>.</p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Daftar penguji dan email resmi dimaintain langsung melalui Google Spreadsheet pada sheet <strong className="text-slate-800">web_penguji</strong>. Data penguji di Firestore otomatis disinkronkan saat dashboard dibuka, atau dapat disinkronkan secara manual melalui tombol di bawah:
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="text-xs text-slate-700">
+                <span>Total Penguji Terdaftar: </span>
+                <strong className="text-blue-900 font-bold">{pengujiList.length} Petugas</strong>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="w-5 h-5 rounded-full bg-[#1E3A8A] text-white flex items-center justify-center font-bold text-[10px]">
-                  2
-                </span>
-                <strong className="block text-slate-800">Tempel Code.gs</strong>
-                <p>Hapus seluruh kode bawaan di editor, lalu paste kode yang telah disalin dari tombol di atas.</p>
-              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1HWv5c9qK1VckVO533mFHrhGGNFFLtl8a0KKiIyTfxrk/edit#gid=819476442"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer w-full sm:w-auto"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Buka Sheet web_penguji</span>
+                </a>
 
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="w-5 h-5 rounded-full bg-[#D97706] text-white flex items-center justify-center font-bold text-[10px]">
-                  3
-                </span>
-                <strong className="block text-slate-800">Deploy as Web App</strong>
-                <p>Klik tombol <strong>Deploy &gt; New deployment</strong>. Pilih type <strong>Web App</strong>.</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[10px]">
-                  4
-                </span>
-                <strong className="block text-slate-800">Atur Hak Akses</strong>
-                <p>Set <em>Execute as: Me</em> dan <em>Who has access: Anyone</em>. Salin URL Web App ke kolom di atas.</p>
+                <button
+                  type="button"
+                  onClick={handleSyncPengujiFromSheet}
+                  disabled={isSyncingPenguji}
+                  className="px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPenguji ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingPenguji ? 'Menyinkronkan...' : 'Sinkronkan Penguji'}</span>
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* Code Box Preview */}
-            <div className="relative mt-4">
-              <pre className="p-4 bg-slate-900 text-slate-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-60 border border-slate-800">
+          {/* Pengaturan Lanjutan (Collapsible) */}
+          <details className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <summary className="cursor-pointer font-bold text-xs text-slate-700 select-none flex items-center justify-between">
+              <span>Pengaturan Lanjutan: Web App URL & Script Deployment (Opsional)</span>
+              <span className="text-slate-400 text-[10px]">Klik untuk membuka / menutup</span>
+            </summary>
+
+            <div className="pt-4 space-y-4 border-t border-slate-100">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                URL Google Apps Script berikut digunakan secara khusus untuk membaca sheet penguji dari spreadsheet:
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="url"
+                  value={gasUrl}
+                  onChange={(e) => setGasUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
+                />
+                <button
+                  onClick={handleSaveGasUrl}
+                  disabled={savingGasUrl}
+                  className="px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70"
+                >
+                  <Save className="w-4 h-4 text-[#D97706]" />
+                  <span>{savingGasUrl ? 'Menyimpan...' : 'Simpan URL'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs font-bold text-slate-800">Script Code.gs:</span>
+                <button
+                  onClick={handleCopyGasCode}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-[#D97706]" />}
+                  <span>{copiedCode ? 'Tersalin!' : 'Salin Script Code.gs'}</span>
+                </button>
+              </div>
+
+              <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 border border-slate-800">
                 {GOOGLE_APPS_SCRIPT_CODE}
               </pre>
             </div>
-          </div>
+          </details>
         </div>
       )}
 
       {/* TAB 7: CETAK RUANGAN */}
       {activeSubTab === 'cetak' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-amber-50 text-[#D97706] flex items-center justify-center">
-                  <Printer className="w-5 h-5" />
+          {/* Header Card Cetak Ruangan */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-5">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-[#D97706] flex items-center justify-center shrink-0 border border-amber-100 shadow-sm">
+                  <Printer className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Cetak Daftar Siswa per Ruangan</h3>
-                  <p className="text-[11px] text-slate-500">
-                    Tampilkan daftar siswa lengkap dengan penguji dan timekeeper; cetak semua sekaligus (halaman per ruangan) atau per ruangan.
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-extrabold text-slate-900">Cetak Daftar Siswa per Ruangan</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-[#1E3A8A] rounded-full border border-blue-200">
+                      Dokumen Pintu & Meja
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    Format cetak resmi berlogo Al-Wildan 29 per lembar ruangan, lengkap dengan jadwal peserta, penguji pos, dan timekeeper.
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+
+              {/* Tombol Cetak Massal */}
+              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
                 <button
+                  type="button"
                   onClick={() => triggerPrint('siswa', null)}
-                  className="px-3.5 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  disabled={siswaRoomGroups.length === 0}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap active:scale-[0.99]"
+                  title="Cetak seluruh daftar ruang ujian siswa"
                 >
                   <Printer className="w-4 h-4 text-[#D97706]" />
                   <span>Cetak Semua Ruang Ujian</span>
+                  <span className="ml-0.5 px-2 py-0.5 bg-blue-800 text-[10px] rounded-full font-mono font-bold">
+                    {siswaRoomGroups.length}
+                  </span>
                 </button>
+
                 <button
+                  type="button"
                   onClick={() => triggerPrint('walmur', null)}
-                  className="px-3.5 py-2 bg-[#D97706] hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  disabled={walmurRoomGroups.length === 0}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#D97706] hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap active:scale-[0.99]"
+                  title="Cetak seluruh daftar ruang wawancara orang tua"
                 >
-                  <Printer className="w-4 h-4" />
+                  <Printer className="w-4 h-4 text-white" />
                   <span>Cetak Semua Ruang Wawancara</span>
+                  <span className="ml-0.5 px-2 py-0.5 bg-amber-700 text-[10px] rounded-full font-mono font-bold">
+                    {walmurRoomGroups.length}
+                  </span>
                 </button>
+              </div>
+            </div>
+
+            {/* Bilah Kontrol & Filter Cetak */}
+            <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Segmented Filter Pills */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-start overflow-x-auto max-w-full">
+                <button
+                  type="button"
+                  onClick={() => setCetakViewFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    cetakViewFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua ({siswaRoomGroups.length + walmurRoomGroups.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCetakViewFilter('siswa')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    cetakViewFilter === 'siswa'
+                      ? 'bg-[#1E3A8A] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Ruang Siswa</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    cetakViewFilter === 'siswa' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {siswaRoomGroups.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCetakViewFilter('walmur')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    cetakViewFilter === 'walmur'
+                      ? 'bg-[#D97706] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Ruang Wawancara</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    cetakViewFilter === 'walmur' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {walmurRoomGroups.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Filter Tanggal & Input Search */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
+                  <CalendarDays className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <select
+                    value={cetakDateFilter}
+                    onChange={(e) => setCetakDateFilter(e.target.value)}
+                    className="bg-transparent py-1 pr-2 text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    title="Filter tanggal ujian ruangan"
+                  >
+                    <option value="">Tanggal: Semua</option>
+                    {jadwalDateOptions.map((opt) => (
+                      <option key={opt.date} value={opt.date}>
+                        {formatTanggalUjian(opt.date)} ({opt.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="relative min-w-[200px] flex-1 sm:flex-initial">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={cetakSearch}
+                    onChange={(e) => setCetakSearch(e.target.value)}
+                    placeholder="Cari ruangan atau penguji..."
+                    className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 transition-all placeholder:text-slate-400"
+                  />
+                  {cetakSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCetakSearch('')}
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                      title="Hapus pencarian"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {(cetakDateFilter || cetakSearch || cetakViewFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCetakDateFilter('');
+                      setCetakSearch('');
+                      setCetakViewFilter('all');
+                    }}
+                    className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Reset filter cetak ruangan"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Daftar Ruangan */}
           <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ruang Ujian Siswa ({siswaRoomGroups.length})</h4>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {siswaRoomGroups.length === 0 && (
-                  <div className="bg-white rounded-2xl p-6 border border-dashed border-slate-300 text-center text-xs text-slate-400">
-                    Tidak ada data ruangan ujian siswa.
-                  </div>
-                )}
-                {siswaRoomGroups.map(g => (
-                  <div key={'s-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="bg-[#1E3A8A] text-white px-4 py-2.5 flex items-center justify-between">
-                      <div>
-                        <div className="font-extrabold text-sm">{g.room}</div>
-                        <div className="text-[10px] text-blue-200">{formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
-                      </div>
-                      <button
-                        onClick={() => triggerPrint('siswa', g.room)}
-                        className="px-2.5 py-1.5 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5" /> Cetak
-                      </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-[11px]">
-                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[9px] tracking-wider">
-                          <tr>
-                            <th className="p-2">No</th>
-                            <th className="p-2">Nama Siswa</th>
-                            <th className="p-2">ID</th>
-                            <th className="p-2">Unit & Kelas</th>
-                            <th className="p-2">Gender</th>
-                            <th className="p-2">Waktu</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">{printRoomRows(g.siswa, 'siswa')}</tbody>
-                      </table>
-                    </div>
-                    <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-[10px] text-slate-600 space-y-0.5">
-                      <div>Penguji Al-Qur'an/Arab: <strong className="text-slate-800">{g.siswa[0]?.penguji_alq_arab || '-'}</strong></div>
-                      <div>Penguji Calistung/English: <strong className="text-slate-800">{g.siswa[0]?.penguji_catung_eng || '-'}</strong></div>
-                      <div>Timekeeper Siswa: <strong className="text-slate-800">{g.siswa[0]?.timekeeper_siswa || '-'}</strong></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Bagian 1: Ruang Ujian Siswa */}
+            {(cetakViewFilter === 'all' || cetakViewFilter === 'siswa') && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1E3A8A]"></span>
+                    <span>Ruang Ujian Siswa ({siswaRoomGroups.length} Ruangan)</span>
+                  </h4>
+                  {cetakDateFilter && (
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Filter: {formatTanggalUjian(cetakDateFilter)}
+                    </span>
+                  )}
+                </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ruang Wawancara Orang Tua ({walmurRoomGroups.length})</h4>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {walmurRoomGroups.length === 0 && (
-                  <div className="bg-white rounded-2xl p-6 border border-dashed border-slate-300 text-center text-xs text-slate-400">
-                    Tidak ada data ruang wawancara orang tua.
+                {siswaRoomGroups.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-8 border border-dashed border-slate-300 text-center text-xs text-slate-500 space-y-1">
+                    <p className="font-semibold text-slate-700">Tidak ada ruangan ujian siswa yang cocok.</p>
+                    <p className="text-[11px] text-slate-400">Pastikan jadwal siswa telah memiliki nomor ruangan ujian.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {siswaRoomGroups.map(g => (
+                      <div key={'s-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+                        <div>
+                          {/* Card Header */}
+                          <div className="bg-[#1E3A8A] text-white px-4 py-3 flex items-center justify-between">
+                            <div>
+                              <div className="font-extrabold text-sm tracking-tight flex items-center gap-2">
+                                <span>{g.room}</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-800 text-blue-100 rounded-full">
+                                  {g.siswa.length} Siswa
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-blue-200 mt-0.5">
+                                {formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => triggerPrint('siswa', g.room)}
+                              className="px-3 py-1.5 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+                              title={`Cetak lembar ${g.room}`}
+                            >
+                              <Printer className="w-3.5 h-3.5 text-[#D97706]" />
+                              <span>Cetak</span>
+                            </button>
+                          </div>
+
+                          {/* Tabel Siswa di Ruangan (ID Siswa di Kolom 2, Nama Siswa di Kolom 3) */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-[11px]">
+                              <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[9px] tracking-wider border-b border-slate-200">
+                                <tr>
+                                  <th className="p-2 w-8 text-center">No</th>
+                                  <th className="p-2 w-24">ID Siswa</th>
+                                  <th className="p-2">Nama Siswa</th>
+                                  <th className="p-2">Kelas</th>
+                                  <th className="p-2">Gender</th>
+                                  <th className="p-2">Waktu</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {printRoomRows(g.siswa, 'siswa')}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Petugas Ruangan Footer */}
+                        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-600 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-medium">Penguji Al-Qur'an / Bahasa Arab:</span>
+                            <strong className="text-slate-900">{g.siswa[0]?.penguji_alq_arab || '-'}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-medium">Penguji Calistung / English:</span>
+                            <strong className="text-slate-900">{g.siswa[0]?.penguji_catung_eng || '-'}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-medium">Timekeeper Siswa:</span>
+                            <strong className="text-[#1E3A8A]">{g.siswa[0]?.timekeeper_siswa || '-'}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-                {walmurRoomGroups.map(g => (
-                  <div key={'w-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="bg-[#D97706] text-white px-4 py-2.5 flex items-center justify-between">
-                      <div>
-                        <div className="font-extrabold text-sm">{g.room}</div>
-                        <div className="text-[10px] text-amber-100">{formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'} • {g.siswa.length} siswa</div>
-                      </div>
-                      <button
-                        onClick={() => triggerPrint('walmur', g.room)}
-                        className="px-2.5 py-1.5 bg-white text-[#D97706] hover:bg-amber-50 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5" /> Cetak
-                      </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-[11px]">
-                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[9px] tracking-wider">
-                          <tr>
-                            <th className="p-2">No</th>
-                            <th className="p-2">Nama Siswa</th>
-                            <th className="p-2">ID</th>
-                            <th className="p-2">Unit & Kelas</th>
-                            <th className="p-2">Gender</th>
-                            <th className="p-2">Waktu</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">{printRoomRows(g.siswa, 'walmur')}</tbody>
-                      </table>
-                    </div>
-                    <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-[10px] text-slate-600 space-y-0.5">
-                      <div>Pewawancara Orang Tua: <strong className="text-slate-800">{g.siswa[0]?.interview_walmur || '-'}</strong></div>
-                      <div>Timekeeper Orang Tua: <strong className="text-slate-800">{g.siswa[0]?.timekeeper_walmur || '-'}</strong></div>
-                    </div>
-                  </div>
-                ))}
               </div>
-            </div>
+            )}
+
+            {/* Bagian 2: Ruang Wawancara Orang Tua */}
+            {(cetakViewFilter === 'all' || cetakViewFilter === 'walmur') && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]"></span>
+                    <span>Ruang Wawancara Orang Tua ({walmurRoomGroups.length} Ruangan)</span>
+                  </h4>
+                  {cetakDateFilter && (
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Filter: {formatTanggalUjian(cetakDateFilter)}
+                    </span>
+                  )}
+                </div>
+
+                {walmurRoomGroups.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-8 border border-dashed border-slate-300 text-center text-xs text-slate-500 space-y-1">
+                    <p className="font-semibold text-slate-700">Tidak ada ruang wawancara orang tua yang cocok.</p>
+                    <p className="text-[11px] text-slate-400">Pastikan jadwal peserta telah memiliki ruangan wawancara wali.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {walmurRoomGroups.map(g => (
+                      <div key={'w-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+                        <div>
+                          {/* Card Header */}
+                          <div className="bg-[#D97706] text-white px-4 py-3 flex items-center justify-between">
+                            <div>
+                              <div className="font-extrabold text-sm tracking-tight flex items-center gap-2">
+                                <span>{g.room}</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-700 text-amber-100 rounded-full">
+                                  {g.siswa.length} Peserta
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-amber-100 mt-0.5">
+                                {formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => triggerPrint('walmur', g.room)}
+                              className="px-3 py-1.5 bg-white text-[#D97706] hover:bg-amber-50 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+                              title={`Cetak lembar ${g.room}`}
+                            >
+                              <Printer className="w-3.5 h-3.5 text-[#D97706]" />
+                              <span>Cetak</span>
+                            </button>
+                          </div>
+
+                          {/* Tabel Siswa di Ruangan Wawancara */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-[11px]">
+                              <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[9px] tracking-wider border-b border-slate-200">
+                                <tr>
+                                  <th className="p-2 w-8 text-center">No</th>
+                                  <th className="p-2 w-24">ID Siswa</th>
+                                  <th className="p-2">Nama Siswa</th>
+                                  <th className="p-2">Kelas</th>
+                                  <th className="p-2">Gender</th>
+                                  <th className="p-2">Waktu</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {printRoomRows(g.siswa, 'walmur')}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Petugas Wawancara Footer */}
+                        <div className="px-4 py-3 bg-amber-50/40 border-t border-amber-100 text-[11px] text-slate-600 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-medium">Pewawancara Orang Tua:</span>
+                            <strong className="text-slate-900">{g.siswa[0]?.interview_walmur || '-'}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-medium">Timekeeper Orang Tua:</span>
+                            <strong className="text-[#D97706]">{g.siswa[0]?.timekeeper_walmur || '-'}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3407,6 +3921,147 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Bulk Import Jadwal CSV / Excel */}
+      {isBulkImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 my-8">
+            <div className="bg-[#1E3A8A] text-white p-5 flex items-center justify-between border-b-4 border-[#D97706]">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-amber-400" />
+                <h3 className="font-extrabold text-base">Bulk Import Data Jadwal Siswa</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBulkImportOpen(false)}
+                className="p-1 text-blue-200 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs text-slate-700">
+              {/* Petunjuk & Download Template */}
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                    💡 Panduan Format CSV / Excel:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="px-3 py-1.5 bg-white hover:bg-amber-100 text-[#1E3A8A] font-bold text-xs rounded-lg border border-amber-300 shadow-sm flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Unduh Template CSV</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  Unggah file berformat <strong>.csv</strong> atau <strong>.xlsx</strong>. Jika kolom <code className="bg-amber-100 px-1 rounded font-bold font-mono">id</code> sudah ada di database, data lama akan <strong>otomatis ditimpa (overwrite)</strong> dengan data baru dari file.
+                </p>
+              </div>
+
+              {/* Upload Input */}
+              <div>
+                <label className="font-bold text-slate-800 block mb-2">Pilih File CSV / Excel:</label>
+                <input
+                  type="file"
+                  accept=".csv, .xlsx, .xls"
+                  onChange={handleSelectBulkFile}
+                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#1E3A8A] file:text-white hover:file:bg-blue-900 cursor-pointer border border-slate-200 rounded-xl p-2 bg-slate-50"
+                />
+              </div>
+
+              {/* Preview Hasil Parsing */}
+              {bulkParsedData.length > 0 && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                      <span className="block text-[10px] text-blue-700 uppercase font-bold">Total Terbaca</span>
+                      <strong className="text-base text-blue-900">{bulkParsedData.length}</strong>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <span className="block text-[10px] text-emerald-700 uppercase font-bold">Data Baru</span>
+                      <strong className="text-base text-emerald-900">{bulkParsedData.length - bulkOverlapCount}</strong>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <span className="block text-[10px] text-amber-700 uppercase font-bold">Menimpa ID Lama</span>
+                      <strong className="text-base text-amber-900">{bulkOverlapCount}</strong>
+                    </div>
+                  </div>
+
+                  {/* Sample Preview Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0">
+                        <tr>
+                          <th className="p-2">ID</th>
+                          <th className="p-2">Nama Siswa</th>
+                          <th className="p-2">Kelas</th>
+                          <th className="p-2">Tgl Ujian</th>
+                          <th className="p-2">Penguji Qur'an</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {bulkParsedData.slice(0, 10).map((row) => (
+                          <tr key={row.id} className="hover:bg-slate-50">
+                            <td className="p-2 font-mono font-bold text-slate-800">{row.id}</td>
+                            <td className="p-2 font-semibold text-slate-900">{row.nama_siswa}</td>
+                            <td className="p-2">{row.kelas}</td>
+                            <td className="p-2">{row.hari_tanggal}</td>
+                            <td className="p-2 truncate max-w-[140px]">{row.penguji_alq_arab || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {bulkParsedData.length > 10 && (
+                    <p className="text-[10px] text-slate-500 italic text-right">
+                      * Menampilkan 10 dari {bulkParsedData.length} calon siswa yang siap diimpor.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Error messages if any */}
+              {bulkParseErrors.length > 0 && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 space-y-1">
+                  <span className="font-bold block">Peringatan Baris Dilewati:</span>
+                  <ul className="list-disc pl-4 space-y-0.5 text-[11px] max-h-24 overflow-y-auto">
+                    {bulkParseErrors.slice(0, 5).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                    {bulkParseErrors.length > 5 && (
+                      <li>...dan {bulkParseErrors.length - 5} baris lainnya.</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-slate-200 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkImportOpen(false)}
+                  disabled={isImporting}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBulkImport}
+                  disabled={isImporting || bulkParsedData.length === 0}
+                  className="px-5 py-2 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-50 text-white font-bold rounded-xl shadow flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-4 h-4 text-amber-400" />
+                  <span>{isImporting ? 'Menyimpan ke Database...' : `Proses Impor ${bulkParsedData.length} Siswa`}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

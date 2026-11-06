@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Selama fase SPMB / Pengujian:
+    // Izinkan read dan write untuk data SPMB (Jadwal, Nilai, Presensi, Penguji, Sesi)
+    match /spmb_jadwal/{id} {
+      allow read, write: if true;
+    }
+    match /spmb_penguji/{id} {
+      allow read, write: if true;
+    }
+    match /spmb_presensi/{id} {
+      allow read, write: if true;
+    }
+    match /spmb_nilai/{id} {
+      allow read, write: if true;
+    }
+    match /spmb_sesi_ujian/{id} {
+      allow read, write: if true;
+    }
+  }
+}

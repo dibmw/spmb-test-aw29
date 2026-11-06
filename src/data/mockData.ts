@@ -1,6 +1,6 @@
 import { SiswaJadwal, PengujiAccount, PresensiRecord, NilaiRecord, SesiUjian } from '../types/spmb';
 
-export const ADMIN_EMAIL = 'admin@example.local';
+export const ADMIN_EMAIL = 'kurikulum.alwildan29@gmail.com';
 
 export const INITIAL_PENGUJI_LIST: PengujiAccount[] = [
   {

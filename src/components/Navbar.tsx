@@ -64,33 +64,49 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Navigation Links (Internal Portals) */}
           <nav className="hidden md:flex items-center gap-1.5">
+            {/* Jadwal Publik Tab */}
+            {session && (
+              <button
+                onClick={() => onSelectTab('landing')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  currentTab === 'landing'
+                    ? 'bg-slate-200 text-slate-800 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Jadwal Publik
+              </button>
+            )}
+
             {/* Timekeeper Tab */}
-            {(session?.activeRole === 'ADMIN') && (
+            {(session?.activeRole === 'ADMIN' || session?.availableRoles?.includes('TIMEKEEPER') || session?.activeRole === 'TIMEKEEPER') && (
               <button
                 onClick={() => onSelectTab('timekeeper')}
                 title="Portal Timekeeper - Presensi Scanner"
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center transition-all cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   currentTab === 'timekeeper'
                     ? 'bg-[#1E3A8A] text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-[#1E3A8A]'
                 }`}
               >
                 <QrCode className="w-4 h-4 text-[#D97706]" />
+                <span className="hidden lg:inline">Timekeeper</span>
               </button>
             )}
 
             {/* Penguji Tab */}
-            {(session?.activeRole === 'ADMIN') && (
+            {(session?.activeRole === 'ADMIN' || session?.availableRoles?.includes('PENGUJI') || session?.activeRole === 'PENGUJI') && (
               <button
                 onClick={() => onSelectTab('penguji')}
                 title="Portal Penguji - Input Nilai"
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center transition-all cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   currentTab === 'penguji'
                     ? 'bg-[#1E3A8A] text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-[#1E3A8A]'
                 }`}
               >
                 <FileCheck className="w-4 h-4 text-emerald-600" />
+                <span className="hidden lg:inline">Portal Penguji</span>
               </button>
             )}
 
@@ -110,71 +126,81 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </nav>
 
-          {/* User Session & Role Switcher */}
+          {/* User Session & Profile Info */}
           <div className="flex items-center gap-2 sm:gap-3">
             {session ? (
-              <div className="relative">
-                <div className="flex items-center gap-2">
-                  {/* Multi-role Switcher Button */}
-                  {session.availableRoles.length > 1 ? (
-                    <div className="relative">
-                      <button
-                        onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 transition-colors cursor-pointer"
-                      >
-                        <span className="w-2 h-2 rounded-full bg-[#D97706] animate-pulse"></span>
-                        <span className="text-[#1E3A8A]">{session.activeRole}</span>
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                      </button>
-
-                      {roleMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95">
-                          <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
-                            Ganti Peran Aktif:
-                          </div>
-                          {session.availableRoles.map((role) => (
-                            <button
-                              key={role}
-                              onClick={() => {
-                                onSwitchRole(role);
-                                setRoleMenuOpen(false);
-                              }}
-                              className={`w-full px-3 py-2 text-left text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
-                                session.activeRole === role
-                                  ? 'bg-blue-50 text-[#1E3A8A] font-bold'
-                                  : 'hover:bg-slate-50 text-slate-700'
-                              }`}
-                            >
-                              <span>Peran {role}</span>
-                              {session.activeRole === role && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A8A]"></span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="hidden sm:inline-block px-2.5 py-1 bg-blue-50 text-[#1E3A8A] border border-blue-200 text-xs font-bold rounded-lg uppercase">
-                      {session.activeRole}
-                    </span>
-                  )}
-
-                  {/* Profile info */}
-                  <div className="hidden lg:block text-right">
-                    <div className="text-xs font-bold text-slate-800 leading-tight max-w-[140px] truncate">
-                      {session.nama}
-                    </div>
+              <div className="flex items-center gap-2.5">
+                {/* Profile info: Nama di atas, Role di bawah */}
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-800 leading-tight max-w-[140px] sm:max-w-[220px] truncate" title={session.nama}>
+                    {session.nama}
                   </div>
 
-                  <button
-                    onClick={onLogout}
-                    className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                    title="Keluar"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-1 mt-0.5">
+                    {session.activeRole === 'ADMIN' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#D97706] tracking-wide uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D97706]"></span>
+                        <span>ADMIN</span>
+                      </span>
+                    ) : session.availableRoles.length > 1 ? (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-[#1E3A8A] hover:text-blue-900 cursor-pointer"
+                          title="Klik untuk mengganti peran aktif"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A8A]"></span>
+                          <span className="uppercase">{session.activeRole}</span>
+                          <ChevronDown className="w-3 h-3 text-slate-400" />
+                        </button>
+
+                        {roleMenuOpen && (
+                          <div className="absolute right-0 mt-1.5 w-44 bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                            <div className="px-3 py-1 text-[9px] uppercase font-bold text-slate-400">
+                              Ganti Peran Aktif:
+                            </div>
+                            {session.availableRoles.map((role) => (
+                              <button
+                                key={role}
+                                type="button"
+                                onClick={() => {
+                                  onSwitchRole(role);
+                                  setRoleMenuOpen(false);
+                                }}
+                                className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                                  session.activeRole === role
+                                    ? 'bg-blue-50 text-[#1E3A8A] font-bold'
+                                    : 'hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <span>{role}</span>
+                                {session.activeRole === role && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A8A]"></span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span>{session.activeRole}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Tombol Logout */}
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                  title="Keluar"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             ) : (
               <button
@@ -203,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {(session?.activeRole === 'ADMIN') && (
+            {(session?.activeRole === 'ADMIN' || session?.activeRole === 'PENGUJI' || session?.availableRoles?.includes('PENGUJI')) && (
               <button
                 onClick={() => onSelectTab('penguji')}
                 title="Portal Penguji - Input Nilai"
