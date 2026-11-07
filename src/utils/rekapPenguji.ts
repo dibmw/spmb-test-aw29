@@ -25,7 +25,7 @@ const cleanNama = (value: string, fallback: string): string => {
 };
 
 const displayNama = (nama: string): string =>
-  normalizeKey(nama) === normalizeKey('Tim Kurikulum Al-Wildan 29 (Admin)')
+  normalizeKey(nama) === normalizeKey('Tim Kurikulum AL-WILDAN 29 (Admin)')
     ? ADMIN_NAME_OVERRIDE
     : nama;
 

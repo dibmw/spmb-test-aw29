@@ -157,7 +157,7 @@ const INTERVIEW_SECTIONS: InterviewSectionItem[] = [
         skorKey: 'nilai_karakter_skor',
         catatanKey: 'nilai_karakter_catatan',
         fokus: 'Visi pendidikan orang tua, kolaborasi, aspek psikologis',
-        text: 'Apa tiga nilai karakter utama yang paling Ayah/Bunda ingin tanamkan pada anak selama menempuh pendidikan di Al-Wildan Islamic School 29 Depok, dan bagaimana cara Ayah/Bunda dan sekolah dapat bekerja sama untuk mewujudkan hal tersebut?'
+        text: 'Apa tiga nilai karakter utama yang paling Ayah/Bunda ingin tanamkan pada anak selama menempuh pendidikan di AL-WILDAN ISLAMIC SCHOOL 29 DEPOK, dan bagaimana cara Ayah/Bunda dan sekolah dapat bekerja sama untuk mewujudkan hal tersebut?'
       },
       {
         skorKey: 'kesulitan_skor',

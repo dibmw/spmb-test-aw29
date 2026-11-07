@@ -54,7 +54,7 @@ export const INITIAL_PENGUJI_LIST: PengujiAccount[] = [
     assignedRoles: ['TIMEKEEPER']
   },
   {
-    penguji: 'Tim Kurikulum Al-Wildan 29',
+    penguji: 'Tim Kurikulum AL-WILDAN 29',
     email_penguji: ADMIN_EMAIL,
     assignedRoles: ['ADMIN', 'PENGUJI', 'TIMEKEEPER']
   }
@@ -268,7 +268,7 @@ export const INITIAL_NILAI_LIST: NilaiRecord[] = [
       catatan: 'Kecakapan membaca sangat lancar, kosakata bahasa Inggris dasar sudah dikuasai.'
     },
     skor_akhir_rata2: 83.25,
-    catatan_umum: 'Lulus tes kesiapan akademik SD Al-Wildan.'
+    catatan_umum: 'Lulus tes kesiapan akademik SD AL-WILDAN.'
   }
 ];
 

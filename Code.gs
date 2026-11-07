@@ -585,13 +585,13 @@ function verifyPetugas(ss, email) {
   }
 
   if (isSuperAdmin && !officialName) {
-    officialName = "Tim Kurikulum Al-Wildan 29 (Admin)";
+    officialName = "Tim Kurikulum AL-WILDAN 29 (Admin)";
   }
 
   if (!officialName && !isSuperAdmin) {
     return {
       status: "error",
-      message: "Email tidak terdaftar di daftar penguji/petugas Al-Wildan 29 Depok."
+      message: "Email tidak terdaftar di daftar penguji/petugas AL-WILDAN 29 DEPOK."
     };
   }
 

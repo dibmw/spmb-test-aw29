@@ -1,25 +1,25 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Shield, 
-  Users, 
-  CheckCircle2, 
-  BarChart3, 
-  Download, 
-  Plus, 
-  Edit, 
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  Shield,
+  Users,
+  CheckCircle2,
+  BarChart3,
+  Download,
+  Plus,
+  Edit,
   Eye,
-  Trash2, 
-  Search, 
-  ExternalLink, 
-  Copy, 
-  Check, 
-  Code, 
-  Database, 
-  Clock, 
-  FileSpreadsheet, 
-  RefreshCw, 
-  Filter, 
-  X, 
+  Trash2,
+  Search,
+  ExternalLink,
+  Copy,
+  Check,
+  Code,
+  Database,
+  Clock,
+  FileSpreadsheet,
+  RefreshCw,
+  Filter,
+  X,
   Save,
   Printer,
   Send,
@@ -31,9 +31,9 @@ import {
   Flame,
   Zap,
   Upload,
-  FileDown
-} from 'lucide-react';
-import * as XLSX from 'xlsx';
+  FileDown,
+} from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   SiswaJadwal,
   PresensiRecord,
@@ -52,11 +52,11 @@ import {
   formatTanggalUjian,
   getModeUjianForDate,
   pickSesiUjianForDate,
-  resolveKehadiran
-} from '../types/spmb';
-import { apiService } from '../services/apiService';
-import { isFirebaseConfigured } from '../services/firebase';
-import { downloadJadwalCsvTemplate, parseJadwalFile } from '../utils/csvJadwal';
+  resolveKehadiran,
+} from "../types/spmb";
+import { apiService } from "../services/apiService";
+import { isFirebaseConfigured } from "../services/firebase";
+import { downloadJadwalCsvTemplate, parseJadwalFile } from "../utils/csvJadwal";
 import {
   buildPresentIncompleteRows,
   buildGradedButAbsentRows,
@@ -68,12 +68,12 @@ import {
   buildPesanPengujiTanggal,
   displayKategori,
   hasPresensi,
-} from '../utils/broadcast';
-import { buildRekapPenguji } from '../utils/rekapPenguji';
-import { getMeetingUrl } from '../utils/meeting';
-import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from '../data/mockData';
-import { RubrikModal } from './RubrikModal';
-import { ConfirmDialog } from './ConfirmDialog';
+} from "../utils/broadcast";
+import { buildRekapPenguji } from "../utils/rekapPenguji";
+import { getMeetingUrl } from "../utils/meeting";
+import { SPREADSHEET_URL, SCHOOL_LOGO_URL } from "../data/mockData";
+import { RubrikModal } from "./RubrikModal";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface AdminDashboardProps {
   session: UserSession;
@@ -82,14 +82,20 @@ interface AdminDashboardProps {
   nilaiList: NilaiRecord[];
   sesiUjianList: SesiUjian[];
   onDataChanged: () => void;
-  showToast: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
+  showToast: (
+    title: string,
+    message: string,
+    type: "success" | "error" | "info",
+  ) => void;
 }
 
-type TimeField = 'waktu_alq_arab' | 'waktu_catung_eng' | 'waktu_interview';
+type TimeField = "waktu_alq_arab" | "waktu_catung_eng" | "waktu_interview";
 type TimeInputPair = { start: string; end: string };
 type StudentTimeInputs = Record<TimeField, TimeInputPair>;
-type StudentFormDraft = Omit<SiswaJadwal, 'gender'> & { gender: 'L' | 'P' | '' };
-type KehadiranFilter = 'Semua' | 'Hadir' | 'Belum Hadir';
+type StudentFormDraft = Omit<SiswaJadwal, "gender"> & {
+  gender: "L" | "P" | "";
+};
+type KehadiranFilter = "Semua" | "Hadir" | "Belum Hadir";
 
 type SessionDateRow = {
   date: string;
@@ -102,168 +108,182 @@ type SessionDateRow = {
   waktuRange: string;
 };
 
-const TIME_FIELDS: TimeField[] = ['waktu_alq_arab', 'waktu_catung_eng', 'waktu_interview'];
+const TIME_FIELDS: TimeField[] = [
+  "waktu_alq_arab",
+  "waktu_catung_eng",
+  "waktu_interview",
+];
 
 const STUDENT_CLASS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'SD 1', label: 'SD - Kelas 1' },
-  { value: 'SD 2', label: 'SD - Kelas 2' },
-  { value: 'SD 3', label: 'SD - Kelas 3' },
-  { value: 'SD 4', label: 'SD - Kelas 4' },
-  { value: 'SD 5', label: 'SD - Kelas 5' },
-  { value: 'SD 6', label: 'SD - Kelas 6' },
-  { value: 'SMP 7', label: 'SMP - Kelas 7' },
-  { value: 'SMP 8', label: 'SMP - Kelas 8' },
-  { value: 'SMP 9', label: 'SMP - Kelas 9' },
-  { value: 'SMA 10', label: 'SMA - Kelas 10' },
-  { value: 'SMA 11', label: 'SMA - Kelas 11' },
-  { value: 'SMA 12', label: 'SMA - Kelas 12' }
+  { value: "SD 1", label: "SD - Kelas 1" },
+  { value: "SD 2", label: "SD - Kelas 2" },
+  { value: "SD 3", label: "SD - Kelas 3" },
+  { value: "SD 4", label: "SD - Kelas 4" },
+  { value: "SD 5", label: "SD - Kelas 5" },
+  { value: "SD 6", label: "SD - Kelas 6" },
+  { value: "SMP 7", label: "SMP - Kelas 7" },
+  { value: "SMP 8", label: "SMP - Kelas 8" },
+  { value: "SMP 9", label: "SMP - Kelas 9" },
+  { value: "SMA 10", label: "SMA - Kelas 10" },
+  { value: "SMA 11", label: "SMA - Kelas 11" },
+  { value: "SMA 12", label: "SMA - Kelas 12" },
 ];
 
 const EMPTY_STUDENT_FORM: StudentFormDraft = {
-  id: '',
-  nama_siswa: '',
-  kelas: '',
-  gender: '',
-  ruangan_siswa: '',
-  waktu_all: '',
-  waktu_alq_arab: '',
-  waktu_catung_eng: '',
-  ruangan_walmur: '',
-  penguji_alq_arab: '',
-  penguji_catung_eng: '',
-  timekeeper_siswa: '',
-  interview_walmur: '',
-  timekeeper_walmur: '',
-  waktu_interview: '',
-  hari_tanggal: '',
-  status: 'Aktif',
-  status_kehadiran_siswa: '',
-  status_kehadiran_walmur: '',
-  gelombang: ''
+  id: "",
+  nama_siswa: "",
+  kelas: "",
+  gender: "",
+  ruangan_siswa: "",
+  waktu_all: "",
+  waktu_alq_arab: "",
+  waktu_catung_eng: "",
+  ruangan_walmur: "",
+  penguji_alq_arab: "",
+  penguji_catung_eng: "",
+  timekeeper_siswa: "",
+  interview_walmur: "",
+  timekeeper_walmur: "",
+  waktu_interview: "",
+  hari_tanggal: "",
+  status: "Aktif",
+  status_kehadiran_siswa: "",
+  status_kehadiran_walmur: "",
+  gelombang: "",
 };
 
 const SCORE_LABELS: Record<string, string> = {
-  baca_indo: 'Membaca Bahasa Indonesia',
-  paham_indo: 'Memahami Teks Bahasa Indonesia',
-  baca_inggris: 'Membaca Bahasa Inggris',
-  paham_inggris: 'Memahami Teks Bahasa Inggris',
-  fluency: 'Fluency',
-  vocab_grammar: 'Vocabulary & Grammar',
-  critical_thinking: 'Critical Thinking',
-  expression_clarity: 'Expression & Clarity',
-  tilawah: 'Tilawah',
-  makhorijul_huruf: 'Makhorijul Huruf',
-  sifatul_huruf: 'Sifatul Huruf',
-  kelancaran: 'Kelancaran',
-  percaya_diri: 'Percaya Diri',
-  kejelasan: 'Kejelasan',
-  adab: 'Adab',
-  kelekatan_skor: 'Kelekatan Anak & Orang Tua',
-  asertif_skor: 'Asertif Anak',
-  kognitif_skor: 'Perkembangan Kognitif',
-  peran_skor: 'Keterlibatan Peran Ayah & Bunda',
-  sentuhan_skor: 'Sentuhan Perkembangan',
-  kebutuhan_khusus_skor: 'Kebutuhan Khusus / Perilaku Spesial',
-  pantauan_ibadah_skor: 'Pantauan Ibadah & Hafalan',
-  pertemanan_skor: 'Pantauan Pertemanan',
-  nilai_karakter_skor: 'Nilai Karakter & Kolaborasi',
-  kesulitan_skor: 'Respons terhadap Kesulitan'
+  baca_indo: "Membaca Bahasa Indonesia",
+  paham_indo: "Memahami Teks Bahasa Indonesia",
+  baca_inggris: "Membaca Bahasa Inggris",
+  paham_inggris: "Memahami Teks Bahasa Inggris",
+  fluency: "Fluency",
+  vocab_grammar: "Vocabulary & Grammar",
+  critical_thinking: "Critical Thinking",
+  expression_clarity: "Expression & Clarity",
+  tilawah: "Tilawah",
+  makhorijul_huruf: "Makhorijul Huruf",
+  sifatul_huruf: "Sifatul Huruf",
+  kelancaran: "Kelancaran",
+  percaya_diri: "Percaya Diri",
+  kejelasan: "Kejelasan",
+  adab: "Adab",
+  kelekatan_skor: "Kelekatan Anak & Orang Tua",
+  asertif_skor: "Asertif Anak",
+  kognitif_skor: "Perkembangan Kognitif",
+  peran_skor: "Keterlibatan Peran Ayah & Bunda",
+  sentuhan_skor: "Sentuhan Perkembangan",
+  kebutuhan_khusus_skor: "Kebutuhan Khusus / Perilaku Spesial",
+  pantauan_ibadah_skor: "Pantauan Ibadah & Hafalan",
+  pertemanan_skor: "Pantauan Pertemanan",
+  nilai_karakter_skor: "Nilai Karakter & Kolaborasi",
+  kesulitan_skor: "Respons terhadap Kesulitan",
 };
 
-type GradeDetailRow = { key: string; label: string; score: string; note?: string };
+type GradeDetailRow = {
+  key: string;
+  label: string;
+  score: string;
+  note?: string;
+};
 
 const isNoteKey = (key: string): boolean =>
-  key === 'catatan' || key.startsWith('catatan_') || key.endsWith('_catatan');
+  key === "catatan" || key.startsWith("catatan_") || key.endsWith("_catatan");
 
 const getScoreNote = (
   detail: Record<string, number | string>,
-  scoreKey: string
+  scoreKey: string,
 ): string | undefined => {
   const candidates = [
     detail[`${scoreKey}_catatan`],
     detail[`catatan_${scoreKey}`],
-    detail[scoreKey.replace(/_skor$/, '_catatan')]
+    detail[scoreKey.replace(/_skor$/, "_catatan")],
   ];
   for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    if (typeof candidate === "string" && candidate.trim())
+      return candidate.trim();
   }
   return undefined;
 };
 
 const buildGradeDetailRows = (
-  detail?: Record<string, number | string> | null
+  detail?: Record<string, number | string> | null,
 ): GradeDetailRow[] => {
   if (!detail) return [];
   const rows: GradeDetailRow[] = [];
   Object.entries(detail).forEach(([key, value]) => {
     if (isNoteKey(key)) return;
-    const isScore = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value)));
+    const isScore =
+      typeof value === "number" ||
+      (typeof value === "string" &&
+        value.trim() !== "" &&
+        !Number.isNaN(Number(value)));
     if (!isScore) return;
     rows.push({
       key,
-      label: SCORE_LABELS[key] || key.replace(/_/g, ' '),
+      label: SCORE_LABELS[key] || key.replace(/_/g, " "),
       score: String(value),
-      note: getScoreNote(detail, key)
+      note: getScoreNote(detail, key),
     });
   });
   return rows;
 };
 
 const formatWaktuInput = (timestamp: string): string => {
-  if (!timestamp) return '-';
+  if (!timestamp) return "-";
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
   return date
-    .toLocaleString('id-ID', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
+    .toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
     })
-    .replace(/\./g, ':');
+    .replace(/\./g, ":");
 };
 
 const createEmptyTimeInputs = (): StudentTimeInputs => ({
-  waktu_alq_arab: { start: '', end: '' },
-  waktu_catung_eng: { start: '', end: '' },
-  waktu_interview: { start: '', end: '' }
+  waktu_alq_arab: { start: "", end: "" },
+  waktu_catung_eng: { start: "", end: "" },
+  waktu_interview: { start: "", end: "" },
 });
 
 const minutesToTimeValue = (total: number): string => {
   const hour = Math.floor(total / 60) % 24;
   const minute = total % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 };
 
 const timeRangeToInputs = (value: string): TimeInputPair => {
   const range = parseTimeRange(value);
-  if (!range) return { start: '', end: '' };
+  if (!range) return { start: "", end: "" };
   return {
     start: minutesToTimeValue(range.start),
-    end: minutesToTimeValue(range.end)
+    end: minutesToTimeValue(range.end),
   };
 };
 
 const composeTimeRange = (pair: TimeInputPair): string => {
-  if (!pair.start || !pair.end) return '';
+  if (!pair.start || !pair.end) return "";
   return `${pair.start} - ${pair.end}`;
 };
 
 const timeValueToMinutes = (value: string): number => {
-  const [hour, minute] = value.split(':').map(Number);
+  const [hour, minute] = value.split(":").map(Number);
   return hour * 60 + minute;
 };
 
 const formatTanggalSingkat = (iso: string): string => {
-  const [year, month, day] = iso.split('-').map(Number);
+  const [year, month, day] = iso.split("-").map(Number);
   if (!year || !month || !day) return iso;
-  return new Date(year, month - 1, day).toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
+  return new Date(year, month - 1, day).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 };
 
@@ -274,38 +294,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   nilaiList,
   sesiUjianList,
   onDataChanged,
-  showToast
+  showToast,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'jadwal' | 'nilai' | 'rekap-penguji' | 'broadcast' | 'export' | 'gas' | 'cetak'>('kpi');
-  const [searchFilter, setSearchFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<SiswaJadwal['status'] | 'Semua'>('Aktif');
-  const [dateFilter, setDateFilter] = useState('');
-  const [kehadiranSiswaFilter, setKehadiranSiswaFilter] = useState<KehadiranFilter>('Semua');
-  const [kehadiranWalmurFilter, setKehadiranWalmurFilter] = useState<KehadiranFilter>('Semua');
-  const [rekapDateFrom, setRekapDateFrom] = useState('');
-  const [rekapDateTo, setRekapDateTo] = useState('');
-  const [rekapSearch, setRekapSearch] = useState('');
-  const [rekapPeranFilter, setRekapPeranFilter] = useState<'Semua' | 'Penguji' | 'Timekeeper'>('Semua');
+  const [activeSubTab, setActiveSubTab] = useState<
+    | "kpi"
+    | "jadwal"
+    | "nilai"
+    | "rekap-penguji"
+    | "broadcast"
+    | "export"
+    | "gas"
+    | "cetak"
+  >("kpi");
+  const [searchFilter, setSearchFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    SiswaJadwal["status"] | "Semua"
+  >("Aktif");
+  const [dateFilter, setDateFilter] = useState("");
+  const [kehadiranSiswaFilter, setKehadiranSiswaFilter] =
+    useState<KehadiranFilter>("Semua");
+  const [kehadiranWalmurFilter, setKehadiranWalmurFilter] =
+    useState<KehadiranFilter>("Semua");
+  const [rekapDateFrom, setRekapDateFrom] = useState("");
+  const [rekapDateTo, setRekapDateTo] = useState("");
+  const [rekapSearch, setRekapSearch] = useState("");
+  const [rekapPeranFilter, setRekapPeranFilter] = useState<
+    "Semua" | "Penguji" | "Timekeeper"
+  >("Semua");
 
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
     confirmLabel: string;
-    variant: 'danger' | 'warning' | 'info';
+    variant: "danger" | "warning" | "info";
     onConfirm: () => void;
   } | null>(null);
 
   // Print target state untuk cetak jadwal per ruangan
-  const [printTarget, setPrintTarget] = useState<null | { group: 'siswa' | 'walmur'; room: string | null }>(null);
-  const [cetakDateFilter, setCetakDateFilter] = useState('');
-  const [cetakSearch, setCetakSearch] = useState('');
-  const [cetakViewFilter, setCetakViewFilter] = useState<'all' | 'siswa' | 'walmur'>('all');
-  
+  const [printTarget, setPrintTarget] = useState<null | {
+    group: "siswa" | "walmur";
+    room: string | null;
+  }>(null);
+  const [cetakDateFilter, setCetakDateFilter] = useState("");
+  const [cetakSearch, setCetakSearch] = useState("");
+  const [cetakViewFilter, setCetakViewFilter] = useState<
+    "all" | "siswa" | "walmur"
+  >("all");
+
   // Student CRUD Modal State
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [studentFormData, setStudentFormData] = useState<StudentFormDraft>({ ...EMPTY_STUDENT_FORM });
-  const [studentTimeInputs, setStudentTimeInputs] = useState<StudentTimeInputs>(createEmptyTimeInputs);
+  const [studentFormData, setStudentFormData] = useState<StudentFormDraft>({
+    ...EMPTY_STUDENT_FORM,
+  });
+  const [studentTimeInputs, setStudentTimeInputs] = useState<StudentTimeInputs>(
+    createEmptyTimeInputs,
+  );
 
   // Bulk Import CSV/Excel State
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
@@ -318,134 +362,150 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Sync Penguji from Spreadsheet State
   const [isSyncingPenguji, setIsSyncingPenguji] = useState(false);
 
-   const [isSessionDateModalOpen, setIsSessionDateModalOpen] = useState(false);
-   const [sessionDateForm, setSessionDateForm] = useState<{ date: string; mode: ModeUjian }>({
-     date: '',
-     mode: 'Offline'
-   });
-   const [sessionDateSearch, setSessionDateSearch] = useState('');
+  const [isSessionDateModalOpen, setIsSessionDateModalOpen] = useState(false);
+  const [sessionDateForm, setSessionDateForm] = useState<{
+    date: string;
+    mode: ModeUjian;
+  }>({
+    date: "",
+    mode: "Offline",
+  });
+  const [sessionDateSearch, setSessionDateSearch] = useState("");
 
-   const rekapGelombangOptions = useMemo(() => {
-     const from = toISODate(rekapDateFrom);
-     const to = toISODate(rekapDateTo);
-     const set = new Set<string>();
-     let hasTanpa = false;
+  const rekapGelombangOptions = useMemo(() => {
+    const from = toISODate(rekapDateFrom);
+    const to = toISODate(rekapDateTo);
+    const set = new Set<string>();
+    let hasTanpa = false;
 
-     jadwalList.forEach((s) => {
-       const iso = toISODate(s.hari_tanggal);
-       if (from && iso && iso < from) return;
-       if (to && iso && iso > to) return;
+    jadwalList.forEach((s) => {
+      const iso = toISODate(s.hari_tanggal);
+      if (from && iso && iso < from) return;
+      if (to && iso && iso > to) return;
 
-       const g = (s.gelombang || '').trim();
-       if (g) {
-         set.add(g);
-       } else {
-         hasTanpa = true;
-       }
-     });
+      const g = (s.gelombang || "").trim();
+      if (g) {
+        set.add(g);
+      } else {
+        hasTanpa = true;
+      }
+    });
 
-     const arr = Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
-     if (hasTanpa) arr.push('Tanpa Gelombang');
-     return arr;
-   }, [jadwalList, rekapDateFrom, rekapDateTo]);
+    const arr = Array.from(set).sort((a, b) =>
+      a.localeCompare(b, "id", { numeric: true }),
+    );
+    if (hasTanpa) arr.push("Tanpa Gelombang");
+    return arr;
+  }, [jadwalList, rekapDateFrom, rekapDateTo]);
 
-   const [rekapGelombangFilter, setRekapGelombangFilter] = useState<string[]>([]);
+  const [rekapGelombangFilter, setRekapGelombangFilter] = useState<string[]>(
+    [],
+  );
 
-   useEffect(() => {
-     // Otomatis sinkronkan daftar penguji dari Google Spreadsheet sheet web_penguji di background
-     apiService.syncPengujiFromSpreadsheet().catch((err) => {
-       console.warn('Background auto-sync penguji sheet info:', err);
-     });
-   }, []);
+  useEffect(() => {
+    // Otomatis sinkronkan daftar penguji dari Google Spreadsheet sheet web_penguji di background
+    apiService.syncPengujiFromSpreadsheet().catch((err) => {
+      console.warn("Background auto-sync penguji sheet info:", err);
+    });
+  }, []);
 
-   useEffect(() => {
-     if (rekapGelombangFilter.length === 0) return;
-     const valid = rekapGelombangFilter.filter((g) => rekapGelombangOptions.includes(g));
-     if (valid.length !== rekapGelombangFilter.length) {
-       setRekapGelombangFilter(valid);
-     }
-   }, [rekapGelombangOptions, rekapGelombangFilter]);
+  useEffect(() => {
+    if (rekapGelombangFilter.length === 0) return;
+    const valid = rekapGelombangFilter.filter((g) =>
+      rekapGelombangOptions.includes(g),
+    );
+    if (valid.length !== rekapGelombangFilter.length) {
+      setRekapGelombangFilter(valid);
+    }
+  }, [rekapGelombangOptions, rekapGelombangFilter]);
 
-   const pengujiList = apiService.getPengujiList();
+  const pengujiList = apiService.getPengujiList();
 
-   const sessionDateRows = useMemo(() => {
-     const map = new Map<string, SessionDateRow>();
-     jadwalList.forEach((siswa) => {
-       const iso = toISODate(siswa.hari_tanggal);
-       if (!iso) return;
-       let row = map.get(iso);
-       if (!row) {
-         const sesi = pickSesiUjianForDate(sesiUjianList, iso);
-         row = {
-           date: iso,
-           count: 0,
-           activeCount: 0,
-           selesaiCount: 0,
-           rescheduleCount: 0,
-           mode: sesi?.mode_ujian === 'Online' ? 'Online' : 'Offline',
-           id_sesi: sesi?.id_sesi || '',
-           waktuRange: ''
-         };
-         map.set(iso, row);
-       }
-       row.count += 1;
-       if (siswa.status === 'Selesai') {
-         row.selesaiCount += 1;
-       } else if (siswa.status === 'Reschedule') {
-         row.rescheduleCount += 1;
-       } else {
-         row.activeCount += 1;
-       }
-     });
-     const sessionDates = new Set<string>();
-     sesiUjianList.forEach((sesi) => {
-       const iso = toISODate(sesi.hari_tanggal);
-       if (iso) sessionDates.add(iso);
-     });
-     sessionDates.forEach((iso) => {
-       const sesi = pickSesiUjianForDate(sesiUjianList, iso);
-       if (!sesi) return;
-       const existing = map.get(iso);
-       if (existing) {
-         existing.mode = sesi.mode_ujian;
-         existing.id_sesi = sesi.id_sesi;
-       } else {
-         map.set(iso, {
-           date: iso,
-           count: 0,
-           activeCount: 0,
-           selesaiCount: 0,
-           rescheduleCount: 0,
-           mode: sesi.mode_ujian,
-           id_sesi: sesi.id_sesi,
-           waktuRange: ''
-         });
-       }
-     });
-     return Array.from(map.values())
-       .map((row) => ({ ...row, waktuRange: getWaktuRangeForDate(jadwalList, row.date) }))
-       .sort((a, b) => a.date.localeCompare(b.date));
-   }, [jadwalList, sesiUjianList]);
+  const sessionDateRows = useMemo(() => {
+    const map = new Map<string, SessionDateRow>();
+    jadwalList.forEach((siswa) => {
+      const iso = toISODate(siswa.hari_tanggal);
+      if (!iso) return;
+      let row = map.get(iso);
+      if (!row) {
+        const sesi = pickSesiUjianForDate(sesiUjianList, iso);
+        row = {
+          date: iso,
+          count: 0,
+          activeCount: 0,
+          selesaiCount: 0,
+          rescheduleCount: 0,
+          mode: sesi?.mode_ujian === "Online" ? "Online" : "Offline",
+          id_sesi: sesi?.id_sesi || "",
+          waktuRange: "",
+        };
+        map.set(iso, row);
+      }
+      row.count += 1;
+      if (siswa.status === "Selesai") {
+        row.selesaiCount += 1;
+      } else if (siswa.status === "Reschedule") {
+        row.rescheduleCount += 1;
+      } else {
+        row.activeCount += 1;
+      }
+    });
+    const sessionDates = new Set<string>();
+    sesiUjianList.forEach((sesi) => {
+      const iso = toISODate(sesi.hari_tanggal);
+      if (iso) sessionDates.add(iso);
+    });
+    sessionDates.forEach((iso) => {
+      const sesi = pickSesiUjianForDate(sesiUjianList, iso);
+      if (!sesi) return;
+      const existing = map.get(iso);
+      if (existing) {
+        existing.mode = sesi.mode_ujian;
+        existing.id_sesi = sesi.id_sesi;
+      } else {
+        map.set(iso, {
+          date: iso,
+          count: 0,
+          activeCount: 0,
+          selesaiCount: 0,
+          rescheduleCount: 0,
+          mode: sesi.mode_ujian,
+          id_sesi: sesi.id_sesi,
+          waktuRange: "",
+        });
+      }
+    });
+    return Array.from(map.values())
+      .map((row) => ({
+        ...row,
+        waktuRange: getWaktuRangeForDate(jadwalList, row.date),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [jadwalList, sesiUjianList]);
 
-   const filteredSessionDateRows = useMemo(() => {
-     const q = sessionDateSearch.trim().toLowerCase();
-     if (!q) return sessionDateRows;
-     return sessionDateRows.filter((row) => {
-       const formatted = formatTanggalUjian(row.date).toLowerCase();
-       return row.date.includes(q) || formatted.includes(q);
-     });
-   }, [sessionDateRows, sessionDateSearch]);
+  const filteredSessionDateRows = useMemo(() => {
+    const q = sessionDateSearch.trim().toLowerCase();
+    if (!q) return sessionDateRows;
+    return sessionDateRows.filter((row) => {
+      const formatted = formatTanggalUjian(row.date).toLowerCase();
+      return row.date.includes(q) || formatted.includes(q);
+    });
+  }, [sessionDateRows, sessionDateSearch]);
 
   const waliBroadcastByDate = useMemo(() => {
     const map = new Map<string, { onlineUrl: string; message: string }>();
     sessionDateRows.forEach((row) => {
       const students = jadwalList.filter(
-        (siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === row.date
+        (siswa) =>
+          siswa.status === "Aktif" &&
+          toISODate(siswa.hari_tanggal) === row.date,
       );
-      let onlineUrl = '';
-      if (row.mode === 'Online') {
+      let onlineUrl = "";
+      if (row.mode === "Online") {
         for (const siswa of students) {
-          const url = getMeetingUrl(siswa.ruangan_siswa) || getMeetingUrl(siswa.ruangan_walmur);
+          const url =
+            getMeetingUrl(siswa.ruangan_siswa) ||
+            getMeetingUrl(siswa.ruangan_walmur);
           if (url) {
             onlineUrl = url;
             break;
@@ -455,29 +515,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       map.set(row.date, {
         onlineUrl,
-        message: buildPesanWaliMurid(row.date, row.mode, onlineUrl)
+        message: buildPesanWaliMurid(row.date, row.mode, onlineUrl),
       });
     });
     return map;
   }, [sessionDateRows, jadwalList]);
 
   const pengujiBroadcastByDate = useMemo(() => {
-    const map = new Map<string, { count: number; message: string; missingRoles: string[] }>();
+    const map = new Map<
+      string,
+      { count: number; message: string; missingRoles: string[] }
+    >();
     sessionDateRows.forEach((row) => {
       const students = jadwalList.filter(
-        (siswa) => siswa.status === 'Aktif' && toISODate(siswa.hari_tanggal) === row.date
+        (siswa) =>
+          siswa.status === "Aktif" &&
+          toISODate(siswa.hari_tanggal) === row.date,
       );
-      const pengujiMap = new Map<string, { nama: string; peran: Set<string> }>();
-      const roleFields: Array<{ field: 'penguji_alq_arab' | 'penguji_catung_eng' | 'interview_walmur'; label: string }> = [
-        { field: 'penguji_alq_arab', label: "Al-Qur'an/Bahasa Arab" },
-        { field: 'penguji_catung_eng', label: 'Calistung/English' },
-        { field: 'interview_walmur', label: 'Wawancara Orang Tua' },
+      const pengujiMap = new Map<
+        string,
+        { nama: string; peran: Set<string> }
+      >();
+      const roleFields: Array<{
+        field: "penguji_alq_arab" | "penguji_catung_eng" | "interview_walmur";
+        label: string;
+      }> = [
+        { field: "penguji_alq_arab", label: "Al-Qur'an/Bahasa Arab" },
+        { field: "penguji_catung_eng", label: "Calistung/English" },
+        { field: "interview_walmur", label: "Wawancara Orang Tua" },
       ];
 
       students.forEach((siswa) => {
         roleFields.forEach(({ field, label }) => {
-          const nama = (siswa[field] || '').trim();
-          if (!nama || nama === '-') return;
+          const nama = (siswa[field] || "").trim();
+          if (!nama || nama === "-") return;
           const key = nama.toLowerCase();
           const existing = pengujiMap.get(key);
           if (existing) {
@@ -490,18 +561,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       const pengujiItems = Array.from(pengujiMap.values())
         .map((item) => ({ nama: item.nama, peran: Array.from(item.peran) }))
-        .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+        .sort((a, b) => a.nama.localeCompare(b.nama, "id"));
       const missingRoles = roleFields
-        .filter(({ field }) => !students.some((siswa) => {
-          const nama = (siswa[field] || '').trim();
-          return Boolean(nama) && nama !== '-';
-        }))
+        .filter(
+          ({ field }) =>
+            !students.some((siswa) => {
+              const nama = (siswa[field] || "").trim();
+              return Boolean(nama) && nama !== "-";
+            }),
+        )
         .map(({ label }) => label);
-      const onlineUrl = waliBroadcastByDate.get(row.date)?.onlineUrl || '';
+      const onlineUrl = waliBroadcastByDate.get(row.date)?.onlineUrl || "";
 
       map.set(row.date, {
         count: pengujiItems.length,
-        message: buildPesanPengujiTanggal(row.date, row.mode, onlineUrl, pengujiItems, students.length, row.waktuRange),
+        message: buildPesanPengujiTanggal(
+          row.date,
+          row.mode,
+          onlineUrl,
+          pengujiItems,
+          students.length,
+          row.waktuRange,
+        ),
         missingRoles,
       });
     });
@@ -521,8 +602,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [jadwalList]);
 
   useEffect(() => {
-    if (dateFilter && !jadwalDateOptions.some((option) => option.date === dateFilter)) {
-      setDateFilter('');
+    if (
+      dateFilter &&
+      !jadwalDateOptions.some((option) => option.date === dateFilter)
+    ) {
+      setDateFilter("");
     }
   }, [dateFilter, jadwalDateOptions]);
 
@@ -530,19 +614,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const query = searchFilter.trim().toLowerCase();
     return jadwalList
       .filter((siswa) => {
-        if (statusFilter !== 'Semua' && siswa.status !== statusFilter) return false;
-        if (dateFilter && toISODate(siswa.hari_tanggal) !== dateFilter) return false;
-        if (kehadiranSiswaFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Siswa') !== kehadiranSiswaFilter) return false;
-        if (kehadiranWalmurFilter !== 'Semua' && resolveKehadiran(siswa, presensiList, 'Walmur') !== kehadiranWalmurFilter) return false;
+        if (statusFilter !== "Semua" && siswa.status !== statusFilter)
+          return false;
+        if (dateFilter && toISODate(siswa.hari_tanggal) !== dateFilter)
+          return false;
+        if (
+          kehadiranSiswaFilter !== "Semua" &&
+          resolveKehadiran(siswa, presensiList, "Siswa") !==
+            kehadiranSiswaFilter
+        )
+          return false;
+        if (
+          kehadiranWalmurFilter !== "Semua" &&
+          resolveKehadiran(siswa, presensiList, "Walmur") !==
+            kehadiranWalmurFilter
+        )
+          return false;
         if (!query) return true;
-        return siswa.nama_siswa.toLowerCase().includes(query)
-          || siswa.id.toLowerCase().includes(query)
-          || siswa.kelas.toLowerCase().includes(query);
+        return (
+          siswa.nama_siswa.toLowerCase().includes(query) ||
+          siswa.id.toLowerCase().includes(query) ||
+          siswa.kelas.toLowerCase().includes(query)
+        );
       })
       .sort((a, b) => {
         const dateA = toISODate(a.hari_tanggal);
         const dateB = toISODate(b.hari_tanggal);
-        if (dateA && dateB && dateA !== dateB) return dateA.localeCompare(dateB);
+        if (dateA && dateB && dateA !== dateB)
+          return dateA.localeCompare(dateB);
         if (dateA && !dateB) return -1;
         if (!dateA && dateB) return 1;
 
@@ -550,7 +649,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const timeB = parseStartTimeMinutes(b.waktu_all);
         if (timeA !== timeB) return timeA - timeB;
 
-        return (a.id || '').localeCompare(b.id || '');
+        return (a.id || "").localeCompare(b.id || "");
       });
   }, [
     jadwalList,
@@ -559,49 +658,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     kehadiranSiswaFilter,
     kehadiranWalmurFilter,
     searchFilter,
-    presensiList
+    presensiList,
   ]);
 
-  const hasJadwalFilter = Boolean(dateFilter)
-    || kehadiranSiswaFilter !== 'Semua'
-    || kehadiranWalmurFilter !== 'Semua';
+  const hasJadwalFilter =
+    Boolean(dateFilter) ||
+    kehadiranSiswaFilter !== "Semua" ||
+    kehadiranWalmurFilter !== "Semua";
 
   const resetJadwalFilters = () => {
-    setDateFilter('');
-    setKehadiranSiswaFilter('Semua');
-    setKehadiranWalmurFilter('Semua');
+    setDateFilter("");
+    setKehadiranSiswaFilter("Semua");
+    setKehadiranWalmurFilter("Semua");
   };
 
   const handleSetSessionMode = (date: string, mode: ModeUjian) => {
     const sesi = pickSesiUjianForDate(sesiUjianList, date);
     const res = apiService.saveSesiUjian({
-      id_sesi: sesi?.id_sesi || '',
+      id_sesi: sesi?.id_sesi || "",
       hari_tanggal: date,
       mode_ujian: mode,
-      catatan: sesi?.catatan || '',
-      updated_at: ''
+      catatan: sesi?.catatan || "",
+      updated_at: "",
     });
     if (res.success) {
-      showToast('Mode Ujian Disimpan', `Tanggal ${formatTanggalUjian(date)} diatur ke mode ${mode}.`, 'success');
+      showToast(
+        "Mode Ujian Disimpan",
+        `Tanggal ${formatTanggalUjian(date)} diatur ke mode ${mode}.`,
+        "success",
+      );
       onDataChanged();
     } else {
-      showToast('Gagal', res.message, 'error');
+      showToast("Gagal", res.message, "error");
     }
   };
 
   const openSessionDateModal = () => {
-    setSessionDateForm({ date: '', mode: 'Offline' });
+    setSessionDateForm({ date: "", mode: "Offline" });
     setIsSessionDateModalOpen(true);
   };
 
   const handleSessionDateChange = (value: string) => {
     const iso = toISODate(value);
-    const existing = iso
-      ? pickSesiUjianForDate(sesiUjianList, iso)
-      : undefined;
+    const existing = iso ? pickSesiUjianForDate(sesiUjianList, iso) : undefined;
     setSessionDateForm({
       date: value,
-      mode: existing?.mode_ujian === 'Online' ? 'Online' : 'Offline'
+      mode: existing?.mode_ujian === "Online" ? "Online" : "Offline",
     });
   };
 
@@ -609,64 +711,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     const iso = toISODate(sessionDateForm.date);
     if (!iso) {
-      showToast('Tanggal Belum Diisi', 'Pilih tanggal ujian terlebih dahulu.', 'error');
+      showToast(
+        "Tanggal Belum Diisi",
+        "Pilih tanggal ujian terlebih dahulu.",
+        "error",
+      );
       return;
     }
 
     const existing = pickSesiUjianForDate(sesiUjianList, iso);
     const res = apiService.saveSesiUjian({
-      id_sesi: existing?.id_sesi || '',
+      id_sesi: existing?.id_sesi || "",
       hari_tanggal: iso,
       mode_ujian: sessionDateForm.mode,
-      catatan: existing?.catatan || '',
-      updated_at: ''
+      catatan: existing?.catatan || "",
+      updated_at: "",
     });
 
     if (res.success) {
       showToast(
-        existing ? 'Mode Tanggal Diperbarui' : 'Tanggal Ditambahkan',
+        existing ? "Mode Tanggal Diperbarui" : "Tanggal Ditambahkan",
         `Tanggal ${formatTanggalUjian(iso)} diatur ke mode ${sessionDateForm.mode}.`,
-        'success'
+        "success",
       );
       setIsSessionDateModalOpen(false);
       onDataChanged();
     } else {
-      showToast('Gagal', res.message, 'error');
+      showToast("Gagal", res.message, "error");
     }
   };
 
   const handleDeleteSessionDate = (row: SessionDateRow) => {
     if (!row.id_sesi) return;
     setConfirmDialog({
-      title: 'Hapus Tanggal Ujian?',
+      title: "Hapus Tanggal Ujian?",
       message: `Tanggal ${formatTanggalUjian(row.date)} belum memiliki siswa. Hapus tanggal ini dari daftar?`,
-      confirmLabel: 'Hapus',
-      variant: 'danger',
+      confirmLabel: "Hapus",
+      variant: "danger",
       onConfirm: () => {
         const res = apiService.deleteSesiUjian(row.id_sesi);
         if (res.success) {
-          showToast('Tanggal Dihapus', res.message, 'info');
+          showToast("Tanggal Dihapus", res.message, "info");
           onDataChanged();
         } else {
-          showToast('Gagal', res.message, 'error');
+          showToast("Gagal", res.message, "error");
         }
-      }
+      },
     });
   };
 
   // Admin Grade Edit Modal
-  const [editingGradeStudent, setEditingGradeStudent] = useState<SiswaJadwal | null>(null);
-  const [editingGradeKategori, setEditingGradeKategori] = useState<KategoriUjian>('Calistung');
+  const [editingGradeStudent, setEditingGradeStudent] =
+    useState<SiswaJadwal | null>(null);
+  const [editingGradeKategori, setEditingGradeKategori] =
+    useState<KategoriUjian>("Calistung");
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
-  const [viewingGradeRecord, setViewingGradeRecord] = useState<NilaiRecord | null>(null);
+  const [viewingGradeRecord, setViewingGradeRecord] =
+    useState<NilaiRecord | null>(null);
 
   // KPI Calculations
-  const activeJadwalList = useMemo(() => jadwalList.filter(s => s.status === 'Aktif'), [jadwalList]);
+  const activeJadwalList = useMemo(
+    () => jadwalList.filter((s) => s.status === "Aktif"),
+    [jadwalList],
+  );
   const activeJadwalByDate = useMemo(() => {
     if (!dateFilter) return activeJadwalList;
-    return activeJadwalList.filter((s) => toISODate(s.hari_tanggal) === dateFilter);
+    return activeJadwalList.filter(
+      (s) => toISODate(s.hari_tanggal) === dateFilter,
+    );
   }, [activeJadwalList, dateFilter]);
-  const activeIds = useMemo(() => new Set(activeJadwalList.map(s => s.id)), [activeJadwalList]);
+  const activeIds = useMemo(
+    () => new Set(activeJadwalList.map((s) => s.id)),
+    [activeJadwalList],
+  );
 
   const kpiData = useMemo(() => {
     const totalSiswa = activeJadwalList.length;
@@ -674,30 +791,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     // Student Attendance (hormati override admin)
     const hadirSiswaIds = new Set(
       activeJadwalList
-        .filter((s) => resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir')
-        .map((s) => s.id)
+        .filter((s) => resolveKehadiran(s, presensiList, "Siswa") === "Hadir")
+        .map((s) => s.id),
     );
     const hadirSiswaCount = hadirSiswaIds.size;
-    const hadirSiswaPercent = totalSiswa ? Math.round((hadirSiswaCount / totalSiswa) * 100) : 0;
+    const hadirSiswaPercent = totalSiswa
+      ? Math.round((hadirSiswaCount / totalSiswa) * 100)
+      : 0;
 
     // Walmur Attendance (hormati override admin)
     const hadirWalmurIds = new Set(
       activeJadwalList
-        .filter((s) => resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir')
-        .map((s) => s.id)
+        .filter((s) => resolveKehadiran(s, presensiList, "Walmur") === "Hadir")
+        .map((s) => s.id),
     );
     const hadirWalmurCount = hadirWalmurIds.size;
-    const hadirWalmurPercent = totalSiswa ? Math.round((hadirWalmurCount / totalSiswa) * 100) : 0;
+    const hadirWalmurPercent = totalSiswa
+      ? Math.round((hadirWalmurCount / totalSiswa) * 100)
+      : 0;
 
     // Grades completion
     const quranDoneIds = new Set(
-      nilaiList.filter(n => activeIds.has(n.id_siswa) && (n.kategori_ujian === 'Al-Quran SD' || n.kategori_ujian === 'Al-Quran SMP/SMA')).map(n => n.id_siswa)
+      nilaiList
+        .filter(
+          (n) =>
+            activeIds.has(n.id_siswa) &&
+            (n.kategori_ujian === "Al-Quran SD" ||
+              n.kategori_ujian === "Al-Quran SMP/SMA"),
+        )
+        .map((n) => n.id_siswa),
     );
     const catungEngDoneIds = new Set(
-      nilaiList.filter(n => activeIds.has(n.id_siswa) && (n.kategori_ujian === 'Calistung' || n.kategori_ujian === 'English')).map(n => n.id_siswa)
+      nilaiList
+        .filter(
+          (n) =>
+            activeIds.has(n.id_siswa) &&
+            (n.kategori_ujian === "Calistung" ||
+              n.kategori_ujian === "English"),
+        )
+        .map((n) => n.id_siswa),
     );
     const interviewDoneIds = new Set(
-      nilaiList.filter(n => activeIds.has(n.id_siswa) && n.kategori_ujian === 'Interview Walmur').map(n => n.id_siswa)
+      nilaiList
+        .filter(
+          (n) =>
+            activeIds.has(n.id_siswa) &&
+            n.kategori_ujian === "Interview Walmur",
+        )
+        .map((n) => n.id_siswa),
     );
 
     return {
@@ -707,55 +848,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       hadirWalmurCount,
       hadirWalmurPercent,
       quranDoneCount: quranDoneIds.size,
-      quranDonePercent: totalSiswa ? Math.round((quranDoneIds.size / totalSiswa) * 100) : 0,
+      quranDonePercent: totalSiswa
+        ? Math.round((quranDoneIds.size / totalSiswa) * 100)
+        : 0,
       catungEngDoneCount: catungEngDoneIds.size,
-      catungEngDonePercent: totalSiswa ? Math.round((catungEngDoneIds.size / totalSiswa) * 100) : 0,
+      catungEngDonePercent: totalSiswa
+        ? Math.round((catungEngDoneIds.size / totalSiswa) * 100)
+        : 0,
       interviewDoneCount: interviewDoneIds.size,
-      interviewDonePercent: totalSiswa ? Math.round((interviewDoneIds.size / totalSiswa) * 100) : 0,
+      interviewDonePercent: totalSiswa
+        ? Math.round((interviewDoneIds.size / totalSiswa) * 100)
+        : 0,
     };
   }, [activeJadwalList, presensiList, nilaiList, activeIds]);
 
-   const rekapPenguji = useMemo(
-     () => buildRekapPenguji(jadwalList, nilaiList, presensiList, {
-       from: rekapDateFrom,
-       to: rekapDateTo,
-       search: rekapSearch,
-       peran: rekapPeranFilter,
-       gelombang: rekapGelombangFilter
-     }),
-     [jadwalList, nilaiList, presensiList, rekapDateFrom, rekapDateTo, rekapSearch, rekapPeranFilter, rekapGelombangFilter]
-   );
+  const rekapPenguji = useMemo(
+    () =>
+      buildRekapPenguji(jadwalList, nilaiList, presensiList, {
+        from: rekapDateFrom,
+        to: rekapDateTo,
+        search: rekapSearch,
+        peran: rekapPeranFilter,
+        gelombang: rekapGelombangFilter,
+      }),
+    [
+      jadwalList,
+      nilaiList,
+      presensiList,
+      rekapDateFrom,
+      rekapDateTo,
+      rekapSearch,
+      rekapPeranFilter,
+      rekapGelombangFilter,
+    ],
+  );
 
-   const rekapMinDate = rekapPenguji.availableDates[0] || '';
-   const rekapMaxDate = rekapPenguji.availableDates[rekapPenguji.availableDates.length - 1] || '';
+  const rekapMinDate = rekapPenguji.availableDates[0] || "";
+  const rekapMaxDate =
+    rekapPenguji.availableDates[rekapPenguji.availableDates.length - 1] || "";
 
-   const handleRekapDateFromChange = (value: string) => {
-     setRekapDateFrom(value);
-     if (value && rekapDateTo && value > rekapDateTo) {
-       setRekapDateTo(value);
-     }
-   };
+  const handleRekapDateFromChange = (value: string) => {
+    setRekapDateFrom(value);
+    if (value && rekapDateTo && value > rekapDateTo) {
+      setRekapDateTo(value);
+    }
+  };
 
-   const handleRekapDateToChange = (value: string) => {
-     setRekapDateTo(value);
-     if (value && rekapDateFrom && value < rekapDateFrom) {
-       setRekapDateFrom(value);
-     }
-   };
+  const handleRekapDateToChange = (value: string) => {
+    setRekapDateTo(value);
+    if (value && rekapDateFrom && value < rekapDateFrom) {
+      setRekapDateFrom(value);
+    }
+  };
 
-   const resetRekapFilters = () => {
-     setRekapDateFrom('');
-     setRekapDateTo('');
-     setRekapSearch('');
-     setRekapPeranFilter('Semua');
-     setRekapGelombangFilter([]);
-   };
+  const resetRekapFilters = () => {
+    setRekapDateFrom("");
+    setRekapDateTo("");
+    setRekapSearch("");
+    setRekapPeranFilter("Semua");
+    setRekapGelombangFilter([]);
+  };
 
-   const hasRekapFilter = Boolean(rekapDateFrom)
-     || Boolean(rekapDateTo)
-     || Boolean(rekapSearch.trim())
-     || rekapPeranFilter !== 'Semua'
-     || rekapGelombangFilter.length > 0;
+  const hasRekapFilter =
+    Boolean(rekapDateFrom) ||
+    Boolean(rekapDateTo) ||
+    Boolean(rekapSearch.trim()) ||
+    rekapPeranFilter !== "Semua" ||
+    rekapGelombangFilter.length > 0;
 
   // Handle Save Student (Add or Edit)
   const handleSaveStudent = (e: React.FormEvent) => {
@@ -769,7 +928,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       !gender ||
       !toISODate(studentFormData.hari_tanggal)
     ) {
-      showToast('Form Tidak Lengkap', 'ID, nama, kelas, jenis kelamin, dan tanggal ujian wajib diisi!', 'error');
+      showToast(
+        "Form Tidak Lengkap",
+        "ID, nama, kelas, jenis kelamin, dan tanggal ujian wajib diisi!",
+        "error",
+      );
       return;
     }
 
@@ -778,16 +941,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return Boolean(pair.start) !== Boolean(pair.end);
     });
     if (incompleteTime) {
-      showToast('Waktu Belum Lengkap', 'Isi jam mulai dan jam selesai untuk setiap waktu ujian.', 'error');
+      showToast(
+        "Waktu Belum Lengkap",
+        "Isi jam mulai dan jam selesai untuk setiap waktu ujian.",
+        "error",
+      );
       return;
     }
 
     const invalidTime = TIME_FIELDS.find((field) => {
       const pair = studentTimeInputs[field];
-      return pair.start && pair.end && timeValueToMinutes(pair.end) <= timeValueToMinutes(pair.start);
+      return (
+        pair.start &&
+        pair.end &&
+        timeValueToMinutes(pair.end) <= timeValueToMinutes(pair.start)
+      );
     });
     if (invalidTime) {
-      showToast('Waktu Tidak Valid', 'Jam selesai harus lebih besar dari jam mulai.', 'error');
+      showToast(
+        "Waktu Tidak Valid",
+        "Jam selesai harus lebih besar dari jam mulai.",
+        "error",
+      );
       return;
     }
 
@@ -797,70 +972,84 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       waktu_all: summarizeWaktuAll(
         studentFormData.waktu_alq_arab,
         studentFormData.waktu_catung_eng,
-        studentFormData.waktu_interview
-      )
+        studentFormData.waktu_interview,
+      ),
     };
 
     const res = apiService.saveJadwal(payload, isEditMode);
     if (res.success) {
-      showToast('Berhasil', res.message, 'success');
+      showToast("Berhasil", res.message, "success");
       setIsStudentModalOpen(false);
       onDataChanged();
     } else {
-      showToast('Gagal', res.message, 'error');
+      showToast("Gagal", res.message, "error");
     }
   };
 
   const handleDeleteStudent = (id: string, name: string) => {
     setConfirmDialog({
-      title: 'Hapus Calon Siswa?',
+      title: "Hapus Calon Siswa?",
       message: `Data "${name}" (${id}) akan dihapus dari jadwal. Tindakan ini tidak dapat dibatalkan.`,
-      confirmLabel: 'Hapus',
-      variant: 'danger',
+      confirmLabel: "Hapus",
+      variant: "danger",
       onConfirm: () => {
         const res = apiService.deleteJadwal(id);
         if (res.success) {
-          showToast('Dihapus', res.message, 'info');
+          showToast("Dihapus", res.message, "info");
           onDataChanged();
         } else {
-          showToast('Gagal', res.message, 'error');
+          showToast("Gagal", res.message, "error");
         }
-      }
+      },
     });
   };
 
-  const handleChangeStudentStatus = (siswa: SiswaJadwal, nextStatus: SiswaJadwal['status']) => {
+  const handleChangeStudentStatus = (
+    siswa: SiswaJadwal,
+    nextStatus: SiswaJadwal["status"],
+  ) => {
     if (nextStatus === siswa.status) return;
-    const titles: Record<SiswaJadwal['status'], string> = {
-      Aktif: 'Aktifkan Kembali?',
-      Reschedule: 'Tandai Reschedule?',
-      Selesai: 'Tandai Selesai?',
+    const titles: Record<SiswaJadwal["status"], string> = {
+      Aktif: "Aktifkan Kembali?",
+      Reschedule: "Tandai Reschedule?",
+      Selesai: "Tandai Selesai?",
     };
     setConfirmDialog({
       title: titles[nextStatus],
       message: `Status jadwal "${siswa.nama_siswa}" (${siswa.id}) akan diubah menjadi ${nextStatus}.`,
-      confirmLabel: 'Ya, Lanjutkan',
-      variant: nextStatus === 'Aktif' ? 'info' : 'warning',
+      confirmLabel: "Ya, Lanjutkan",
+      variant: nextStatus === "Aktif" ? "info" : "warning",
       onConfirm: () => {
-        const res = apiService.saveJadwal({ ...siswa, status: nextStatus }, true);
+        const res = apiService.saveJadwal(
+          { ...siswa, status: nextStatus },
+          true,
+        );
         if (res.success) {
-          showToast(nextStatus === 'Selesai' ? 'Ditandai Selesai' : nextStatus === 'Reschedule' ? 'Diubah ke Reschedule' : 'Diaktifkan', res.message, 'success');
+          showToast(
+            nextStatus === "Selesai"
+              ? "Ditandai Selesai"
+              : nextStatus === "Reschedule"
+                ? "Diubah ke Reschedule"
+                : "Diaktifkan",
+            res.message,
+            "success",
+          );
           onDataChanged();
         } else {
-          showToast('Gagal', res.message, 'error');
+          showToast("Gagal", res.message, "error");
         }
-      }
+      },
     });
   };
 
   const handleTimeInputChange = (
     field: TimeField,
-    edge: 'start' | 'end',
-    value: string
+    edge: "start" | "end",
+    value: string,
   ) => {
     const nextInputs: StudentTimeInputs = {
       ...studentTimeInputs,
-      [field]: { ...studentTimeInputs[field], [edge]: value }
+      [field]: { ...studentTimeInputs[field], [edge]: value },
     };
     setStudentTimeInputs(nextInputs);
 
@@ -873,28 +1062,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       waktu_alq_arab: waktuAlqArab,
       waktu_catung_eng: waktuCatungEng,
       waktu_interview: waktuInterview,
-      waktu_all: summarizeWaktuAll(waktuAlqArab, waktuCatungEng, waktuInterview)
+      waktu_all: summarizeWaktuAll(
+        waktuAlqArab,
+        waktuCatungEng,
+        waktuInterview,
+      ),
     }));
   };
 
   const handleChangeKehadiran = (
     siswa: SiswaJadwal,
-    tipe: 'Siswa' | 'Walmur',
-    value: '' | 'Hadir' | 'Belum Hadir'
+    tipe: "Siswa" | "Walmur",
+    value: "" | "Hadir" | "Belum Hadir",
   ) => {
-    const payload: SiswaJadwal = tipe === 'Siswa'
-      ? { ...siswa, status_kehadiran_siswa: value }
-      : { ...siswa, status_kehadiran_walmur: value };
+    const payload: SiswaJadwal =
+      tipe === "Siswa"
+        ? { ...siswa, status_kehadiran_siswa: value }
+        : { ...siswa, status_kehadiran_walmur: value };
     const res = apiService.saveJadwal(payload, true);
     if (res.success) {
       showToast(
-        'Kehadiran Diperbarui',
-        `Status kehadiran ${tipe === 'Siswa' ? 'siswa' : 'wali murid'} ${siswa.nama_siswa} disimpan.`,
-        'success'
+        "Kehadiran Diperbarui",
+        `Status kehadiran ${tipe === "Siswa" ? "siswa" : "wali murid"} ${siswa.nama_siswa} disimpan.`,
+        "success",
       );
       onDataChanged();
     } else {
-      showToast('Gagal', res.message, 'error');
+      showToast("Gagal", res.message, "error");
     }
   };
 
@@ -909,7 +1103,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const nextTimeInputs: StudentTimeInputs = {
       waktu_alq_arab: timeRangeToInputs(siswa.waktu_alq_arab),
       waktu_catung_eng: timeRangeToInputs(siswa.waktu_catung_eng),
-      waktu_interview: timeRangeToInputs(siswa.waktu_interview)
+      waktu_interview: timeRangeToInputs(siswa.waktu_interview),
     };
     const waktuAlqArab = composeTimeRange(nextTimeInputs.waktu_alq_arab);
     const waktuCatungEng = composeTimeRange(nextTimeInputs.waktu_catung_eng);
@@ -922,7 +1116,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       waktu_alq_arab: waktuAlqArab,
       waktu_catung_eng: waktuCatungEng,
       waktu_interview: waktuInterview,
-      waktu_all: summarizeWaktuAll(waktuAlqArab, waktuCatungEng, waktuInterview)
+      waktu_all: summarizeWaktuAll(
+        waktuAlqArab,
+        waktuCatungEng,
+        waktuInterview,
+      ),
     });
     setIsEditMode(true);
     setIsStudentModalOpen(true);
@@ -931,7 +1129,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Bulk Import Handlers
   const handleDownloadTemplate = () => {
     downloadJadwalCsvTemplate();
-    showToast('Template Diunduh', 'File template_jadwal_spmb.csv berhasil diunduh.', 'success');
+    showToast(
+      "Template Diunduh",
+      "File template_jadwal_spmb.csv berhasil diunduh.",
+      "success",
+    );
   };
 
   const openBulkImportModal = () => {
@@ -942,7 +1144,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsBulkImportOpen(true);
   };
 
-  const handleSelectBulkFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectBulkFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -952,7 +1156,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setBulkParsedData(res.valid);
       setBulkParseErrors(res.errors);
 
-      const existingIds = new Set(jadwalList.map((s) => String(s.id).trim().toUpperCase()));
+      const existingIds = new Set(
+        jadwalList.map((s) => String(s.id).trim().toUpperCase()),
+      );
       let overlaps = 0;
       res.valid.forEach((s) => {
         if (existingIds.has(String(s.id).trim().toUpperCase())) {
@@ -962,12 +1168,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setBulkOverlapCount(overlaps);
 
       if (res.valid.length === 0) {
-        showToast('File Tidak Valid', 'Tidak ditemukan baris data yang valid dalam file.', 'error');
+        showToast(
+          "File Tidak Valid",
+          "Tidak ditemukan baris data yang valid dalam file.",
+          "error",
+        );
       } else {
-        showToast('File Terbaca', `${res.valid.length} data calon siswa berhasil diurai.`, 'info');
+        showToast(
+          "File Terbaca",
+          `${res.valid.length} data calon siswa berhasil diurai.`,
+          "info",
+        );
       }
     } catch (err: any) {
-      showToast('Gagal Membaca File', err.message || 'Format file tidak didukung.', 'error');
+      showToast(
+        "Gagal Membaca File",
+        err.message || "Format file tidak didukung.",
+        "error",
+      );
       setBulkImportFile(null);
       setBulkParsedData([]);
       setBulkParseErrors([]);
@@ -980,17 +1198,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const res = await apiService.bulkUpsertJadwal(bulkParsedData);
       if (res.success) {
-        showToast('Import Berhasil', res.message, 'success');
+        showToast("Import Berhasil", res.message, "success");
         setIsBulkImportOpen(false);
         setBulkImportFile(null);
         setBulkParsedData([]);
         setBulkParseErrors([]);
         onDataChanged();
       } else {
-        showToast('Import Gagal', res.message, 'error');
+        showToast("Import Gagal", res.message, "error");
       }
     } catch (err: any) {
-      showToast('Error Import', err.message || 'Terjadi kesalahan saat menyimpan ke database.', 'error');
+      showToast(
+        "Error Import",
+        err.message || "Terjadi kesalahan saat menyimpan ke database.",
+        "error",
+      );
     } finally {
       setIsImporting(false);
     }
@@ -1002,13 +1224,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const res = await apiService.syncPengujiFromSpreadsheet();
       if (res.success) {
-        showToast('Penguji Tersinkron', res.message, 'success');
+        showToast("Penguji Tersinkron", res.message, "success");
         onDataChanged();
       } else {
-        showToast('Sinkronisasi Gagal', res.message, 'error');
+        showToast("Sinkronisasi Gagal", res.message, "error");
       }
     } catch (err: any) {
-      showToast('Error', err.message || 'Gagal sinkron data penguji.', 'error');
+      showToast("Error", err.message || "Gagal sinkron data penguji.", "error");
     } finally {
       setIsSyncingPenguji(false);
     }
@@ -1020,81 +1242,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const getStudentKelas = (idSiswa: string): string => {
-    const siswa = jadwalList.find(s => s.id.toUpperCase() === idSiswa.toUpperCase());
-    return siswa ? formatKelas(siswa.kelas) : '-';
+    const siswa = jadwalList.find(
+      (s) => s.id.toUpperCase() === idSiswa.toUpperCase(),
+    );
+    return siswa ? formatKelas(siswa.kelas) : "-";
   };
 
   const handleCopyExamResult = async (nilai: NilaiRecord) => {
     const kelas = getStudentKelas(nilai.id_siswa);
     const rows = buildGradeDetailRows(nilai.detail_skor_json);
-    const catatanUmum = nilai.catatan_umum || nilai.detail_skor_json?.catatan || '-';
+    const catatanUmum =
+      nilai.catatan_umum || nilai.detail_skor_json?.catatan || "-";
 
     const lines: string[] = [
-      '📋 *HASIL UJIAN SPMB AL-WILDAN 29*',
-      '----------------------------------------',
+      "📋 *HASIL UJIAN SPMB AL-WILDAN 29*",
+      "----------------------------------------",
       `👤 Nama Siswa : ${nilai.nama_siswa} (${nilai.id_siswa})`,
       `🏫 Kelas      : ${kelas}`,
       `📝 Kategori   : ${nilai.kategori_ujian}`,
       `⭐ Skor Akhir : ${nilai.skor_akhir_rata2.toFixed(2)}`,
       `👨‍🏫 Penguji    : ${nilai.nama_penguji}`,
-      `📅 Waktu Input: ${formatWaktuInput(nilai.timestamp)}`
+      `📅 Waktu Input: ${formatWaktuInput(nilai.timestamp)}`,
     ];
 
     if (rows.length > 0) {
-      lines.push('', '*Rincian Skor & Catatan:*');
+      lines.push("", "*Rincian Skor & Catatan:*");
       rows.forEach((row) => {
         lines.push(`- ${row.label}: ${row.score}`);
         if (row.note) lines.push(`  └ Catatan: ${row.note}`);
       });
     }
 
-    lines.push('', '*Catatan Umum:*', String(catatanUmum));
+    lines.push("", "*Catatan Umum:*", String(catatanUmum));
 
     try {
-      await navigator.clipboard.writeText(lines.join('\n'));
-      showToast('Tersalin', 'Hasil ujian berhasil disalin ke clipboard.', 'success');
+      await navigator.clipboard.writeText(lines.join("\n"));
+      showToast(
+        "Tersalin",
+        "Hasil ujian berhasil disalin ke clipboard.",
+        "success",
+      );
     } catch {
-      showToast('Gagal Menyalin', 'Browser menolak akses clipboard.', 'error');
+      showToast("Gagal Menyalin", "Browser menolak akses clipboard.", "error");
     }
   };
 
   // Handle Edit Grade from Admin
   const openEditGrade = (nilai: NilaiRecord) => {
-    const siswa = jadwalList.find(s => s.id.toUpperCase() === nilai.id_siswa.toUpperCase());
+    const siswa = jadwalList.find(
+      (s) => s.id.toUpperCase() === nilai.id_siswa.toUpperCase(),
+    );
     if (siswa) {
       setEditingGradeStudent(siswa);
       setEditingGradeKategori(nilai.kategori_ujian);
       setIsGradeModalOpen(true);
     } else {
-      showToast('Error', 'Data siswa tidak ditemukan di jadwal.', 'error');
+      showToast("Error", "Data siswa tidak ditemukan di jadwal.", "error");
     }
   };
 
   const handleDeleteGrade = (id: string) => {
     setConfirmDialog({
-      title: 'Hapus Entri Nilai?',
-      message: 'Entri penilaian ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.',
-      confirmLabel: 'Hapus',
-      variant: 'danger',
+      title: "Hapus Entri Nilai?",
+      message:
+        "Entri penilaian ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+      confirmLabel: "Hapus",
+      variant: "danger",
       onConfirm: () => {
         apiService.deleteNilai(id);
-        showToast('Berhasil', 'Entri nilai dihapus.', 'info');
+        showToast("Berhasil", "Entri nilai dihapus.", "info");
         onDataChanged();
-      }
+      },
     });
   };
 
   const handleDeletePresensi = (id: string) => {
     setConfirmDialog({
-      title: 'Hapus Entri Presensi?',
-      message: 'Entri presensi ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.',
-      confirmLabel: 'Hapus',
-      variant: 'danger',
+      title: "Hapus Entri Presensi?",
+      message:
+        "Entri presensi ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+      confirmLabel: "Hapus",
+      variant: "danger",
       onConfirm: () => {
         apiService.deletePresensi(id);
-        showToast('Berhasil', 'Entri presensi dihapus.', 'info');
+        showToast("Berhasil", "Entri presensi dihapus.", "info");
         onDataChanged();
-      }
+      },
     });
   };
 
@@ -1105,14 +1338,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       // Sheet 1: Jadwal Siswa
       const wsJadwal = XLSX.utils.json_to_sheet(jadwalList);
-      XLSX.utils.book_append_sheet(wb, wsJadwal, 'web_jadwal');
+      XLSX.utils.book_append_sheet(wb, wsJadwal, "web_jadwal");
 
       // Sheet 2: Presensi
       const wsPresensi = XLSX.utils.json_to_sheet(presensiList);
-      XLSX.utils.book_append_sheet(wb, wsPresensi, 'web_presensi');
+      XLSX.utils.book_append_sheet(wb, wsPresensi, "web_presensi");
 
       // Sheet 3: Rekap Nilai
-      const flatNilai = nilaiList.map(n => ({
+      const flatNilai = nilaiList.map((n) => ({
         timestamp: n.timestamp,
         id_siswa: n.id_siswa,
         nama_siswa: n.nama_siswa,
@@ -1121,88 +1354,122 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         email_penguji: n.email_penguji,
         skor_akhir_rata2: n.skor_akhir_rata2,
         catatan_umum: n.catatan_umum,
-        detail_skor: JSON.stringify(n.detail_skor_json)
+        detail_skor: JSON.stringify(n.detail_skor_json),
       }));
       const wsNilai = XLSX.utils.json_to_sheet(flatNilai);
-      XLSX.utils.book_append_sheet(wb, wsNilai, 'web_nilai');
+      XLSX.utils.book_append_sheet(wb, wsNilai, "web_nilai");
 
       // Sheet 4: Siswa Tidak Hadir (jadwal Aktif tapi belum ada presensi Siswa)
       const tidakHadir = jadwalList
-        .filter((s) => s.status === 'Aktif')
-        .filter((s) => !hasPresensi(presensiList, s.id, 'Siswa'))
+        .filter((s) => s.status === "Aktif")
+        .filter((s) => !hasPresensi(presensiList, s.id, "Siswa"))
         .map((s) => ({ id: s.id, nama: s.nama_siswa, kelas: s.kelas }))
         .sort((a, b) => a.nama.localeCompare(b.nama));
-      const wsTidakHadir = XLSX.utils.json_to_sheet(tidakHadir, { header: ['id', 'nama', 'kelas'] });
-      XLSX.utils.book_append_sheet(wb, wsTidakHadir, 'web_tidak_hadir');
+      const wsTidakHadir = XLSX.utils.json_to_sheet(tidakHadir, {
+        header: ["id", "nama", "kelas"],
+      });
+      XLSX.utils.book_append_sheet(wb, wsTidakHadir, "web_tidak_hadir");
 
       // Download
       XLSX.writeFile(wb, `REKAP_SPMB_ALWILDAN29_${Date.now()}.xlsx`);
-      showToast('Ekspor Berhasil', `File Excel (.xlsx) lengkap berhasil diunduh (${tidakHadir.length} siswa tidak hadir).`, 'success');
+      showToast(
+        "Ekspor Berhasil",
+        `File Excel (.xlsx) lengkap berhasil diunduh (${tidakHadir.length} siswa tidak hadir).`,
+        "success",
+      );
     } catch (err: any) {
-      showToast('Ekspor Gagal', err.message || 'Gagal membuat file excel.', 'error');
+      showToast(
+        "Ekspor Gagal",
+        err.message || "Gagal membuat file excel.",
+        "error",
+      );
     }
   };
 
   const handleExportRekapPenguji = () => {
     if (rekapPenguji.rows.length === 0) {
-      showToast('Belum Ada Data', 'Tidak ada data nilai atau presensi pada rentang tanggal yang dipilih.', 'info');
+      showToast(
+        "Belum Ada Data",
+        "Tidak ada data nilai atau presensi pada rentang tanggal yang dipilih.",
+        "info",
+      );
       return;
     }
 
     try {
       const dates = rekapPenguji.dates;
       const headerDate = [
-        'Peran',
-        'Nama',
-        ...dates.flatMap((date) => [formatTanggalSingkat(date), '']),
-        'Total'
+        "Peran",
+        "Nama",
+        ...dates.flatMap((date) => [formatTanggalSingkat(date), ""]),
+        "Total",
       ];
-      const headerSub = ['', '', ...dates.flatMap(() => ['Keterangan', 'Jumlah']), ''];
+      const headerSub = [
+        "",
+        "",
+        ...dates.flatMap(() => ["Keterangan", "Jumlah"]),
+        "",
+      ];
       const body = rekapPenguji.rows.map((row) => [
         row.peran,
         row.nama,
         ...dates.flatMap((date) => [
           (row.keteranganByDate[date] || [])
             .map((keterangan) => displayKategori(keterangan as KategoriUjian))
-            .join(', ') || '-',
-          row.counts[date] || 0
+            .join(", ") || "-",
+          row.counts[date] || 0,
         ]),
-        row.total
+        row.total,
       ]);
       const footer = [
-        '',
-        'Total',
-        ...dates.flatMap((date) => ['', rekapPenguji.totalByDate[date] || 0]),
-        rekapPenguji.grandTotal
+        "",
+        "Total",
+        ...dates.flatMap((date) => ["", rekapPenguji.totalByDate[date] || 0]),
+        rekapPenguji.grandTotal,
       ];
 
-      const ws = XLSX.utils.aoa_to_sheet([headerDate, headerSub, ...body, footer]);
-      ws['!merges'] = [
+      const ws = XLSX.utils.aoa_to_sheet([
+        headerDate,
+        headerSub,
+        ...body,
+        footer,
+      ]);
+      ws["!merges"] = [
         { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
         { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
         ...dates.map((_, index) => ({
           s: { r: 0, c: 2 + index * 2 },
-          e: { r: 0, c: 3 + index * 2 }
+          e: { r: 0, c: 3 + index * 2 },
         })),
-        { s: { r: 0, c: 2 + dates.length * 2 }, e: { r: 1, c: 2 + dates.length * 2 } }
+        {
+          s: { r: 0, c: 2 + dates.length * 2 },
+          e: { r: 1, c: 2 + dates.length * 2 },
+        },
       ];
-      ws['!cols'] = [
+      ws["!cols"] = [
         { wch: 12 },
         { wch: 34 },
         ...dates.flatMap(() => [{ wch: 30 }, { wch: 10 }]),
-        { wch: 12 }
+        { wch: 12 },
       ];
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'rekap_penguji');
-      XLSX.writeFile(wb, `REKAP_PENGUJI_TIMEKEEPER_ALWILDAN29_${Date.now()}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "rekap_penguji");
+      XLSX.writeFile(
+        wb,
+        `REKAP_PENGUJI_TIMEKEEPER_ALWILDAN29_${Date.now()}.xlsx`,
+      );
       showToast(
-        'Ekspor Berhasil',
+        "Ekspor Berhasil",
         `Rekap ${rekapPenguji.rows.length} penguji/timekeeper berhasil diunduh.`,
-        'success'
+        "success",
       );
     } catch (err: any) {
-      showToast('Ekspor Gagal', err.message || 'Gagal membuat file excel.', 'error');
+      showToast(
+        "Ekspor Gagal",
+        err.message || "Gagal membuat file excel.",
+        "error",
+      );
     }
   };
 
@@ -1211,9 +1478,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleMigrateToFirebase = async () => {
     if (!isFirebaseConfigured) {
       showToast(
-        'Firebase Belum Dikonfigurasi',
-        'Silakan masukkan kredensial Firebase di file .env terlebih dahulu.',
-        'error'
+        "Firebase Belum Dikonfigurasi",
+        "Silakan masukkan kredensial Firebase di file .env terlebih dahulu.",
+        "error",
       );
       return;
     }
@@ -1221,13 +1488,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const res = await apiService.migrateSpreadsheetToFirestore();
       if (res.success) {
-        showToast('Migrasi Berhasil', res.message, 'success');
+        showToast("Migrasi Berhasil", res.message, "success");
         onDataChanged();
       } else {
-        showToast('Migrasi Gagal', res.message, 'error');
+        showToast("Migrasi Gagal", res.message, "error");
       }
     } catch (err: any) {
-      showToast('Error Migrasi', err.message || 'Terjadi kesalahan saat migrasi ke Firebase.', 'error');
+      showToast(
+        "Error Migrasi",
+        err.message || "Terjadi kesalahan saat migrasi ke Firebase.",
+        "error",
+      );
     } finally {
       setIsMigratingFirebase(false);
     }
@@ -1237,7 +1508,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDownloadDatabaseBackup = () => {
     try {
       const backupPayload = {
-        title: "Backup Database SPMB Al-Wildan 29 Depok",
+        title: "Backup Database SPMB AL-WILDAN 29 DEPOK",
         createdAt: new Date().toISOString(),
         stats: {
           totalSiswa: jadwalList.length,
@@ -1252,16 +1523,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           spmb_presensi: presensiList,
           spmb_nilai: nilaiList,
           spmb_sesi_ujian: sesiUjianList,
-        }
+        },
       };
 
       const jsonStr = JSON.stringify(backupPayload, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const blob = new Blob([jsonStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       const now = new Date();
       const dateStr = now.toISOString().slice(0, 10);
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
       a.href = url;
       a.download = `backup-spmb-aw29-${dateStr}-${timeStr}.json`;
       document.body.appendChild(a);
@@ -1269,39 +1540,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      showToast('Cadangan Database Berhasil', 'File backup JSON telah diunduh.', 'success');
+      showToast(
+        "Cadangan Database Berhasil",
+        "File backup JSON telah diunduh.",
+        "success",
+      );
     } catch (err: any) {
-      showToast('Gagal Mengunduh Cadangan', err.message || 'Terjadi kesalahan.', 'error');
+      showToast(
+        "Gagal Mengunduh Cadangan",
+        err.message || "Terjadi kesalahan.",
+        "error",
+      );
     }
   };
 
   // ====== MONITORING & BROADCAST WA (cek silang presensi <-> nilai) ======
-  const [broadcastSearch, setBroadcastSearch] = useState('');
-  const [broadcastJenjang, setBroadcastJenjang] = useState<'Semua' | 'SD' | 'SMP' | 'SMA'>('Semua');
-  const [broadcastKelas, setBroadcastKelas] = useState<string>('Semua');
+  const [broadcastSearch, setBroadcastSearch] = useState("");
+  const [broadcastJenjang, setBroadcastJenjang] = useState<
+    "Semua" | "SD" | "SMP" | "SMA"
+  >("Semua");
+  const [broadcastKelas, setBroadcastKelas] = useState<string>("Semua");
 
   const broadcastBaseA = useMemo(
     () => buildPresentIncompleteRows(jadwalList, presensiList, nilaiList),
-    [jadwalList, presensiList, nilaiList]
+    [jadwalList, presensiList, nilaiList],
   );
   const broadcastBaseB = useMemo(
     () => buildGradedButAbsentRows(jadwalList, presensiList, nilaiList),
-    [jadwalList, presensiList, nilaiList]
+    [jadwalList, presensiList, nilaiList],
   );
 
   const broadcastKelasOptions = useMemo(() => {
     const set = new Set<string>();
-    jadwalList.forEach((s) => { if (s.kelas) set.add(s.kelas); });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    jadwalList.forEach((s) => {
+      if (s.kelas) set.add(s.kelas);
+    });
+    return Array.from(set).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true }),
+    );
   }, [jadwalList]);
 
   const broadcastRowsA = useMemo(() => {
     const q = broadcastSearch.trim().toLowerCase();
     return broadcastBaseA.filter((r) => {
       const s = r.siswa;
-      const okQ = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas) === broadcastJenjang;
-      const okK = broadcastKelas === 'Semua' || s.kelas === broadcastKelas;
+      const okQ =
+        !q ||
+        s.nama_siswa.toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q);
+      const okJ =
+        broadcastJenjang === "Semua" ||
+        getJenjangFromKelas(s.kelas) === broadcastJenjang;
+      const okK = broadcastKelas === "Semua" || s.kelas === broadcastKelas;
       return okQ && okJ && okK;
     });
   }, [broadcastBaseA, broadcastSearch, broadcastJenjang, broadcastKelas]);
@@ -1310,33 +1600,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const q = broadcastSearch.trim().toLowerCase();
     return broadcastBaseB.filter((r) => {
       const s = r.siswa;
-      const okQ = !q || s.nama_siswa.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-      const okJ = broadcastJenjang === 'Semua' || getJenjangFromKelas(s.kelas) === broadcastJenjang;
-      const okK = broadcastKelas === 'Semua' || s.kelas === broadcastKelas;
+      const okQ =
+        !q ||
+        s.nama_siswa.toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q);
+      const okJ =
+        broadcastJenjang === "Semua" ||
+        getJenjangFromKelas(s.kelas) === broadcastJenjang;
+      const okK = broadcastKelas === "Semua" || s.kelas === broadcastKelas;
       return okQ && okJ && okK;
     });
   }, [broadcastBaseB, broadcastSearch, broadcastJenjang, broadcastKelas]);
 
-  const broadcastPengujiGroups = useMemo(() => groupBroadcastByPenguji(broadcastRowsA), [broadcastRowsA]);
-  const broadcastTimekeeperGroups = useMemo(() => groupBroadcastByTimekeeper(broadcastRowsB), [broadcastRowsB]);
+  const broadcastPengujiGroups = useMemo(
+    () => groupBroadcastByPenguji(broadcastRowsA),
+    [broadcastRowsA],
+  );
+  const broadcastTimekeeperGroups = useMemo(
+    () => groupBroadcastByTimekeeper(broadcastRowsB),
+    [broadcastRowsB],
+  );
 
   const handleCopyText = (text: string, label: string) => {
     if (!text.trim()) return;
     navigator.clipboard
       .writeText(text)
-      .then(() => showToast('Disalin!', `${label} berhasil disalin. Tempel (paste) ke WhatsApp.`, 'success'))
-      .catch(() => showToast('Gagal Menyalin', 'Clipboard tidak tersedia di browser ini. Salin manual dari kolom preview.', 'error'));
+      .then(() =>
+        showToast(
+          "Disalin!",
+          `${label} berhasil disalin. Tempel (paste) ke WhatsApp.`,
+          "success",
+        ),
+      )
+      .catch(() =>
+        showToast(
+          "Gagal Menyalin",
+          "Clipboard tidak tersedia di browser ini. Salin manual dari kolom preview.",
+          "error",
+        ),
+      );
   };
 
-
   const handleCopyAllPenguji = () => {
-    const all = broadcastPengujiGroups.map((g) => buildPesanPenguji(g.penguji, g.items)).join('\n\n———————————\n\n');
-    handleCopyText(all, `Semua pesan penguji (${broadcastPengujiGroups.length} orang)`);
+    const all = broadcastPengujiGroups
+      .map((g) => buildPesanPenguji(g.penguji, g.items))
+      .join("\n\n———————————\n\n");
+    handleCopyText(
+      all,
+      `Semua pesan penguji (${broadcastPengujiGroups.length} orang)`,
+    );
   };
 
   const handleCopyAllTimekeeper = () => {
-    const all = broadcastTimekeeperGroups.map((g) => buildPesanTimekeeper(g.timekeeper, g.items)).join('\n\n———————————\n\n');
-    handleCopyText(all, `Semua pesan timekeeper (${broadcastTimekeeperGroups.length} orang)`);
+    const all = broadcastTimekeeperGroups
+      .map((g) => buildPesanTimekeeper(g.timekeeper, g.items))
+      .join("\n\n———————————\n\n");
+    handleCopyText(
+      all,
+      `Semua pesan timekeeper (${broadcastTimekeeperGroups.length} orang)`,
+    );
   };
 
   // ====== CETAK RUANGAN ======
@@ -1345,12 +1667,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     getTime: (s: SiswaJadwal) => string,
   ): { room: string; date: string; siswa: SiswaJadwal[] }[] => {
     const map = new Map<string, SiswaJadwal[]>();
-    activeJadwalList.forEach(s => {
+    activeJadwalList.forEach((s) => {
       if (cetakDateFilter) {
         const iso = toISODate(s.hari_tanggal);
         if (iso !== cetakDateFilter) return;
       }
-      const key = getRoom(s) || 'Tanpa Ruangan';
+      const key = getRoom(s) || "Tanpa Ruangan";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     });
@@ -1358,7 +1680,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let groups = Array.from(map.entries())
       .map(([room, siswa]) => ({
         room,
-        date: siswa[0]?.hari_tanggal || '',
+        date: siswa[0]?.hari_tanggal || "",
         siswa: [...siswa].sort((a, b) => {
           const ta = parseStartTimeMinutes(getTime(a));
           const tb = parseStartTimeMinutes(getTime(b));
@@ -1366,20 +1688,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           return a.nama_siswa.localeCompare(b.nama_siswa);
         }),
       }))
-      .sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true, sensitivity: 'base' }));
+      .sort((a, b) =>
+        a.room.localeCompare(b.room, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
 
     if (cetakSearch.trim()) {
       const q = cetakSearch.trim().toLowerCase();
-      groups = groups.filter(g => {
+      groups = groups.filter((g) => {
         const matchRoom = g.room.toLowerCase().includes(q);
-        const matchOfficer = g.siswa.some(s =>
-          (s.penguji_alq_arab || '').toLowerCase().includes(q) ||
-          (s.penguji_catung_eng || '').toLowerCase().includes(q) ||
-          (s.timekeeper_siswa || '').toLowerCase().includes(q) ||
-          (s.interview_walmur || '').toLowerCase().includes(q) ||
-          (s.timekeeper_walmur || '').toLowerCase().includes(q) ||
-          s.nama_siswa.toLowerCase().includes(q) ||
-          s.id.toLowerCase().includes(q)
+        const matchOfficer = g.siswa.some(
+          (s) =>
+            (s.penguji_alq_arab || "").toLowerCase().includes(q) ||
+            (s.penguji_catung_eng || "").toLowerCase().includes(q) ||
+            (s.timekeeper_siswa || "").toLowerCase().includes(q) ||
+            (s.interview_walmur || "").toLowerCase().includes(q) ||
+            (s.timekeeper_walmur || "").toLowerCase().includes(q) ||
+            s.nama_siswa.toLowerCase().includes(q) ||
+            s.id.toLowerCase().includes(q),
         );
         return matchRoom || matchOfficer;
       });
@@ -1388,10 +1716,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return groups;
   };
 
-  const siswaRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_siswa, s => s.waktu_all), [activeJadwalList, cetakDateFilter, cetakSearch]);
-  const walmurRoomGroups = useMemo(() => buildRoomGroups(s => s.ruangan_walmur, s => s.waktu_interview), [activeJadwalList, cetakDateFilter, cetakSearch]);
+  const siswaRoomGroups = useMemo(
+    () =>
+      buildRoomGroups(
+        (s) => s.ruangan_siswa,
+        (s) => s.waktu_all,
+      ),
+    [activeJadwalList, cetakDateFilter, cetakSearch],
+  );
+  const walmurRoomGroups = useMemo(
+    () =>
+      buildRoomGroups(
+        (s) => s.ruangan_walmur,
+        (s) => s.waktu_interview,
+      ),
+    [activeJadwalList, cetakDateFilter, cetakSearch],
+  );
 
-  const triggerPrint = (group: 'siswa' | 'walmur', room: string | null) => {
+  const triggerPrint = (group: "siswa" | "walmur", room: string | null) => {
     setPrintTarget({ group, room });
     setTimeout(() => {
       window.print();
@@ -1400,48 +1742,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     const clearTarget = () => setPrintTarget(null);
-    window.addEventListener('afterprint', clearTarget);
-    return () => window.removeEventListener('afterprint', clearTarget);
+    window.addEventListener("afterprint", clearTarget);
+    return () => window.removeEventListener("afterprint", clearTarget);
   }, []);
 
-  const printRoomRows = (siswa: SiswaJadwal[], group: 'siswa' | 'walmur') =>
+  const printRoomRows = (siswa: SiswaJadwal[], group: "siswa" | "walmur") =>
     siswa.map((s, idx) => (
       <tr key={s.id} className="even:bg-slate-50">
         <td className="p-2 font-mono">{idx + 1}</td>
         <td className="p-2 font-mono">{s.id}</td>
         <td className="p-2 font-bold">{s.nama_siswa}</td>
-        <td className="p-2">{getJenjangFromKelas(s.kelas)} • {formatKelas(s.kelas)}</td>
-        <td className="p-2">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-        <td className="p-2 font-mono">{group === 'siswa' ? s.waktu_all : s.waktu_interview}</td>
+        <td className="p-2">
+          {getJenjangFromKelas(s.kelas)} • {formatKelas(s.kelas)}
+        </td>
+        <td className="p-2">{s.gender === "L" ? "Laki-laki" : "Perempuan"}</td>
+        <td className="p-2 font-mono">
+          {group === "siswa" ? s.waktu_all : s.waktu_interview}
+        </td>
       </tr>
     ));
 
-  const renderPrintBlocks = (group: 'siswa' | 'walmur') => {
-    const groups = group === 'siswa' ? siswaRoomGroups : walmurRoomGroups;
-    const roomFilter = printTarget && printTarget.group === group ? printTarget.room : null;
-    const title = group === 'siswa' ? 'Ruang Ujian Siswa' : 'Ruang Wawancara Orang Tua';
+  const renderPrintBlocks = (group: "siswa" | "walmur") => {
+    const groups = group === "siswa" ? siswaRoomGroups : walmurRoomGroups;
+    const roomFilter =
+      printTarget && printTarget.group === group ? printTarget.room : null;
+    const title =
+      group === "siswa" ? "Ruang Ujian Siswa" : "Ruang Wawancara Orang Tua";
     return groups
-      .filter(g => !roomFilter || g.room === roomFilter)
-      .map(g => {
+      .filter((g) => !roomFilter || g.room === roomFilter)
+      .map((g) => {
         const first = g.siswa[0];
         return (
           <div key={group + g.room} className="print-block">
             <div className="text-center mb-2">
               <img
                 src={SCHOOL_LOGO_URL}
-                alt="Al-Wildan 29"
+                alt="AL-WILDAN 29"
                 className="w-14 h-14 mx-auto object-contain mb-1"
               />
               <div>
-                <div className="text-sm font-black">TES SPMB AL-WILDAN ISLAMIC SCHOOL 29 DEPOK</div>
-                <div className="text-xs font-bold mt-0.5">Daftar {title} per Ruangan</div>
+                <div className="text-sm font-black">
+                  TES SPMB AL-WILDAN ISLAMIC SCHOOL 29 DEPOK
+                </div>
                 <div className="text-xs font-bold mt-0.5">
-                  {g.room} — {formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'}
+                  Daftar {title} per Ruangan
+                </div>
+                <div className="text-xs font-bold mt-0.5">
+                  {g.room} —{" "}
+                  {formatTanggalUjian(g.date) || "Tanggal tidak tercantum"}
                 </div>
               </div>
             </div>
             <table className="print-table mt-2">
-              <thead className={group === 'siswa' ? 'print-thead-siswa' : 'print-thead-walmur'}>
+              <thead
+                className={
+                  group === "siswa" ? "print-thead-siswa" : "print-thead-walmur"
+                }
+              >
                 <tr>
                   <th>No</th>
                   <th>ID Siswa</th>
@@ -1454,16 +1811,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <tbody>{printRoomRows(g.siswa, group)}</tbody>
             </table>
             <div className="mt-3 text-[11px] space-y-1">
-              {group === 'siswa' ? (
+              {group === "siswa" ? (
                 <>
-                  <div>Penguji Al-Qur'an/Arab: <strong>{first?.penguji_alq_arab || '-'}</strong></div>
-                  <div>Penguji Calistung/English: <strong>{first?.penguji_catung_eng || '-'}</strong></div>
-                  <div>Timekeeper Siswa: <strong>{first?.timekeeper_siswa || '-'}</strong></div>
+                  <div>
+                    Penguji Al-Qur'an/Arab:{" "}
+                    <strong>{first?.penguji_alq_arab || "-"}</strong>
+                  </div>
+                  <div>
+                    Penguji Calistung/English:{" "}
+                    <strong>{first?.penguji_catung_eng || "-"}</strong>
+                  </div>
+                  <div>
+                    Timekeeper Siswa:{" "}
+                    <strong>{first?.timekeeper_siswa || "-"}</strong>
+                  </div>
                 </>
               ) : (
                 <>
-                  <div>Pewawancara Orang Tua: <strong>{first?.interview_walmur || '-'}</strong></div>
-                  <div>Timekeeper Orang Tua: <strong>{first?.timekeeper_walmur || '-'}</strong></div>
+                  <div>
+                    Pewawancara Orang Tua:{" "}
+                    <strong>{first?.interview_walmur || "-"}</strong>
+                  </div>
+                  <div>
+                    Timekeeper Orang Tua:{" "}
+                    <strong>{first?.timekeeper_walmur || "-"}</strong>
+                  </div>
                 </>
               )}
             </div>
@@ -1481,10 +1853,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             Super Administrator Portal
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-            Controlling Center SPMB Al-Wildan 29
+            Controlling Center SPMB AL-WILDAN 29
           </h1>
           <p className="text-xs text-blue-100">
-            Akses Penuh: <strong className="text-amber-300">Admin</strong> • Manajemen CRUD & Live Monitoring
+            Akses Penuh: <strong className="text-amber-300">Admin</strong> •
+            Manajemen CRUD & Live Monitoring
           </p>
         </div>
 
@@ -1495,8 +1868,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className="px-3.5 py-2 bg-[#D97706] hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-75"
             title="Sinkronkan daftar petugas penguji dari Google Spreadsheet (sheet web_penguji)"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPenguji ? 'animate-spin' : ''}`} />
-            <span>{isSyncingPenguji ? 'Menyinkronkan...' : 'Sinkronkan Penguji'}</span>
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isSyncingPenguji ? "animate-spin" : ""}`}
+            />
+            <span>
+              {isSyncingPenguji ? "Menyinkronkan..." : "Sinkronkan Penguji"}
+            </span>
           </button>
 
           <a
@@ -1516,11 +1893,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Admin Tabs */}
       <div className="border-b border-slate-200 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
         <button
-          onClick={() => setActiveSubTab('kpi')}
+          onClick={() => setActiveSubTab("kpi")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'kpi'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "kpi"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <BarChart3 className="w-4 h-4 text-amber-300" />
@@ -1528,11 +1905,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('jadwal')}
+          onClick={() => setActiveSubTab("jadwal")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'jadwal'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "jadwal"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <Users className="w-4 h-4 text-[#D97706]" />
@@ -1540,11 +1917,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('nilai')}
+          onClick={() => setActiveSubTab("nilai")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'nilai'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "nilai"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <FileSpreadsheet className="w-4 h-4 text-blue-300" />
@@ -1552,11 +1929,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('rekap-penguji')}
+          onClick={() => setActiveSubTab("rekap-penguji")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'rekap-penguji'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "rekap-penguji"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <BarChart3 className="w-4 h-4 text-emerald-300" />
@@ -1564,11 +1941,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('broadcast')}
+          onClick={() => setActiveSubTab("broadcast")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'broadcast'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "broadcast"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <Send className="w-4 h-4 text-emerald-300" />
@@ -1576,11 +1953,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('export')}
+          onClick={() => setActiveSubTab("export")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'export'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "export"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <Download className="w-4 h-4 text-[#D97706]" />
@@ -1588,11 +1965,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('cetak')}
+          onClick={() => setActiveSubTab("cetak")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'cetak'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "cetak"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <Printer className="w-4 h-4 text-[#D97706]" />
@@ -1600,11 +1977,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('gas')}
+          onClick={() => setActiveSubTab("gas")}
           className={`px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-            activeSubTab === 'gas'
-              ? 'bg-[#1E3A8A] text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
+            activeSubTab === "gas"
+              ? "bg-[#1E3A8A] text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
           }`}
         >
           <Database className="w-4 h-4 text-[#D97706]" />
@@ -1613,25 +1990,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
       {/* TAB 1: KPI & MONITORING */}
-      {activeSubTab === 'kpi' && (
+      {activeSubTab === "kpi" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Total Siswa */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Calon Siswa</span>
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  Total Calon Siswa
+                </span>
                 <Users className="w-5 h-5 text-[#1E3A8A]" />
               </div>
               <div className="text-3xl font-extrabold text-[#1E3A8A] font-mono">
                 {kpiData.totalSiswa}
               </div>
-              <p className="text-[11px] text-slate-500">Terdaftar di sheet jadwal SPMB</p>
+              <p className="text-[11px] text-slate-500">
+                Terdaftar di sheet jadwal SPMB
+              </p>
             </div>
 
             {/* Presensi Siswa */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-bold uppercase tracking-wider">Kehadiran Siswa</span>
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  Kehadiran Siswa
+                </span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -1653,7 +2036,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Presensi Walmur */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-bold uppercase tracking-wider">Kehadiran Wali Murid</span>
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  Kehadiran Wali Murid
+                </span>
                 <Users className="w-5 h-5 text-[#D97706]" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -1683,7 +2068,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Pos Qur'an & Arab */}
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">Pos Al-Qur'an & B. Arab</span>
+                  <span className="font-bold text-slate-800">
+                    Pos Al-Qur'an & B. Arab
+                  </span>
                   <span className="font-mono font-bold text-[#1E3A8A]">
                     {kpiData.quranDoneCount} / {kpiData.totalSiswa}
                   </span>
@@ -1702,7 +2089,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Pos Calistung / English */}
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">Pos Calistung / English</span>
+                  <span className="font-bold text-slate-800">
+                    Pos Calistung / English
+                  </span>
                   <span className="font-mono font-bold text-[#D97706]">
                     {kpiData.catungEngDoneCount} / {kpiData.totalSiswa}
                   </span>
@@ -1721,7 +2110,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Wawancara Orang Tua */}
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-800">Wawancara Orang Tua</span>
+                  <span className="font-bold text-slate-800">
+                    Wawancara Orang Tua
+                  </span>
                   <span className="font-mono font-bold text-emerald-700">
                     {kpiData.interviewDoneCount} / {kpiData.totalSiswa}
                   </span>
@@ -1742,206 +2133,303 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* TAB 2: JADWAL CRUD */}
-      {activeSubTab === 'jadwal' && (
+      {activeSubTab === "jadwal" && (
         <div className="space-y-4">
-           {/* Mode Ujian per Tanggal */}
-           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-             <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-               <div className="flex items-center gap-2">
-                 <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
-                 <div>
-                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mode Ujian per Tanggal</h3>
-                   <p className="text-[11px] text-slate-500">Satu tanggal/sesi berlaku untuk semua peserta di tanggal tersebut.</p>
-                 </div>
-               </div>
-               <div className="flex items-center gap-2 flex-wrap">
-                 <div className="relative">
-                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-                   <input
-                     type="text"
-                     value={sessionDateSearch}
-                     onChange={(e) => setSessionDateSearch(e.target.value)}
-                     placeholder="Cari tanggal..."
-                     className="pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-                   />
-                 </div>
-                 <button
-                   type="button"
-                   onClick={openSessionDateModal}
-                   className="px-3 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white text-[11px] font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
-                 >
-                   <Plus className="w-3.5 h-3.5" />
-                   Tambah Tanggal
-                 </button>
-               </div>
-             </div>
-             <div className="p-4">
-               {sessionDateRows.length === 0 ? (
-                 <p className="text-xs text-slate-500">Belum ada tanggal ujian pada jadwal.</p>
-               ) : filteredSessionDateRows.length === 0 ? (
-                 <p className="text-xs text-slate-500">Tidak ada tanggal yang cocok dengan pencarian "{sessionDateSearch}".</p>
-               ) : (
-                 <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-slate-200">
-                   <table className="w-full text-left text-xs">
-                     <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider sticky top-0 z-20">
-                       <tr>
-                         <th className="p-3">Tanggal Ujian</th>
-                         <th className="p-3">Mode Ujian</th>
-                         <th className="p-3 text-center">Jumlah Siswa</th>
-                         <th className="p-3">Status / Peringatan</th>
-                         <th className="p-3 text-right">Aksi & Broadcast</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-200 bg-white">
-                       {filteredSessionDateRows.map((row) => {
-                         const broadcast = waliBroadcastByDate.get(row.date);
-                         const pengujiBroadcast = pengujiBroadcastByDate.get(row.date);
-                         const hasNoStudents = row.count === 0;
-                         const hasNoActiveStudents = row.activeCount === 0;
-                         const missingOnlineLink = row.mode === 'Online' && !broadcast?.onlineUrl;
-                         const hasNoPenguji = !pengujiBroadcast || pengujiBroadcast.count === 0;
-                         const missingPengujiRoles = pengujiBroadcast?.missingRoles || [];
-                         const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
-                         const pengujiBroadcastLabel = `Broadcast penguji ${formatTanggalUjian(row.date)}`;
+          {/* Mode Ujian per Tanggal */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-[#1E3A8A]" />
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Mode Ujian per Tanggal
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Satu tanggal/sesi berlaku untuk semua peserta di tanggal
+                    tersebut.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={sessionDateSearch}
+                    onChange={(e) => setSessionDateSearch(e.target.value)}
+                    placeholder="Cari tanggal..."
+                    className="pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={openSessionDateModal}
+                  className="px-3 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white text-[11px] font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Tambah Tanggal
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              {sessionDateRows.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  Belum ada tanggal ujian pada jadwal.
+                </p>
+              ) : filteredSessionDateRows.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  Tidak ada tanggal yang cocok dengan pencarian "
+                  {sessionDateSearch}".
+                </p>
+              ) : (
+                <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider sticky top-0 z-20">
+                      <tr>
+                        <th className="p-3">Tanggal Ujian</th>
+                        <th className="p-3">Mode Ujian</th>
+                        <th className="p-3 text-center">Jumlah Siswa</th>
+                        <th className="p-3">Status / Peringatan</th>
+                        <th className="p-3 text-right">Aksi & Broadcast</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {filteredSessionDateRows.map((row) => {
+                        const broadcast = waliBroadcastByDate.get(row.date);
+                        const pengujiBroadcast = pengujiBroadcastByDate.get(
+                          row.date,
+                        );
+                        const hasNoStudents = row.count === 0;
+                        const hasNoActiveStudents = row.activeCount === 0;
+                        const missingOnlineLink =
+                          row.mode === "Online" && !broadcast?.onlineUrl;
+                        const hasNoPenguji =
+                          !pengujiBroadcast || pengujiBroadcast.count === 0;
+                        const missingPengujiRoles =
+                          pengujiBroadcast?.missingRoles || [];
+                        const broadcastLabel = `Broadcast wali murid ${formatTanggalUjian(row.date)}`;
+                        const pengujiBroadcastLabel = `Broadcast penguji ${formatTanggalUjian(row.date)}`;
 
-                         return (
-                           <tr key={row.date} className="hover:bg-slate-50">
-                             <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
-                               {formatTanggalUjian(row.date)}
-                               {row.waktuRange && (
-                                 <span className="block text-[10px] font-medium text-slate-500 font-mono">{row.waktuRange}</span>
-                               )}
-                             </td>
-                             <td className="p-3 whitespace-nowrap">
-                               <div className="flex items-center gap-2">
-                                 <select
-                                   value={row.mode}
-                                   onChange={(e) => handleSetSessionMode(row.date, e.target.value as ModeUjian)}
-                                   className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
-                                     row.mode === 'Online'
-                                       ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                                       : 'bg-slate-200 text-slate-700 border-slate-300'
-                                   }`}
-                                   title="Ubah mode ujian sesi ini"
-                                 >
-                                   <option value="Offline">Offline</option>
-                                   <option value="Online">Online</option>
-                                 </select>
-                                 {row.mode === 'Online' ? (
-                                   <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                                 ) : (
-                                   <WifiOff className="w-3.5 h-3.5 text-slate-400" />
-                                 )}
-                               </div>
-                             </td>
-                             <td className="p-3 text-center font-mono font-bold text-slate-700">
-                               <span className="block">{row.activeCount} siswa aktif</span>
-                               {row.count > row.activeCount && (
-                                 <span className="block text-[10px] font-normal text-slate-400">dari {row.count} total</span>
-                               )}
-                             </td>
-                             <td className="p-3">
-                               <div className="flex flex-col gap-0.5 text-[10px]">
-                                 {hasNoStudents ? (
-                                   <span className="font-semibold text-slate-500">Belum ada siswa</span>
-                                 ) : hasNoActiveStudents ? (
-                                   <span className="font-semibold text-rose-600">
-                                     ⚠ Tidak ada siswa aktif ({row.selesaiCount} selesai, {row.rescheduleCount} reschedule)
-                                   </span>
-                                 ) : (
-                                   <>
-                                     {missingOnlineLink && (
-                                       <span className="font-semibold text-amber-700">⚠ Link Zoom belum tersedia</span>
-                                     )}
-                                     {missingPengujiRoles.length === 3 ? (
-                                       <span className="font-semibold text-slate-500">⚠ Belum ada penguji</span>
-                                     ) : (
-                                       missingPengujiRoles.map((role) => (
-                                         <span key={role} className="font-semibold text-slate-500">⚠ Penguji {role} belum diisi</span>
-                                       ))
-                                     )}
-                                     {!missingOnlineLink && missingPengujiRoles.length === 0 && (
-                                       <span className="text-emerald-600 font-semibold">Siap broadcast</span>
-                                     )}
-                                   </>
-                                 )}
-                               </div>
-                             </td>
-                             <td className="p-3 text-right whitespace-nowrap">
-                               <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
-                                 <button
-                                   type="button"
-                                   onClick={() => handleCopyText(broadcast?.message || '', broadcastLabel)}
-                                   disabled={hasNoActiveStudents || !broadcast?.message || missingOnlineLink}
-                                   className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
-                                   title={hasNoActiveStudents ? 'Tidak ada siswa aktif pada tanggal ini' : missingOnlineLink ? 'Link Zoom belum tersedia' : 'Salin pesan WA Wali Murid'}
-                                 >
-                                   <Copy className="w-3 h-3" /> Salin Walmur
-                                 </button>
-                                 <button
-                                   type="button"
-                                   onClick={() => handleCopyText(pengujiBroadcast?.message || '', pengujiBroadcastLabel)}
-                                   disabled={hasNoActiveStudents || !pengujiBroadcast?.message || missingOnlineLink || hasNoPenguji}
-                                   className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
-                                   title={hasNoActiveStudents ? 'Tidak ada siswa aktif pada tanggal ini' : hasNoPenguji ? 'Belum ada penguji pada tanggal ini' : missingOnlineLink ? 'Link Zoom belum tersedia' : 'Salin pesan WA Penguji'}
-                                 >
-                                   <Copy className="w-3 h-3" /> Salin Penguji
-                                 </button>
-                                 {row.count === 0 && row.id_sesi && (
-                                   <button
-                                     type="button"
-                                     onClick={() => handleDeleteSessionDate(row)}
-                                     className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-1"
-                                     title="Hapus tanggal"
-                                   >
-                                     <Trash2 className="w-3.5 h-3.5" />
-                                   </button>
-                                 )}
-                               </div>
-                             </td>
-                           </tr>
-                         );
-                       })}
-                     </tbody>
-                   </table>
-                 </div>
-               )}
-             </div>
-           </div>
+                        return (
+                          <tr key={row.date} className="hover:bg-slate-50">
+                            <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
+                              {formatTanggalUjian(row.date)}
+                              {row.waktuRange && (
+                                <span className="block text-[10px] font-medium text-slate-500 font-mono">
+                                  {row.waktuRange}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={row.mode}
+                                  onChange={(e) =>
+                                    handleSetSessionMode(
+                                      row.date,
+                                      e.target.value as ModeUjian,
+                                    )
+                                  }
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border cursor-pointer focus:outline-none ${
+                                    row.mode === "Online"
+                                      ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                      : "bg-slate-200 text-slate-700 border-slate-300"
+                                  }`}
+                                  title="Ubah mode ujian sesi ini"
+                                >
+                                  <option value="Offline">Offline</option>
+                                  <option value="Online">Online</option>
+                                </select>
+                                {row.mode === "Online" ? (
+                                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <WifiOff className="w-3.5 h-3.5 text-slate-400" />
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-slate-700">
+                              <span className="block">
+                                {row.activeCount} siswa aktif
+                              </span>
+                              {row.count > row.activeCount && (
+                                <span className="block text-[10px] font-normal text-slate-400">
+                                  dari {row.count} total
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex flex-col gap-0.5 text-[10px]">
+                                {hasNoStudents ? (
+                                  <span className="font-semibold text-slate-500">
+                                    Belum ada siswa
+                                  </span>
+                                ) : hasNoActiveStudents ? (
+                                  <span className="font-semibold text-rose-600">
+                                    ⚠ Tidak ada siswa aktif ({row.selesaiCount}{" "}
+                                    selesai, {row.rescheduleCount} reschedule)
+                                  </span>
+                                ) : (
+                                  <>
+                                    {missingOnlineLink && (
+                                      <span className="font-semibold text-amber-700">
+                                        ⚠ Link Zoom belum tersedia
+                                      </span>
+                                    )}
+                                    {missingPengujiRoles.length === 3 ? (
+                                      <span className="font-semibold text-slate-500">
+                                        ⚠ Belum ada penguji
+                                      </span>
+                                    ) : (
+                                      missingPengujiRoles.map((role) => (
+                                        <span
+                                          key={role}
+                                          className="font-semibold text-slate-500"
+                                        >
+                                          ⚠ Penguji {role} belum diisi
+                                        </span>
+                                      ))
+                                    )}
+                                    {!missingOnlineLink &&
+                                      missingPengujiRoles.length === 0 && (
+                                        <span className="text-emerald-600 font-semibold">
+                                          Siap broadcast
+                                        </span>
+                                      )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopyText(
+                                      broadcast?.message || "",
+                                      broadcastLabel,
+                                    )
+                                  }
+                                  disabled={
+                                    hasNoActiveStudents ||
+                                    !broadcast?.message ||
+                                    missingOnlineLink
+                                  }
+                                  className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                                  title={
+                                    hasNoActiveStudents
+                                      ? "Tidak ada siswa aktif pada tanggal ini"
+                                      : missingOnlineLink
+                                        ? "Link Zoom belum tersedia"
+                                        : "Salin pesan WA Wali Murid"
+                                  }
+                                >
+                                  <Copy className="w-3 h-3" /> Salin Walmur
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopyText(
+                                      pengujiBroadcast?.message || "",
+                                      pengujiBroadcastLabel,
+                                    )
+                                  }
+                                  disabled={
+                                    hasNoActiveStudents ||
+                                    !pengujiBroadcast?.message ||
+                                    missingOnlineLink ||
+                                    hasNoPenguji
+                                  }
+                                  className="px-2 py-1 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                                  title={
+                                    hasNoActiveStudents
+                                      ? "Tidak ada siswa aktif pada tanggal ini"
+                                      : hasNoPenguji
+                                        ? "Belum ada penguji pada tanggal ini"
+                                        : missingOnlineLink
+                                          ? "Link Zoom belum tersedia"
+                                          : "Salin pesan WA Penguji"
+                                  }
+                                >
+                                  <Copy className="w-3 h-3" /> Salin Penguji
+                                </button>
+                                {row.count === 0 && row.id_sesi && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSessionDate(row)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-1"
+                                    title="Hapus tanggal"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Ringkasan Belum Presensi */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Siswa</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Belum Presensi Siswa
+                </span>
                 <Users className="w-4 h-4 text-rose-500" />
               </div>
               <span className="text-2xl font-extrabold text-rose-700 font-mono">
-                {activeJadwalByDate.filter((s) => resolveKehadiran(s, presensiList, 'Siswa') !== 'Hadir').length}
+                {
+                  activeJadwalByDate.filter(
+                    (s) =>
+                      resolveKehadiran(s, presensiList, "Siswa") !== "Hadir",
+                  ).length
+                }
               </span>
               <p className="text-[10px] text-slate-400">
-                dari {activeJadwalByDate.length} siswa aktif{dateFilter ? ' pada tanggal terpilih' : ''}
+                dari {activeJadwalByDate.length} siswa aktif
+                {dateFilter ? " pada tanggal terpilih" : ""}
               </p>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Presensi Wali Murid</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Belum Presensi Wali Murid
+                </span>
                 <Users className="w-4 h-4 text-amber-500" />
               </div>
               <span className="text-2xl font-extrabold text-amber-700 font-mono">
-                {activeJadwalByDate.filter((s) => resolveKehadiran(s, presensiList, 'Walmur') !== 'Hadir').length}
+                {
+                  activeJadwalByDate.filter(
+                    (s) =>
+                      resolveKehadiran(s, presensiList, "Walmur") !== "Hadir",
+                  ).length
+                }
               </span>
               <p className="text-[10px] text-slate-400">
-                dari {activeJadwalByDate.length} siswa aktif{dateFilter ? ' pada tanggal terpilih' : ''}
+                dari {activeJadwalByDate.length} siswa aktif
+                {dateFilter ? " pada tanggal terpilih" : ""}
               </p>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa Aktif</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Total Siswa Aktif
+                </span>
                 <Users className="w-4 h-4 text-[#1E3A8A]" />
               </div>
-              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">{activeJadwalByDate.length}</span>
-              <p className="text-[10px] text-slate-400">siswa terdaftar aktif{dateFilter ? ' pada tanggal terpilih' : ''}</p>
+              <span className="text-2xl font-extrabold text-[#1E3A8A] font-mono">
+                {activeJadwalByDate.length}
+              </span>
+              <p className="text-[10px] text-slate-400">
+                siswa terdaftar aktif
+                {dateFilter ? " pada tanggal terpilih" : ""}
+              </p>
             </div>
           </div>
 
@@ -1960,7 +2448,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {searchFilter && (
                   <button
                     type="button"
-                    onClick={() => setSearchFilter('')}
+                    onClick={() => setSearchFilter("")}
                     className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
                     title="Hapus pencarian"
                   >
@@ -2028,7 +2516,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <select
                   value={kehadiranSiswaFilter}
-                  onChange={(e) => setKehadiranSiswaFilter(e.target.value as KehadiranFilter)}
+                  onChange={(e) =>
+                    setKehadiranSiswaFilter(e.target.value as KehadiranFilter)
+                  }
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 cursor-pointer"
                   title="Filter kehadiran siswa"
                 >
@@ -2039,7 +2529,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <select
                   value={kehadiranWalmurFilter}
-                  onChange={(e) => setKehadiranWalmurFilter(e.target.value as KehadiranFilter)}
+                  onChange={(e) =>
+                    setKehadiranWalmurFilter(e.target.value as KehadiranFilter)
+                  }
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 cursor-pointer"
                   title="Filter kehadiran wali murid"
                 >
@@ -2050,7 +2542,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as SiswaJadwal['status'] | 'Semua')}
+                  onChange={(e) =>
+                    setStatusFilter(
+                      e.target.value as SiswaJadwal["status"] | "Semua",
+                    )
+                  }
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 cursor-pointer"
                   title="Filter status siswa"
                 >
@@ -2074,21 +2570,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="text-xs text-slate-500 font-medium whitespace-nowrap">
-                Menampilkan <strong className="text-slate-800 font-mono font-bold">{filteredJadwalList.length}</strong> dari {activeJadwalByDate.length} siswa
+                Menampilkan{" "}
+                <strong className="text-slate-800 font-mono font-bold">
+                  {filteredJadwalList.length}
+                </strong>{" "}
+                dari {activeJadwalByDate.length} siswa
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1948px] text-left text-xs">
+              <table className="w-full min-w-[1948px] text-left text-xs">
                 <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="p-3 w-[48px] min-w-[48px] text-center whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">No</th>
-                    <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-[48px] lg:z-30">ID Siswa</th>
-                    <th className="p-3 w-[180px] min-w-[180px] bg-[#1E3A8A] lg:sticky lg:left-[152px] lg:z-30">Nama Siswa</th>
-                    <th className="p-3 w-[88px] min-w-[88px] bg-[#1E3A8A] lg:sticky lg:left-[332px] lg:z-30">Gender</th>
-                    <th className="p-3 w-[112px] min-w-[112px] bg-[#1E3A8A] border-r border-blue-700/60 lg:sticky lg:left-[420px] lg:z-30 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">Unit & Kelas</th>
+                    <th className="p-3 w-[48px] min-w-[48px] text-center whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-0 lg:z-30">
+                      No
+                    </th>
+                    <th className="p-3 w-[104px] min-w-[104px] whitespace-nowrap bg-[#1E3A8A] lg:sticky lg:left-[48px] lg:z-30">
+                      ID Siswa
+                    </th>
+                    <th className="p-3 w-[180px] min-w-[180px] bg-[#1E3A8A] lg:sticky lg:left-[152px] lg:z-30">
+                      Nama Siswa
+                    </th>
+                    <th className="p-3 w-[88px] min-w-[88px] bg-[#1E3A8A] lg:sticky lg:left-[332px] lg:z-30">
+                      Gender
+                    </th>
+                    <th className="p-3 w-[112px] min-w-[112px] bg-[#1E3A8A] border-r border-blue-700/60 lg:sticky lg:left-[420px] lg:z-30 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
+                      Unit & Kelas
+                    </th>
                     <th className="p-3 min-w-[130px]">Gelombang</th>
                     <th className="p-3">Tanggal Ujian</th>
                     <th className="p-3">Mode</th>
@@ -2109,76 +2619,153 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {filteredJadwalList.map((s, index) => {
-                      const mode = getModeUjianForDate(sesiUjianList, s.hari_tanggal);
-                      const jenjang = getJenjangFromKelas(s.kelas);
-                      const kehadiranSiswa = resolveKehadiran(s, presensiList, 'Siswa');
-                      const kehadiranWalmur = resolveKehadiran(s, presensiList, 'Walmur');
-                      const alqCat: KategoriUjian = jenjang === 'SD' ? 'Al-Quran SD' : 'Al-Quran SMP/SMA';
-                      const arabCat: KategoriUjian = 'Bahasa Arab';
-                      const calCat: KategoriUjian = jenjang === 'SD' ? 'Calistung' : 'English';
-                      const ivCat: KategoriUjian = 'Interview Walmur';
-                      const alqNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === alqCat);
-                      const arabNilai = jenjang === 'SMP' || jenjang === 'SMA' ? nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === arabCat) : undefined;
-                      const calNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === calCat);
-                      const ivNilai = nilaiList.find((n) => n.id_siswa.toLowerCase() === s.id.toLowerCase() && n.kategori_ujian === ivCat);
-                      const renderNilaiCell = (rec?: NilaiRecord) => rec ? (
+                    const mode = getModeUjianForDate(
+                      sesiUjianList,
+                      s.hari_tanggal,
+                    );
+                    const jenjang = getJenjangFromKelas(s.kelas);
+                    const kehadiranSiswa = resolveKehadiran(
+                      s,
+                      presensiList,
+                      "Siswa",
+                    );
+                    const kehadiranWalmur = resolveKehadiran(
+                      s,
+                      presensiList,
+                      "Walmur",
+                    );
+                    const alqCat: KategoriUjian =
+                      jenjang === "SD" ? "Al-Quran SD" : "Al-Quran SMP/SMA";
+                    const arabCat: KategoriUjian = "Bahasa Arab";
+                    const calCat: KategoriUjian =
+                      jenjang === "SD" ? "Calistung" : "English";
+                    const ivCat: KategoriUjian = "Interview Walmur";
+                    const alqNilai = nilaiList.find(
+                      (n) =>
+                        n.id_siswa.toLowerCase() === s.id.toLowerCase() &&
+                        n.kategori_ujian === alqCat,
+                    );
+                    const arabNilai =
+                      jenjang === "SMP" || jenjang === "SMA"
+                        ? nilaiList.find(
+                            (n) =>
+                              n.id_siswa.toLowerCase() === s.id.toLowerCase() &&
+                              n.kategori_ujian === arabCat,
+                          )
+                        : undefined;
+                    const calNilai = nilaiList.find(
+                      (n) =>
+                        n.id_siswa.toLowerCase() === s.id.toLowerCase() &&
+                        n.kategori_ujian === calCat,
+                    );
+                    const ivNilai = nilaiList.find(
+                      (n) =>
+                        n.id_siswa.toLowerCase() === s.id.toLowerCase() &&
+                        n.kategori_ujian === ivCat,
+                    );
+                    const renderNilaiCell = (rec?: NilaiRecord) =>
+                      rec ? (
                         <div className="space-y-0.5">
-                          <span className="block font-mono font-bold text-emerald-700">{rec.skor_akhir_rata2.toFixed(2)}</span>
-                          <span className="block text-[10px] text-slate-500 max-w-[120px] truncate">{rec.nama_penguji}</span>
+                          <span className="block font-mono font-bold text-emerald-700">
+                            {rec.skor_akhir_rata2.toFixed(2)}
+                          </span>
+                          <span className="block text-[10px] text-slate-500 max-w-[120px] truncate">
+                            {rec.nama_penguji}
+                          </span>
                         </div>
-                      ) : <span className="text-[10px] text-slate-400 italic">Belum Dinilai</span>;
-                      const hadirSiswaPresensi = resolveKehadiran(s, presensiList, 'Siswa') === 'Hadir';
-                      const hadirWalmurPresensi = resolveKehadiran(s, presensiList, 'Walmur') === 'Hadir';
-                      return (
-                      <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
-                        <td className="p-3 text-center font-mono font-bold text-slate-500 bg-white group-hover:bg-slate-50 w-[48px] min-w-[48px] lg:sticky lg:left-0 lg:z-20">{index + 1}</td>
-                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-[48px] lg:z-20">{s.id}</td>
-                        <td className="p-3 font-bold text-slate-900 bg-white group-hover:bg-slate-50 w-[180px] min-w-[180px] lg:sticky lg:left-[152px] lg:z-20">{s.nama_siswa}</td>
-                        <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[332px] lg:z-20">{s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                         <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[420px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
-                           <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
-                             {jenjang}
-                           </span>
-                           <span className="block mt-1 font-bold text-[#1E3A8A]">
-                             {formatKelas(s.kelas)}
-                           </span>
-                         </td>
-                         <td className="p-3 font-semibold text-slate-700 whitespace-nowrap">
-                           {s.gelombang || '-'}
-                         </td>
-                         <td className="p-3 text-slate-700 font-medium whitespace-nowrap">
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">
+                          Belum Dinilai
+                        </span>
+                      );
+                    const hadirSiswaPresensi =
+                      resolveKehadiran(s, presensiList, "Siswa") === "Hadir";
+                    const hadirWalmurPresensi =
+                      resolveKehadiran(s, presensiList, "Walmur") === "Hadir";
+                    return (
+                      <tr
+                        key={s.id}
+                        className="group hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="p-3 text-center font-mono font-bold text-slate-500 bg-white group-hover:bg-slate-50 w-[48px] min-w-[48px] lg:sticky lg:left-0 lg:z-20">
+                          {index + 1}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap bg-white group-hover:bg-slate-50 w-[104px] min-w-[104px] lg:sticky lg:left-[48px] lg:z-20">
+                          {s.id}
+                        </td>
+                        <td className="p-3 font-bold text-slate-900 bg-white group-hover:bg-slate-50 w-[180px] min-w-[180px] lg:sticky lg:left-[152px] lg:z-20">
+                          {s.nama_siswa}
+                        </td>
+                        <td className="p-3 text-slate-700 bg-white group-hover:bg-slate-50 w-[88px] min-w-[88px] lg:sticky lg:left-[332px] lg:z-20">
+                          {s.gender === "L" ? "Laki-laki" : "Perempuan"}
+                        </td>
+                        <td className="p-3 bg-white group-hover:bg-slate-50 w-[112px] min-w-[112px] border-r border-slate-200 lg:sticky lg:left-[420px] lg:z-20 lg:shadow-[6px_0_10px_-8px_rgba(15,23,42,0.45)]">
+                          <span className="px-2 py-0.5 bg-[#D97706] text-white text-[10px] font-black rounded uppercase inline-block">
+                            {jenjang}
+                          </span>
+                          <span className="block mt-1 font-bold text-[#1E3A8A]">
+                            {formatKelas(s.kelas)}
+                          </span>
+                        </td>
+                        <td className="p-3 font-semibold text-slate-700 whitespace-nowrap">
+                          {s.gelombang || "-"}
+                        </td>
+                        <td className="p-3 text-slate-700 font-medium whitespace-nowrap">
                           {formatTanggalUjian(s.hari_tanggal)}
                         </td>
                         <td className="p-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
-                            mode === 'Online'
-                              ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                              : 'bg-slate-100 text-slate-600 border-slate-300'
-                          }`}>
-                            {mode === 'Online' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                              mode === "Online"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                : "bg-slate-100 text-slate-600 border-slate-300"
+                            }`}
+                          >
+                            {mode === "Online" ? (
+                              <Wifi className="w-3 h-3" />
+                            ) : (
+                              <WifiOff className="w-3 h-3" />
+                            )}
                             {mode}
                           </span>
                         </td>
-                        <td className="p-3 font-medium text-slate-700">{s.ruangan_siswa}</td>
-                        <td className="p-3 text-slate-600 truncate max-w-[150px]">
-                          <span className="block font-medium text-slate-700">{s.penguji_alq_arab}</span>
-                          <span className="block text-[10px] text-slate-500 font-mono">{s.waktu_alq_arab}</span>
+                        <td className="p-3 font-medium text-slate-700">
+                          {s.ruangan_siswa}
                         </td>
                         <td className="p-3 text-slate-600 truncate max-w-[150px]">
-                          <span className="block font-medium text-slate-700">{s.penguji_catung_eng}</span>
-                          <span className="block text-[10px] text-slate-500 font-mono">{s.waktu_catung_eng}</span>
+                          <span className="block font-medium text-slate-700">
+                            {s.penguji_alq_arab}
+                          </span>
+                          <span className="block text-[10px] text-slate-500 font-mono">
+                            {s.waktu_alq_arab}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600 truncate max-w-[150px]">
+                          <span className="block font-medium text-slate-700">
+                            {s.penguji_catung_eng}
+                          </span>
+                          <span className="block text-[10px] text-slate-500 font-mono">
+                            {s.waktu_catung_eng}
+                          </span>
                         </td>
                         <td className="p-3 text-slate-700 truncate max-w-[170px]">
                           <strong>{s.interview_walmur}</strong>
-                          <span className="block text-[10px] text-slate-500 font-mono">{s.waktu_interview}</span>
-                          <span className="block text-[10px] text-slate-400 font-normal">{s.ruangan_walmur}</span>
+                          <span className="block text-[10px] text-slate-500 font-mono">
+                            {s.waktu_interview}
+                          </span>
+                          <span className="block text-[10px] text-slate-400 font-normal">
+                            {s.ruangan_walmur}
+                          </span>
                         </td>
-                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">{s.waktu_all || '-'}</td>
+                        <td className="p-3 font-mono font-bold text-[#1E3A8A] whitespace-nowrap">
+                          {s.waktu_all || "-"}
+                        </td>
                         <td className="p-3 space-y-1.5">
                           <div>
                             {hadirSiswaPresensi ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
-                                <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
+                                <CheckCircle2 className="w-3 h-3" /> Sudah
+                                Presensi
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
@@ -2187,12 +2774,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             )}
                           </div>
                           <select
-                            value={s.status_kehadiran_siswa || ''}
-                            onChange={(e) => handleChangeKehadiran(s, 'Siswa', e.target.value as '' | 'Hadir' | 'Belum Hadir')}
+                            value={s.status_kehadiran_siswa || ""}
+                            onChange={(e) =>
+                              handleChangeKehadiran(
+                                s,
+                                "Siswa",
+                                e.target.value as "" | "Hadir" | "Belum Hadir",
+                              )
+                            }
                             className={`w-full px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
-                              kehadiranSiswa === 'Hadir'
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                                : 'bg-amber-100 text-amber-700 border-amber-300'
+                              kehadiranSiswa === "Hadir"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                : "bg-amber-100 text-amber-700 border-amber-300"
                             }`}
                             title="Override kehadiran manual. Kosong = ikut data presensi/timekeeper"
                           >
@@ -2205,7 +2798,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <div>
                             {hadirWalmurPresensi ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
-                                <CheckCircle2 className="w-3 h-3" /> Sudah Presensi
+                                <CheckCircle2 className="w-3 h-3" /> Sudah
+                                Presensi
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold text-[10px]">
@@ -2214,12 +2808,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             )}
                           </div>
                           <select
-                            value={s.status_kehadiran_walmur || ''}
-                            onChange={(e) => handleChangeKehadiran(s, 'Walmur', e.target.value as '' | 'Hadir' | 'Belum Hadir')}
+                            value={s.status_kehadiran_walmur || ""}
+                            onChange={(e) =>
+                              handleChangeKehadiran(
+                                s,
+                                "Walmur",
+                                e.target.value as "" | "Hadir" | "Belum Hadir",
+                              )
+                            }
                             className={`w-full px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer focus:outline-none ${
-                              kehadiranWalmur === 'Hadir'
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                                : 'bg-amber-100 text-amber-700 border-amber-300'
+                              kehadiranWalmur === "Hadir"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                : "bg-amber-100 text-amber-700 border-amber-300"
                             }`}
                             title="Override kehadiran manual. Kosong = ikut data presensi/timekeeper"
                           >
@@ -2229,19 +2829,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </select>
                         </td>
                         <td className="p-3">{renderNilaiCell(alqNilai)}</td>
-                        <td className="p-3">{(jenjang === 'SMP' || jenjang === 'SMA') ? renderNilaiCell(arabNilai) : <span className="text-[10px] text-slate-400">-</span>}</td>
+                        <td className="p-3">
+                          {jenjang === "SMP" || jenjang === "SMA" ? (
+                            renderNilaiCell(arabNilai)
+                          ) : (
+                            <span className="text-[10px] text-slate-400">
+                              -
+                            </span>
+                          )}
+                        </td>
                         <td className="p-3">{renderNilaiCell(calNilai)}</td>
                         <td className="p-3">{renderNilaiCell(ivNilai)}</td>
                         <td className="p-3">
                           <select
-                            value={s.status || 'Aktif'}
-                            onChange={(e) => handleChangeStudentStatus(s, e.target.value as SiswaJadwal['status'])}
+                            value={s.status || "Aktif"}
+                            onChange={(e) =>
+                              handleChangeStudentStatus(
+                                s,
+                                e.target.value as SiswaJadwal["status"],
+                              )
+                            }
                             className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/30 ${
-                              s.status === 'Selesai'
-                                ? 'bg-slate-200 text-slate-600 border-slate-300'
-                                : s.status === 'Reschedule'
-                                ? 'bg-amber-100 text-amber-700 border-amber-300'
-                                : 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                              s.status === "Selesai"
+                                ? "bg-slate-200 text-slate-600 border-slate-300"
+                                : s.status === "Reschedule"
+                                  ? "bg-amber-100 text-amber-700 border-amber-300"
+                                  : "bg-emerald-100 text-emerald-700 border-emerald-300"
                             }`}
                             title="Ubah status siswa"
                           >
@@ -2259,7 +2872,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteStudent(s.id, s.nama_siswa)}
+                            onClick={() =>
+                              handleDeleteStudent(s.id, s.nama_siswa)
+                            }
                             className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                             title="Hapus Siswa"
                           >
@@ -2267,11 +2882,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </button>
                         </td>
                       </tr>
-                      );
-                    })}
+                    );
+                  })}
                   {filteredJadwalList.length === 0 && (
                     <tr>
-                      <td colSpan={21} className="p-8 text-center text-slate-500 text-xs font-semibold">
+                      <td
+                        colSpan={21}
+                        className="p-8 text-center text-slate-500 text-xs font-semibold"
+                      >
                         Tidak ada siswa yang sesuai dengan filter.
                       </td>
                     </tr>
@@ -2283,9 +2901,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-
       {/* TAB 3: NILAI TABLE (WITH EDIT GRADE) */}
-      {activeSubTab === 'nilai' && (
+      {activeSubTab === "nilai" && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
@@ -2312,18 +2929,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {nilaiList.map((n) => (
-                  <tr key={n.id || `${n.id_siswa}-${n.kategori_ujian}`} className="hover:bg-slate-50">
-                    <td className="p-3 font-mono text-slate-500">{formatWaktuInput(n.timestamp)}</td>
-                    <td className="p-3 font-mono font-bold text-[#1E3A8A]">{n.id_siswa}</td>
-                    <td className="p-3 font-bold text-slate-800">{n.nama_siswa}</td>
-                    <td className="p-3 font-semibold text-slate-700">{n.kategori_ujian}</td>
+                  <tr
+                    key={n.id || `${n.id_siswa}-${n.kategori_ujian}`}
+                    className="hover:bg-slate-50"
+                  >
+                    <td className="p-3 font-mono text-slate-500">
+                      {formatWaktuInput(n.timestamp)}
+                    </td>
+                    <td className="p-3 font-mono font-bold text-[#1E3A8A]">
+                      {n.id_siswa}
+                    </td>
+                    <td className="p-3 font-bold text-slate-800">
+                      {n.nama_siswa}
+                    </td>
+                    <td className="p-3 font-semibold text-slate-700">
+                      {n.kategori_ujian}
+                    </td>
                     <td className="p-3">
                       <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-bold font-mono rounded">
                         {n.skor_akhir_rata2.toFixed(2)}
                       </span>
                     </td>
-                    <td className="p-3 text-slate-600 truncate max-w-[120px]">{n.nama_penguji}</td>
-                    <td className="p-3 text-slate-500 italic truncate max-w-[160px]">{n.catatan_umum || '-'}</td>
+                    <td className="p-3 text-slate-600 truncate max-w-[120px]">
+                      {n.nama_penguji}
+                    </td>
+                    <td className="p-3 text-slate-500 italic truncate max-w-[160px]">
+                      {n.catatan_umum || "-"}
+                    </td>
                     <td className="p-3 text-right whitespace-nowrap">
                       <button
                         onClick={() => openViewGrade(n)}
@@ -2351,62 +2983,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* TAB 4: REKAP PENGUJI (siswa unik per tanggal ujian) */}
-      {activeSubTab === 'rekap-penguji' && (
+      {activeSubTab === "rekap-penguji" && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Penguji Menilai</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  Penguji Menilai
+                </span>
                 <Users className="w-5 h-5 text-[#1E3A8A]" />
               </div>
               <div className="text-2xl font-extrabold text-[#1E3A8A] font-mono">
                 {rekapPenguji.totalPenguji}
               </div>
-              <p className="text-[11px] text-slate-500">Penguji dengan nilai pada rentang terpilih</p>
+              <p className="text-[11px] text-slate-500">
+                Penguji dengan nilai pada rentang terpilih
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Timekeeper Mencatat</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  Timekeeper Mencatat
+                </span>
                 <Users className="w-5 h-5 text-emerald-600" />
               </div>
               <div className="text-2xl font-extrabold text-emerald-700 font-mono">
                 {rekapPenguji.totalTimekeeper}
               </div>
-              <p className="text-[11px] text-slate-500">Timekeeper dengan presensi pada rentang terpilih</p>
+              <p className="text-[11px] text-slate-500">
+                Timekeeper dengan presensi pada rentang terpilih
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Total Penilaian</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  Total Penilaian
+                </span>
                 <BarChart3 className="w-5 h-5 text-[#1E3A8A]" />
               </div>
               <div className="text-2xl font-extrabold text-[#1E3A8A] font-mono">
                 {rekapPenguji.totalPenilaian}
               </div>
-              <p className="text-[11px] text-slate-500">Penjumlahan siswa-teruji per penguji per tanggal</p>
+              <p className="text-[11px] text-slate-500">
+                Penjumlahan siswa-teruji per penguji per tanggal
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Total Presensi</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  Total Presensi
+                </span>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div className="text-2xl font-extrabold text-emerald-700 font-mono">
                 {rekapPenguji.totalPresensi}
               </div>
-              <p className="text-[11px] text-slate-500">Penjumlahan siswa-tercatat per timekeeper per tanggal</p>
+              <p className="text-[11px] text-slate-500">
+                Penjumlahan siswa-tercatat per timekeeper per tanggal
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-1">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Tanggal Ujian</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  Tanggal Ujian
+                </span>
                 <CalendarDays className="w-5 h-5 text-[#D97706]" />
               </div>
               <div className="text-2xl font-extrabold text-[#D97706] font-mono">
                 {rekapPenguji.dates.length}
               </div>
-              <p className="text-[11px] text-slate-500">Tanggal dengan nilai atau presensi pada rentang terpilih</p>
+              <p className="text-[11px] text-slate-500">
+                Tanggal dengan nilai atau presensi pada rentang terpilih
+              </p>
             </div>
           </div>
 
@@ -2422,19 +3074,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             </div>
 
-             <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Multi-select Gelombang Dropdown */}
               <div className="relative inline-block text-left">
                 <details className="group relative">
                   <summary className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer flex items-center gap-1.5 list-none">
                     <span>
-                      Gelombang: {rekapGelombangFilter.length === 0 ? 'Semua' : `${rekapGelombangFilter.length} dipilih`}
+                      Gelombang:{" "}
+                      {rekapGelombangFilter.length === 0
+                        ? "Semua"
+                        : `${rekapGelombangFilter.length} dipilih`}
                     </span>
                     <span className="text-slate-400 text-[10px]">▼</span>
                   </summary>
                   <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 space-y-2 text-xs">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <span className="font-bold text-slate-800">Filter Gelombang</span>
+                      <span className="font-bold text-slate-800">
+                        Filter Gelombang
+                      </span>
                       {rekapGelombangFilter.length > 0 && (
                         <button
                           type="button"
@@ -2453,30 +3110,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           onChange={() => setRekapGelombangFilter([])}
                           className="rounded border-slate-300 text-[#1E3A8A] focus:ring-[#1E3A8A]"
                         />
-                        <span className="font-bold text-slate-800">Semua Gelombang</span>
+                        <span className="font-bold text-slate-800">
+                          Semua Gelombang
+                        </span>
                       </label>
                       {rekapGelombangOptions.map((opt) => {
                         const checked = rekapGelombangFilter.includes(opt);
                         return (
-                          <label key={opt} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded-lg">
+                          <label
+                            key={opt}
+                            className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded-lg"
+                          >
                             <input
                               type="checkbox"
                               checked={checked}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setRekapGelombangFilter([...rekapGelombangFilter, opt]);
+                                  setRekapGelombangFilter([
+                                    ...rekapGelombangFilter,
+                                    opt,
+                                  ]);
                                 } else {
-                                  setRekapGelombangFilter(rekapGelombangFilter.filter(item => item !== opt));
+                                  setRekapGelombangFilter(
+                                    rekapGelombangFilter.filter(
+                                      (item) => item !== opt,
+                                    ),
+                                  );
                                 }
                               }}
                               className="rounded border-slate-300 text-[#1E3A8A] focus:ring-[#1E3A8A]"
                             />
-                            <span className="text-slate-700 font-medium">{opt}</span>
+                            <span className="text-slate-700 font-medium">
+                              {opt}
+                            </span>
                           </label>
                         );
                       })}
                       {rekapGelombangOptions.length === 0 && (
-                        <p className="text-[11px] text-slate-400 text-center py-2">Tidak ada gelombang</p>
+                        <p className="text-[11px] text-slate-400 text-center py-2">
+                          Tidak ada gelombang
+                        </p>
                       )}
                     </div>
                   </div>
@@ -2485,7 +3158,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <select
                 value={rekapPeranFilter}
-                onChange={(e) => setRekapPeranFilter(e.target.value as 'Semua' | 'Penguji' | 'Timekeeper')}
+                onChange={(e) =>
+                  setRekapPeranFilter(
+                    e.target.value as "Semua" | "Penguji" | "Timekeeper",
+                  )
+                }
                 className="px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer"
                 title="Filter peran"
               >
@@ -2505,7 +3182,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none cursor-pointer"
                   title="Tanggal mulai"
                 />
-                <span className="text-[11px] font-semibold text-slate-500">s.d.</span>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  s.d.
+                </span>
                 <input
                   type="date"
                   value={rekapDateTo}
@@ -2545,9 +3224,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#1E3A8A] flex items-center justify-center mx-auto mb-3">
                 <BarChart3 className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-bold text-slate-800">Belum Ada Nilai</h3>
+              <h3 className="text-base font-bold text-slate-800">
+                Belum Ada Nilai
+              </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Tidak ada data nilai atau presensi pada rentang tanggal, peran, dan pencarian saat ini.
+                Tidak ada data nilai atau presensi pada rentang tanggal, peran,
+                dan pencarian saat ini.
               </p>
               {hasRekapFilter && (
                 <button
@@ -2567,13 +3249,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     Rekap Penguji & Timekeeper per Tanggal Ujian
                   </h3>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Penguji: siswa dinilai + kategori. Timekeeper: siswa dengan presensi (Siswa atau Walmur).
+                    Penguji: siswa dinilai + kategori. Timekeeper: siswa dengan
+                    presensi (Siswa atau Walmur).
                   </p>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium">
                   {rekapDateFrom || rekapDateTo
-                    ? `Rentang: ${rekapDateFrom ? formatTanggalSingkat(rekapDateFrom) : 'Awal'} s.d. ${rekapDateTo ? formatTanggalSingkat(rekapDateTo) : 'Akhir'}`
-                    : 'Semua tanggal'}
+                    ? `Rentang: ${rekapDateFrom ? formatTanggalSingkat(rekapDateFrom) : "Awal"} s.d. ${rekapDateTo ? formatTanggalSingkat(rekapDateTo) : "Akhir"}`
+                    : "Semua tanggal"}
                 </span>
               </div>
 
@@ -2581,24 +3264,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#1E3A8A] text-white uppercase text-[10px] tracking-wider">
                     <tr>
-                      <th rowSpan={2} className="p-3 w-[88px] min-w-[88px] sticky left-0 z-20 bg-[#1E3A8A]">Peran</th>
-                      <th rowSpan={2} className="p-3 min-w-[200px] sticky left-[88px] z-20 bg-[#1E3A8A] border-r border-blue-700/50">
+                      <th
+                        rowSpan={2}
+                        className="p-3 w-[88px] min-w-[88px] sticky left-0 z-20 bg-[#1E3A8A]"
+                      >
+                        Peran
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="p-3 min-w-[200px] sticky left-[88px] z-20 bg-[#1E3A8A] border-r border-blue-700/50"
+                      >
                         Nama
                       </th>
                       {rekapPenguji.dates.map((date) => (
-                        <th key={date} colSpan={2} className="p-3 text-center min-w-[210px] whitespace-nowrap border-l border-blue-700/50">
+                        <th
+                          key={date}
+                          colSpan={2}
+                          className="p-3 text-center min-w-[210px] whitespace-nowrap border-l border-blue-700/50"
+                        >
                           {formatTanggalSingkat(date)}
                         </th>
                       ))}
-                      <th rowSpan={2} className="p-3 text-center min-w-[80px] bg-blue-900/60 whitespace-nowrap">
+                      <th
+                        rowSpan={2}
+                        className="p-3 text-center min-w-[80px] bg-blue-900/60 whitespace-nowrap"
+                      >
                         Total
                       </th>
                     </tr>
                     <tr>
                       {rekapPenguji.dates.map((date) => (
                         <React.Fragment key={date}>
-                          <th className="p-2 min-w-[140px] text-left border-l border-blue-700/50">Keterangan</th>
-                          <th className="p-2 min-w-[70px] text-center">Jumlah</th>
+                          <th className="p-2 min-w-[140px] text-left border-l border-blue-700/50">
+                            Keterangan
+                          </th>
+                          <th className="p-2 min-w-[70px] text-center">
+                            Jumlah
+                          </th>
                         </React.Fragment>
                       ))}
                     </tr>
@@ -2609,34 +3311,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-3 sticky left-0 z-10 bg-white">
                           <span
                             className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-bold uppercase ${
-                              row.peran === 'Penguji'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                              row.peran === "Penguji"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-emerald-100 text-emerald-800"
                             }`}
                           >
                             {row.peran}
                           </span>
                         </td>
                         <td className="p-3 sticky left-[88px] z-10 bg-white border-r border-slate-100">
-                          <div className="font-bold text-slate-800">{row.nama}</div>
+                          <div className="font-bold text-slate-800">
+                            {row.nama}
+                          </div>
                         </td>
                         {rekapPenguji.dates.map((date) => {
                           const count = row.counts[date] || 0;
-                          const keteranganText = (row.keteranganByDate[date] || [])
-                            .map((keterangan) => displayKategori(keterangan as KategoriUjian))
-                            .join(', ');
+                          const keteranganText = (
+                            row.keteranganByDate[date] || []
+                          )
+                            .map((keterangan) =>
+                              displayKategori(keterangan as KategoriUjian),
+                            )
+                            .join(", ");
                           return (
                             <React.Fragment key={date}>
                               <td className="p-3 text-[10px] text-slate-600 leading-snug border-l border-slate-100">
-                                {keteranganText || <span className="text-slate-300">-</span>}
+                                {keteranganText || (
+                                  <span className="text-slate-300">-</span>
+                                )}
                               </td>
                               <td className="p-3 text-center">
                                 {count > 0 ? (
                                   <span
                                     className={`inline-flex min-w-7 justify-center px-2 py-0.5 rounded-md font-bold font-mono ${
-                                      row.peran === 'Penguji'
-                                        ? 'bg-blue-50 text-[#1E3A8A]'
-                                        : 'bg-emerald-50 text-emerald-700'
+                                      row.peran === "Penguji"
+                                        ? "bg-blue-50 text-[#1E3A8A]"
+                                        : "bg-emerald-50 text-emerald-700"
                                     }`}
                                   >
                                     {count}
@@ -2651,7 +3361,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-3 text-center bg-slate-50">
                           <span
                             className={`inline-flex min-w-8 justify-center px-2 py-0.5 rounded-md text-white font-bold font-mono ${
-                              row.peran === 'Penguji' ? 'bg-[#1E3A8A]' : 'bg-emerald-600'
+                              row.peran === "Penguji"
+                                ? "bg-[#1E3A8A]"
+                                : "bg-emerald-600"
                             }`}
                           >
                             {row.total}
@@ -2683,9 +3395,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <p className="px-4 py-3 text-[11px] leading-relaxed text-slate-500 border-t border-slate-200">
-                Penguji: angka adalah siswa unik yang dinilai per tanggal, keterangan berisi kategori ujian.
-                Timekeeper: angka adalah siswa unik yang presensinya dicatat per tanggal (Siswa atau Walmur dihitung sekali).
-                Total adalah penjumlahan angka per tanggal.
+                Penguji: angka adalah siswa unik yang dinilai per tanggal,
+                keterangan berisi kategori ujian. Timekeeper: angka adalah siswa
+                unik yang presensinya dicatat per tanggal (Siswa atau Walmur
+                dihitung sekali). Total adalah penjumlahan angka per tanggal.
               </p>
             </div>
           )}
@@ -2693,7 +3406,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* TAB 4B: MONITORING & BROADCAST WA (cek silang presensi <-> nilai) */}
-      {activeSubTab === 'broadcast' && (
+      {activeSubTab === "broadcast" && (
         <div className="space-y-6">
           {/* Filter bar */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-3">
@@ -2710,7 +3423,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex items-center gap-2 w-full md:w-auto">
               <select
                 value={broadcastJenjang}
-                onChange={(e) => setBroadcastJenjang(e.target.value as 'Semua' | 'SD' | 'SMP' | 'SMA')}
+                onChange={(e) =>
+                  setBroadcastJenjang(
+                    e.target.value as "Semua" | "SD" | "SMP" | "SMA",
+                  )
+                }
                 className="flex-1 md:flex-none px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] cursor-pointer"
                 title="Filter jenjang"
               >
@@ -2727,7 +3444,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               >
                 <option value="Semua">Kelas: Semua</option>
                 {broadcastKelasOptions.map((k) => (
-                  <option key={k} value={k}>Kelas: {k}</option>
+                  <option key={k} value={k}>
+                    Kelas: {k}
+                  </option>
                 ))}
               </select>
             </div>
@@ -2737,19 +3456,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-white rounded-2xl p-4 border border-rose-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kelompok A — Sudah Presensi, Nilai Belum Lengkap</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Kelompok A — Sudah Presensi, Nilai Belum Lengkap
+                </span>
                 <Clock className="w-4 h-4 text-rose-500" />
               </div>
-              <span className="text-2xl font-extrabold text-rose-700 font-mono">{broadcastRowsA.length}</span>
-              <p className="text-[10px] text-slate-400">siswa • pesan ke {broadcastPengujiGroups.length} penguji</p>
+              <span className="text-2xl font-extrabold text-rose-700 font-mono">
+                {broadcastRowsA.length}
+              </span>
+              <p className="text-[10px] text-slate-400">
+                siswa • pesan ke {broadcastPengujiGroups.length} penguji
+              </p>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kelompok B — Nilai Ada, Presensi Pasangan Belum</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Kelompok B — Nilai Ada, Presensi Pasangan Belum
+                </span>
                 <Clock className="w-4 h-4 text-amber-500" />
               </div>
-              <span className="text-2xl font-extrabold text-amber-700 font-mono">{broadcastRowsB.length}</span>
-              <p className="text-[10px] text-slate-400">siswa • pesan ke {broadcastTimekeeperGroups.length} timekeeper</p>
+              <span className="text-2xl font-extrabold text-amber-700 font-mono">
+                {broadcastRowsB.length}
+              </span>
+              <p className="text-[10px] text-slate-400">
+                siswa • pesan ke {broadcastTimekeeperGroups.length} timekeeper
+              </p>
             </div>
           </div>
 
@@ -2761,10 +3492,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Kelompok A — Sudah Presensi, Nilai Belum Lengkap
                 </h3>
                 <p className="text-[11px] text-rose-700 mt-0.5">
-                  Siswa sudah hadir tapi nilai belum diinput • tindak lanjut ke penguji penanggung jawab.
+                  Siswa sudah hadir tapi nilai belum diinput • tindak lanjut ke
+                  penguji penanggung jawab.
                 </p>
               </div>
-              <span className="text-xs text-rose-700 font-mono font-bold shrink-0">{broadcastRowsA.length} siswa</span>
+              <span className="text-xs text-rose-700 font-mono font-bold shrink-0">
+                {broadcastRowsA.length} siswa
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -2781,10 +3515,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <tbody className="divide-y divide-slate-200">
                   {broadcastRowsA.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                      <td
+                        colSpan={6}
+                        className="p-6 text-center text-slate-400"
+                      >
                         <CheckCircle2 className="w-5 h-5 mx-auto mb-1.5 text-emerald-500" />
-                        <span className="block text-xs font-bold text-slate-600">Semua siswa yang hadir sudah lengkap nilainya.</span>
-                        <span className="block text-[11px] mt-0.5">Tidak ada yang perlu dibroadcast ke penguji.</span>
+                        <span className="block text-xs font-bold text-slate-600">
+                          Semua siswa yang hadir sudah lengkap nilainya.
+                        </span>
+                        <span className="block text-[11px] mt-0.5">
+                          Tidak ada yang perlu dibroadcast ke penguji.
+                        </span>
                       </td>
                     </tr>
                   ) : (
@@ -2792,13 +3533,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       const jenjang = getJenjangFromKelas(r.siswa.kelas);
                       return (
                         <tr key={r.siswa.id} className="hover:bg-slate-50">
-                          <td className="p-3 font-mono font-bold text-[#1E3A8A]">{r.siswa.id}</td>
-                          <td className="p-3 font-bold text-slate-800">{r.siswa.nama_siswa}</td>
+                          <td className="p-3 font-mono font-bold text-[#1E3A8A]">
+                            {r.siswa.id}
+                          </td>
+                          <td className="p-3 font-bold text-slate-800">
+                            {r.siswa.nama_siswa}
+                          </td>
                           <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === 'SD' ? 'bg-sky-100 text-sky-700' : jenjang === 'SMP' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-purple-100 text-purple-800'}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === "SD" ? "bg-sky-100 text-sky-700" : jenjang === "SMP" ? "bg-blue-100 text-[#1E3A8A]" : "bg-purple-100 text-purple-800"}`}
+                            >
                               {jenjang}
                             </span>
-                            <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">{formatKelas(r.siswa.kelas)}</span>
+                            <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">
+                              {formatKelas(r.siswa.kelas)}
+                            </span>
                           </td>
                           <td className="p-3">
                             {r.presensiSiswa ? (
@@ -2825,11 +3574,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <td className="p-3">
                             <div className="space-y-1">
                               {r.missing.map((m) => (
-                                <div key={m.kategori} className="flex items-center gap-1.5 flex-wrap">
+                                <div
+                                  key={m.kategori}
+                                  className="flex items-center gap-1.5 flex-wrap"
+                                >
                                   <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 font-bold text-[10px]">
                                     {displayKategori(m.kategori)}
                                   </span>
-                                  <span className="text-[10px] text-slate-600">• {m.penguji}</span>
+                                  <span className="text-[10px] text-slate-600">
+                                    • {m.penguji}
+                                  </span>
                                 </div>
                               ))}
                               <span className="block text-[10px] text-slate-400 font-mono mt-0.5">
@@ -2854,10 +3608,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Kelompok B — Ada Nilai, Presensi Pasangannya Belum
                 </h3>
                 <p className="text-[11px] text-amber-800 mt-0.5">
-                  Nilai ujian siswa harus dipasangkan presensi Siswa; nilai interview harus dipasangkan presensi Walmur • tindak lanjut ke timekeeper.
+                  Nilai ujian siswa harus dipasangkan presensi Siswa; nilai
+                  interview harus dipasangkan presensi Walmur • tindak lanjut ke
+                  timekeeper.
                 </p>
               </div>
-              <span className="text-xs text-amber-800 font-mono font-bold shrink-0">{broadcastRowsB.length} siswa</span>
+              <span className="text-xs text-amber-800 font-mono font-bold shrink-0">
+                {broadcastRowsB.length} siswa
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -2874,10 +3632,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <tbody className="divide-y divide-slate-200">
                   {broadcastRowsB.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                      <td
+                        colSpan={6}
+                        className="p-6 text-center text-slate-400"
+                      >
                         <CheckCircle2 className="w-5 h-5 mx-auto mb-1.5 text-emerald-500" />
-                        <span className="block text-xs font-bold text-slate-600">Tidak ada anomali.</span>
-                        <span className="block text-[11px] mt-0.5">Semua nilai yang terisi didukung catatan kehadiran pasangannya.</span>
+                        <span className="block text-xs font-bold text-slate-600">
+                          Tidak ada anomali.
+                        </span>
+                        <span className="block text-[11px] mt-0.5">
+                          Semua nilai yang terisi didukung catatan kehadiran
+                          pasangannya.
+                        </span>
                       </td>
                     </tr>
                   ) : (
@@ -2885,18 +3651,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       const jenjang = getJenjangFromKelas(r.siswa.kelas);
                       return (
                         <tr key={r.siswa.id} className="hover:bg-slate-50">
-                          <td className="p-3 font-mono font-bold text-[#1E3A8A]">{r.siswa.id}</td>
-                          <td className="p-3 font-bold text-slate-800">{r.siswa.nama_siswa}</td>
+                          <td className="p-3 font-mono font-bold text-[#1E3A8A]">
+                            {r.siswa.id}
+                          </td>
+                          <td className="p-3 font-bold text-slate-800">
+                            {r.siswa.nama_siswa}
+                          </td>
                           <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === 'SD' ? 'bg-sky-100 text-sky-700' : jenjang === 'SMP' ? 'bg-blue-100 text-[#1E3A8A]' : 'bg-purple-100 text-purple-800'}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${jenjang === "SD" ? "bg-sky-100 text-sky-700" : jenjang === "SMP" ? "bg-blue-100 text-[#1E3A8A]" : "bg-purple-100 text-purple-800"}`}
+                            >
                               {jenjang}
                             </span>
-                            <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">{formatKelas(r.siswa.kelas)}</span>
+                            <span className="block mt-0.5 text-[10px] text-slate-500 font-semibold">
+                              {formatKelas(r.siswa.kelas)}
+                            </span>
                           </td>
                           <td className="p-3">
                             <div className="flex flex-wrap gap-1">
                               {r.filled.map((kat) => (
-                                <span key={kat} className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                <span
+                                  key={kat}
+                                  className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-800 font-bold text-[10px]"
+                                >
                                   {displayKategori(kat)}
                                 </span>
                               ))}
@@ -2909,7 +3686,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 font-bold text-[10px]">
                                     Presensi Siswa belum
                                   </span>
-                                  <span className="text-[10px] text-slate-600">• {r.masalahSiswa.map(displayKategori).join(', ')}</span>
+                                  <span className="text-[10px] text-slate-600">
+                                    •{" "}
+                                    {r.masalahSiswa
+                                      .map(displayKategori)
+                                      .join(", ")}
+                                  </span>
                                 </div>
                               )}
                               {r.masalahWalmur.length > 0 && (
@@ -2917,14 +3699,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   <span className="px-2 py-0.5 rounded-lg bg-orange-100 text-orange-800 font-bold text-[10px]">
                                     Presensi Walmur belum
                                   </span>
-                                  <span className="text-[10px] text-slate-600">• {r.masalahWalmur.map(displayKategori).join(', ')}</span>
+                                  <span className="text-[10px] text-slate-600">
+                                    •{" "}
+                                    {r.masalahWalmur
+                                      .map(displayKategori)
+                                      .join(", ")}
+                                  </span>
                                 </div>
                               )}
                             </div>
                           </td>
                           <td className="p-3 text-slate-700 space-y-0.5">
-                            <div className="text-[11px]"><span className="font-bold text-slate-500">Siswa:</span> {r.timekeeperSiswa}</div>
-                            <div className="text-[11px]"><span className="font-bold text-slate-500">Walmur:</span> {r.timekeeperWalmur}</div>
+                            <div className="text-[11px]">
+                              <span className="font-bold text-slate-500">
+                                Siswa:
+                              </span>{" "}
+                              {r.timekeeperSiswa}
+                            </div>
+                            <div className="text-[11px]">
+                              <span className="font-bold text-slate-500">
+                                Walmur:
+                              </span>{" "}
+                              {r.timekeeperWalmur}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2944,9 +3741,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <MessageCircle className="w-4 h-4 text-[#1E3A8A]" />
                   <div>
                     <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
-                      Pesan Broadcast — Penguji ({broadcastPengujiGroups.length} orang)
+                      Pesan Broadcast — Penguji ({broadcastPengujiGroups.length}{" "}
+                      orang)
                     </h3>
-                    <p className="text-[11px] text-slate-500">Salin lalu tempel (paste) ke WhatsApp masing-masing penguji.</p>
+                    <p className="text-[11px] text-slate-500">
+                      Salin lalu tempel (paste) ke WhatsApp masing-masing
+                      penguji.
+                    </p>
                   </div>
                 </div>
                 <button
@@ -2968,21 +3769,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   broadcastPengujiGroups.map((g) => {
                     const msg = buildPesanPenguji(g.penguji, g.items);
                     return (
-                      <div key={g.penguji} className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div
+                        key={g.penguji}
+                        className="border border-slate-200 rounded-xl overflow-hidden"
+                      >
                         <div className="px-3 py-2 bg-blue-50/70 border-b border-slate-200 flex items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <strong className="text-xs text-slate-900 block truncate">{g.penguji}</strong>
-                            <span className="text-[10px] text-slate-500">{g.items.length} pos belum terinput</span>
+                            <strong className="text-xs text-slate-900 block truncate">
+                              {g.penguji}
+                            </strong>
+                            <span className="text-[10px] text-slate-500">
+                              {g.items.length} pos belum terinput
+                            </span>
                           </div>
                           <button
-                            onClick={() => handleCopyText(msg, `Pesan untuk ${g.penguji}`)}
+                            onClick={() =>
+                              handleCopyText(msg, `Pesan untuk ${g.penguji}`)
+                            }
                             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                           >
                             <Copy className="w-3.5 h-3.5" />
                             <span>Salin</span>
                           </button>
                         </div>
-                        <pre className="p-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">{msg}</pre>
+                        <pre className="p-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">
+                          {msg}
+                        </pre>
                       </div>
                     );
                   })
@@ -2997,9 +3809,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <MessageCircle className="w-4 h-4 text-[#D97706]" />
                   <div>
                     <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
-                      Pesan Broadcast — Timekeeper ({broadcastTimekeeperGroups.length} orang)
+                      Pesan Broadcast — Timekeeper (
+                      {broadcastTimekeeperGroups.length} orang)
                     </h3>
-                    <p className="text-[11px] text-slate-500">Salin lalu tempel (paste) ke WhatsApp masing-masing timekeeper.</p>
+                    <p className="text-[11px] text-slate-500">
+                      Salin lalu tempel (paste) ke WhatsApp masing-masing
+                      timekeeper.
+                    </p>
                   </div>
                 </div>
                 <button
@@ -3021,21 +3837,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   broadcastTimekeeperGroups.map((g) => {
                     const msg = buildPesanTimekeeper(g.timekeeper, g.items);
                     return (
-                      <div key={g.timekeeper} className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div
+                        key={g.timekeeper}
+                        className="border border-slate-200 rounded-xl overflow-hidden"
+                      >
                         <div className="px-3 py-2 bg-amber-50/70 border-b border-slate-200 flex items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <strong className="text-xs text-slate-900 block truncate">{g.timekeeper}</strong>
-                            <span className="text-[10px] text-slate-500">{g.items.length} catatan perlu dicek</span>
+                            <strong className="text-xs text-slate-900 block truncate">
+                              {g.timekeeper}
+                            </strong>
+                            <span className="text-[10px] text-slate-500">
+                              {g.items.length} catatan perlu dicek
+                            </span>
                           </div>
                           <button
-                            onClick={() => handleCopyText(msg, `Pesan untuk ${g.timekeeper}`)}
+                            onClick={() =>
+                              handleCopyText(msg, `Pesan untuk ${g.timekeeper}`)
+                            }
                             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                           >
                             <Copy className="w-3.5 h-3.5" />
                             <span>Salin</span>
                           </button>
                         </div>
-                        <pre className="p-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">{msg}</pre>
+                        <pre className="p-3 text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap font-sans">
+                          {msg}
+                        </pre>
                       </div>
                     );
                   })
@@ -3047,7 +3874,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* TAB 6: EXPORT DATA */}
-      {activeSubTab === 'export' && (
+      {activeSubTab === "export" && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-amber-50 text-[#D97706] flex items-center justify-center">
@@ -3058,7 +3885,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Ekspor Data Rekapitulasi SPMB
               </h3>
               <p className="text-xs text-slate-500">
-                Unduh seluruh data jadwal, kehadiran, dan penilaian peserta ke format Microsoft Excel (.xlsx)
+                Unduh seluruh data jadwal, kehadiran, dan penilaian peserta ke
+                format Microsoft Excel (.xlsx)
               </p>
             </div>
           </div>
@@ -3066,10 +3894,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 text-xs text-blue-950 space-y-2">
             <div className="font-bold flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-[#1E3A8A]" />
-              <span>Format Rekapitulasi Terpadu Al-Wildan 29</span>
+              <span>Format Rekapitulasi Terpadu AL-WILDAN 29</span>
             </div>
             <p className="leading-relaxed">
-              File Excel yang diunduh mencakup 4 worksheet terpisah: <strong>web_jadwal</strong>, <strong>web_presensi</strong>, <strong>web_nilai</strong> (termasuk rincian skor JSON per pos ujian), dan <strong>web_tidak_hadir</strong> (ID, Nama, Kelas siswa jadwal Aktif yang belum presensi Siswa).
+              File Excel yang diunduh mencakup 4 worksheet terpisah:{" "}
+              <strong>web_jadwal</strong>, <strong>web_presensi</strong>,{" "}
+              <strong>web_nilai</strong> (termasuk rincian skor JSON per pos
+              ujian), dan <strong>web_tidak_hadir</strong> (ID, Nama, Kelas
+              siswa jadwal Aktif yang belum presensi Siswa).
             </p>
           </div>
 
@@ -3084,7 +3916,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* TAB 6: GOOGLE APPS SCRIPT BACKEND & DEPLOYMENT */}
-      {activeSubTab === 'gas' && (
+      {activeSubTab === "gas" && (
         <div className="space-y-6">
           {/* Firebase Firestore Realtime Card */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
@@ -3095,27 +3927,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Firebase Cloud Firestore (Real-Time CRUD Instan)
                 </h3>
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
-                isFirebaseConfigured 
-                  ? 'bg-emerald-100 text-emerald-800' 
-                  : 'bg-amber-100 text-amber-800'
-              }`}>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
+                  isFirebaseConfigured
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-amber-100 text-amber-800"
+                }`}
+              >
                 <Zap className="w-3 h-3" />
-                {isFirebaseConfigured ? 'Aktif Real-Time' : 'Menunggu Konfigurasi .env'}
+                {isFirebaseConfigured
+                  ? "Aktif Real-Time"
+                  : "Menunggu Konfigurasi .env"}
               </span>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Dengan Firebase Firestore, seluruh aksi penilaian dan presensi tersimpan secara instan (&lt;100ms) tanpa jeda reload antarmuka dan otomatis tersinkron ke semua perangkat petugas secara real-time.
+              Dengan Firebase Firestore, seluruh aksi penilaian dan presensi
+              tersimpan secara instan (&lt;100ms) tanpa jeda reload antarmuka
+              dan otomatis tersinkron ke semua perangkat petugas secara
+              real-time.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
               <div className="text-xs text-slate-700">
-                <strong>Status Database:</strong>{' '}
+                <strong>Status Database:</strong>{" "}
                 {isFirebaseConfigured ? (
-                  <span className="text-emerald-700 font-semibold">Tersambung ke Firestore. Real-time listener aktif.</span>
+                  <span className="text-emerald-700 font-semibold">
+                    Tersambung ke Firestore. Real-time listener aktif.
+                  </span>
                 ) : (
-                  <span className="text-amber-700 font-semibold">Menggunakan Spreadsheet/Lokal. Masukkan kredensial Firebase di .env untuk mengaktifkan.</span>
+                  <span className="text-amber-700 font-semibold">
+                    Menggunakan Spreadsheet/Lokal. Masukkan kredensial Firebase
+                    di .env untuk mengaktifkan.
+                  </span>
                 )}
               </div>
 
@@ -3134,10 +3978,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onClick={handleMigrateToFirebase}
                   disabled={isMigratingFirebase || !isFirebaseConfigured}
                   className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                  title={!isFirebaseConfigured ? 'Konfigurasikan Firebase di .env terlebih dahulu' : 'Salin seluruh data spreadsheet ke Firestore'}
+                  title={
+                    !isFirebaseConfigured
+                      ? "Konfigurasikan Firebase di .env terlebih dahulu"
+                      : "Salin seluruh data spreadsheet ke Firestore"
+                  }
                 >
-                  <Flame className={`w-4 h-4 ${isMigratingFirebase ? 'animate-bounce' : ''}`} />
-                  <span>{isMigratingFirebase ? 'Memigrasikan Data...' : '⚡ Migrasi Spreadsheet (1-Click)'}</span>
+                  <Flame
+                    className={`w-4 h-4 ${isMigratingFirebase ? "animate-bounce" : ""}`}
+                  />
+                  <span>
+                    {isMigratingFirebase
+                      ? "Memigrasikan Data..."
+                      : "⚡ Migrasi Spreadsheet (1-Click)"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -3158,13 +4012,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Daftar penguji dan email resmi dimaintain langsung melalui Google Spreadsheet pada sheet <strong className="text-slate-800">web_penguji</strong>. Data penguji di Firestore otomatis disinkronkan saat dashboard dibuka, atau dapat disinkronkan secara manual melalui tombol di bawah:
+              Daftar penguji dan email resmi dimaintain langsung melalui Google
+              Spreadsheet pada sheet{" "}
+              <strong className="text-slate-800">web_penguji</strong>. Data
+              penguji di Firestore otomatis disinkronkan saat dashboard dibuka,
+              atau dapat disinkronkan secara manual melalui tombol di bawah:
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
               <div className="text-xs text-slate-700">
                 <span>Total Penguji Terdaftar: </span>
-                <strong className="text-blue-900 font-bold">{pengujiList.length} Petugas</strong>
+                <strong className="text-blue-900 font-bold">
+                  {pengujiList.length} Petugas
+                </strong>
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -3184,8 +4044,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   disabled={isSyncingPenguji}
                   className="px-4 py-2 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPenguji ? 'animate-spin' : ''}`} />
-                  <span>{isSyncingPenguji ? 'Menyinkronkan...' : 'Sinkronkan Penguji'}</span>
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${isSyncingPenguji ? "animate-spin" : ""}`}
+                  />
+                  <span>
+                    {isSyncingPenguji
+                      ? "Menyinkronkan..."
+                      : "Sinkronkan Penguji"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -3195,20 +4061,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-xs text-slate-600 space-y-2">
             <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Arsitektur Sistem: Full Firebase Firestore & Spreadsheet Sync</span>
+              <span>
+                Arsitektur Sistem: Full Firebase Firestore & Spreadsheet Sync
+              </span>
             </h4>
             <p className="leading-relaxed">
-              Seluruh operasi harian seperti input nilai penguji, presensi timekeeper, dan manajemen jadwal siswa kini berjalan 100% langsung di <strong>Firebase Cloud Firestore</strong> dengan kecepatan instan (&lt;100ms) dan sinkronisasi real-time tanpa jeda antrean.
+              Seluruh operasi harian seperti input nilai penguji, presensi
+              timekeeper, dan manajemen jadwal siswa kini berjalan 100% langsung
+              di <strong>Firebase Cloud Firestore</strong> dengan kecepatan
+              instan (&lt;100ms) dan sinkronisasi real-time tanpa jeda antrean.
             </p>
             <p className="leading-relaxed text-slate-500 text-[11px]">
-              Google Spreadsheet difungsikan secara khusus sebagai master data untuk sheet <strong className="text-slate-700">web_penguji</strong> (daftar petugas penguji). Script lama (Code.gs) sudah tidak lagi menangani operasi tulis untuk menjamin integritas data dan mencegah konflik antar perangkat.
+              Google Spreadsheet difungsikan secara khusus sebagai master data
+              untuk sheet{" "}
+              <strong className="text-slate-700">web_penguji</strong> (daftar
+              petugas penguji). Script lama (Code.gs) sudah tidak lagi menangani
+              operasi tulis untuk menjamin integritas data dan mencegah konflik
+              antar perangkat.
             </p>
           </div>
         </div>
       )}
 
       {/* TAB 7: CETAK RUANGAN */}
-      {activeSubTab === 'cetak' && (
+      {activeSubTab === "cetak" && (
         <div className="space-y-6">
           {/* Header Card Cetak Ruangan */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-5">
@@ -3219,13 +4095,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-extrabold text-slate-900">Cetak Daftar Siswa per Ruangan</h3>
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      Cetak Daftar Siswa per Ruangan
+                    </h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-[#1E3A8A] rounded-full border border-blue-200">
                       Dokumen Pintu & Meja
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                    Format cetak resmi berlogo Al-Wildan 29 per lembar ruangan, lengkap dengan jadwal peserta, penguji pos, dan timekeeper.
+                    Format cetak resmi berlogo AL-WILDAN 29 per lembar ruangan,
+                    lengkap dengan jadwal peserta, penguji pos, dan timekeeper.
                   </p>
                 </div>
               </div>
@@ -3234,7 +4113,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
-                  onClick={() => triggerPrint('siswa', null)}
+                  onClick={() => triggerPrint("siswa", null)}
                   disabled={siswaRoomGroups.length === 0}
                   className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap active:scale-[0.99]"
                   title="Cetak seluruh daftar ruang ujian siswa"
@@ -3248,7 +4127,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => triggerPrint('walmur', null)}
+                  onClick={() => triggerPrint("walmur", null)}
                   disabled={walmurRoomGroups.length === 0}
                   className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#D97706] hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap active:scale-[0.99]"
                   title="Cetak seluruh daftar ruang wawancara orang tua"
@@ -3268,11 +4147,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-start overflow-x-auto max-w-full">
                 <button
                   type="button"
-                  onClick={() => setCetakViewFilter('all')}
+                  onClick={() => setCetakViewFilter("all")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    cetakViewFilter === 'all'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
+                    cetakViewFilter === "all"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   Semua ({siswaRoomGroups.length + walmurRoomGroups.length})
@@ -3280,34 +4159,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setCetakViewFilter('siswa')}
+                  onClick={() => setCetakViewFilter("siswa")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                    cetakViewFilter === 'siswa'
-                      ? 'bg-[#1E3A8A] text-white shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
+                    cetakViewFilter === "siswa"
+                      ? "bg-[#1E3A8A] text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <span>Ruang Siswa</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    cetakViewFilter === 'siswa' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                      cetakViewFilter === "siswa"
+                        ? "bg-blue-800 text-white"
+                        : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
                     {siswaRoomGroups.length}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setCetakViewFilter('walmur')}
+                  onClick={() => setCetakViewFilter("walmur")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                    cetakViewFilter === 'walmur'
-                      ? 'bg-[#D97706] text-white shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
+                    cetakViewFilter === "walmur"
+                      ? "bg-[#D97706] text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <span>Ruang Wawancara</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    cetakViewFilter === 'walmur' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                      cetakViewFilter === "walmur"
+                        ? "bg-amber-700 text-white"
+                        : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
                     {walmurRoomGroups.length}
                   </span>
                 </button>
@@ -3344,7 +4231,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {cetakSearch && (
                     <button
                       type="button"
-                      onClick={() => setCetakSearch('')}
+                      onClick={() => setCetakSearch("")}
                       className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
                       title="Hapus pencarian"
                     >
@@ -3353,13 +4240,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   )}
                 </div>
 
-                {(cetakDateFilter || cetakSearch || cetakViewFilter !== 'all') && (
+                {(cetakDateFilter ||
+                  cetakSearch ||
+                  cetakViewFilter !== "all") && (
                   <button
                     type="button"
                     onClick={() => {
-                      setCetakDateFilter('');
-                      setCetakSearch('');
-                      setCetakViewFilter('all');
+                      setCetakDateFilter("");
+                      setCetakSearch("");
+                      setCetakViewFilter("all");
                     }}
                     className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                     title="Reset filter cetak ruangan"
@@ -3375,12 +4264,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Daftar Ruangan */}
           <div className="space-y-6">
             {/* Bagian 1: Ruang Ujian Siswa */}
-            {(cetakViewFilter === 'all' || cetakViewFilter === 'siswa') && (
+            {(cetakViewFilter === "all" || cetakViewFilter === "siswa") && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#1E3A8A]"></span>
-                    <span>Ruang Ujian Siswa ({siswaRoomGroups.length} Ruangan)</span>
+                    <span>
+                      Ruang Ujian Siswa ({siswaRoomGroups.length} Ruangan)
+                    </span>
                   </h4>
                   {cetakDateFilter && (
                     <span className="text-[11px] text-slate-500 font-medium">
@@ -3391,13 +4282,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {siswaRoomGroups.length === 0 ? (
                   <div className="bg-white rounded-2xl p-8 border border-dashed border-slate-300 text-center text-xs text-slate-500 space-y-1">
-                    <p className="font-semibold text-slate-700">Tidak ada ruangan ujian siswa yang cocok.</p>
-                    <p className="text-[11px] text-slate-400">Pastikan jadwal siswa telah memiliki nomor ruangan ujian.</p>
+                    <p className="font-semibold text-slate-700">
+                      Tidak ada ruangan ujian siswa yang cocok.
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Pastikan jadwal siswa telah memiliki nomor ruangan ujian.
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                    {siswaRoomGroups.map(g => (
-                      <div key={'s-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+                    {siswaRoomGroups.map((g) => (
+                      <div
+                        key={"s-" + g.room}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between"
+                      >
                         <div>
                           {/* Card Header */}
                           <div className="bg-[#1E3A8A] text-white px-4 py-3 flex items-center justify-between">
@@ -3409,12 +4307,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </span>
                               </div>
                               <div className="text-[10px] text-blue-200 mt-0.5">
-                                {formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'}
+                                {formatTanggalUjian(g.date) ||
+                                  "Tanggal tidak tercantum"}
                               </div>
                             </div>
                             <button
                               type="button"
-                              onClick={() => triggerPrint('siswa', g.room)}
+                              onClick={() => triggerPrint("siswa", g.room)}
                               className="px-3 py-1.5 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
                               title={`Cetak lembar ${g.room}`}
                             >
@@ -3437,7 +4336,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {printRoomRows(g.siswa, 'siswa')}
+                                {printRoomRows(g.siswa, "siswa")}
                               </tbody>
                             </table>
                           </div>
@@ -3446,16 +4345,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {/* Petugas Ruangan Footer */}
                         <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-600 space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500 font-medium">Penguji Al-Qur'an / Bahasa Arab:</span>
-                            <strong className="text-slate-900">{g.siswa[0]?.penguji_alq_arab || '-'}</strong>
+                            <span className="text-slate-500 font-medium">
+                              Penguji Al-Qur'an / Bahasa Arab:
+                            </span>
+                            <strong className="text-slate-900">
+                              {g.siswa[0]?.penguji_alq_arab || "-"}
+                            </strong>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500 font-medium">Penguji Calistung / English:</span>
-                            <strong className="text-slate-900">{g.siswa[0]?.penguji_catung_eng || '-'}</strong>
+                            <span className="text-slate-500 font-medium">
+                              Penguji Calistung / English:
+                            </span>
+                            <strong className="text-slate-900">
+                              {g.siswa[0]?.penguji_catung_eng || "-"}
+                            </strong>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500 font-medium">Timekeeper Siswa:</span>
-                            <strong className="text-[#1E3A8A]">{g.siswa[0]?.timekeeper_siswa || '-'}</strong>
+                            <span className="text-slate-500 font-medium">
+                              Timekeeper Siswa:
+                            </span>
+                            <strong className="text-[#1E3A8A]">
+                              {g.siswa[0]?.timekeeper_siswa || "-"}
+                            </strong>
                           </div>
                         </div>
                       </div>
@@ -3466,12 +4377,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
 
             {/* Bagian 2: Ruang Wawancara Orang Tua */}
-            {(cetakViewFilter === 'all' || cetakViewFilter === 'walmur') && (
+            {(cetakViewFilter === "all" || cetakViewFilter === "walmur") && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]"></span>
-                    <span>Ruang Wawancara Orang Tua ({walmurRoomGroups.length} Ruangan)</span>
+                    <span>
+                      Ruang Wawancara Orang Tua ({walmurRoomGroups.length}{" "}
+                      Ruangan)
+                    </span>
                   </h4>
                   {cetakDateFilter && (
                     <span className="text-[11px] text-slate-500 font-medium">
@@ -3482,13 +4396,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {walmurRoomGroups.length === 0 ? (
                   <div className="bg-white rounded-2xl p-8 border border-dashed border-slate-300 text-center text-xs text-slate-500 space-y-1">
-                    <p className="font-semibold text-slate-700">Tidak ada ruang wawancara orang tua yang cocok.</p>
-                    <p className="text-[11px] text-slate-400">Pastikan jadwal peserta telah memiliki ruangan wawancara wali.</p>
+                    <p className="font-semibold text-slate-700">
+                      Tidak ada ruang wawancara orang tua yang cocok.
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Pastikan jadwal peserta telah memiliki ruangan wawancara
+                      wali.
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                    {walmurRoomGroups.map(g => (
-                      <div key={'w-' + g.room} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+                    {walmurRoomGroups.map((g) => (
+                      <div
+                        key={"w-" + g.room}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between"
+                      >
                         <div>
                           {/* Card Header */}
                           <div className="bg-[#D97706] text-white px-4 py-3 flex items-center justify-between">
@@ -3500,12 +4422,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </span>
                               </div>
                               <div className="text-[10px] text-amber-100 mt-0.5">
-                                {formatTanggalUjian(g.date) || 'Tanggal tidak tercantum'}
+                                {formatTanggalUjian(g.date) ||
+                                  "Tanggal tidak tercantum"}
                               </div>
                             </div>
                             <button
                               type="button"
-                              onClick={() => triggerPrint('walmur', g.room)}
+                              onClick={() => triggerPrint("walmur", g.room)}
                               className="px-3 py-1.5 bg-white text-[#D97706] hover:bg-amber-50 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
                               title={`Cetak lembar ${g.room}`}
                             >
@@ -3528,7 +4451,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {printRoomRows(g.siswa, 'walmur')}
+                                {printRoomRows(g.siswa, "walmur")}
                               </tbody>
                             </table>
                           </div>
@@ -3537,12 +4460,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {/* Petugas Wawancara Footer */}
                         <div className="px-4 py-3 bg-amber-50/40 border-t border-amber-100 text-[11px] text-slate-600 space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500 font-medium">Pewawancara Orang Tua:</span>
-                            <strong className="text-slate-900">{g.siswa[0]?.interview_walmur || '-'}</strong>
+                            <span className="text-slate-500 font-medium">
+                              Pewawancara Orang Tua:
+                            </span>
+                            <strong className="text-slate-900">
+                              {g.siswa[0]?.interview_walmur || "-"}
+                            </strong>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500 font-medium">Timekeeper Orang Tua:</span>
-                            <strong className="text-[#D97706]">{g.siswa[0]?.timekeeper_walmur || '-'}</strong>
+                            <span className="text-slate-500 font-medium">
+                              Timekeeper Orang Tua:
+                            </span>
+                            <strong className="text-[#D97706]">
+                              {g.siswa[0]?.timekeeper_walmur || "-"}
+                            </strong>
                           </div>
                         </div>
                       </div>
@@ -3557,8 +4488,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* PRINT LAYER */}
       <div id="print-area">
-        {printTarget?.group === 'siswa' && renderPrintBlocks('siswa')}
-        {printTarget?.group === 'walmur' && renderPrintBlocks('walmur')}
+        {printTarget?.group === "siswa" && renderPrintBlocks("siswa")}
+        {printTarget?.group === "walmur" && renderPrintBlocks("walmur")}
       </div>
 
       {/* MODAL: Tambah/Edit Siswa Jadwal */}
@@ -3567,7 +4498,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 my-8">
             <div className="bg-[#1E3A8A] text-white p-5 flex items-center justify-between border-b-4 border-[#D97706]">
               <h3 className="font-extrabold text-base">
-                {isEditMode ? 'Edit Data Calon Siswa' : 'Tambah Calon Siswa Baru'}
+                {isEditMode
+                  ? "Edit Data Calon Siswa"
+                  : "Tambah Calon Siswa Baru"}
               </h3>
               <button
                 onClick={() => setIsStudentModalOpen(false)}
@@ -3577,15 +4510,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveStudent} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs text-slate-700">
+            <form
+              onSubmit={handleSaveStudent}
+              className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs text-slate-700"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">ID Siswa</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    ID Siswa
+                  </label>
                   <input
                     type="text"
                     value={studentFormData.id}
                     disabled={isEditMode}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, id: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        id: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:bg-white focus:outline-none"
                     placeholder="Contoh: 27282901001"
                     required
@@ -3593,61 +4536,97 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Nama Lengkap Siswa</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Nama Lengkap Siswa
+                  </label>
                   <input
                     type="text"
                     value={studentFormData.nama_siswa}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, nama_siswa: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        nama_siswa: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold focus:bg-white focus:outline-none"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Unit & Kelas</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Unit & Kelas
+                  </label>
                   <select
                     value={studentFormData.kelas}
                     onChange={(e) => {
                       setStudentFormData({
                         ...studentFormData,
-                        kelas: e.target.value
+                        kelas: e.target.value,
                       });
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                     required
                   >
                     <option value="">-- Pilih Kelas --</option>
-                    {studentFormData.kelas && !STUDENT_CLASS_OPTIONS.some((option) => option.value === studentFormData.kelas) && (
-                      <option value={studentFormData.kelas}>{studentFormData.kelas}</option>
-                    )}
+                    {studentFormData.kelas &&
+                      !STUDENT_CLASS_OPTIONS.some(
+                        (option) => option.value === studentFormData.kelas,
+                      ) && (
+                        <option value={studentFormData.kelas}>
+                          {studentFormData.kelas}
+                        </option>
+                      )}
                     {STUDENT_CLASS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Gelombang</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Gelombang
+                  </label>
                   <input
                     type="text"
                     list="gelombang-options-list"
-                    value={studentFormData.gelombang || ''}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, gelombang: e.target.value })}
+                    value={studentFormData.gelombang || ""}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        gelombang: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold focus:bg-white focus:outline-none"
                     placeholder="Contoh: Gel. 1 2027/2028"
                   />
                   <datalist id="gelombang-options-list">
-                    {Array.from(new Set(jadwalList.map(s => (s.gelombang || '').trim()).filter(Boolean))).map(g => (
+                    {Array.from(
+                      new Set(
+                        jadwalList
+                          .map((s) => (s.gelombang || "").trim())
+                          .filter(Boolean),
+                      ),
+                    ).map((g) => (
                       <option key={g} value={g} />
                     ))}
                   </datalist>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Jenis Kelamin</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Jenis Kelamin
+                  </label>
                   <select
                     value={studentFormData.gender}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, gender: e.target.value as 'L' | 'P' | '' })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        gender: e.target.value as "L" | "P" | "",
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                     required
                   >
@@ -3658,104 +4637,192 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Ruangan Ujian Siswa</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Ruangan Ujian Siswa
+                  </label>
                   <input
                     type="text"
                     value={studentFormData.ruangan_siswa}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, ruangan_siswa: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        ruangan_siswa: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Penguji Pos Qur'an & Arab</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Penguji Pos Qur'an & Arab
+                  </label>
                   <select
                     value={studentFormData.penguji_alq_arab}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, penguji_alq_arab: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        penguji_alq_arab: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   >
                     <option value="">-- Pilih Penguji --</option>
                     {pengujiList.map((p) => (
-                      <option key={`alq-${p.email_penguji}`} value={p.penguji}>{p.penguji}</option>
+                      <option key={`alq-${p.email_penguji}`} value={p.penguji}>
+                        {p.penguji}
+                      </option>
                     ))}
-                    {studentFormData.penguji_alq_arab && !pengujiList.some((p) => p.penguji === studentFormData.penguji_alq_arab) && (
-                      <option value={studentFormData.penguji_alq_arab}>{studentFormData.penguji_alq_arab}</option>
-                    )}
+                    {studentFormData.penguji_alq_arab &&
+                      !pengujiList.some(
+                        (p) => p.penguji === studentFormData.penguji_alq_arab,
+                      ) && (
+                        <option value={studentFormData.penguji_alq_arab}>
+                          {studentFormData.penguji_alq_arab}
+                        </option>
+                      )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Penguji Pos Catung / Eng</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Penguji Pos Catung / Eng
+                  </label>
                   <select
                     value={studentFormData.penguji_catung_eng}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, penguji_catung_eng: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        penguji_catung_eng: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   >
                     <option value="">-- Pilih Penguji --</option>
                     {pengujiList.map((p) => (
-                      <option key={`catung-${p.email_penguji}`} value={p.penguji}>{p.penguji}</option>
+                      <option
+                        key={`catung-${p.email_penguji}`}
+                        value={p.penguji}
+                      >
+                        {p.penguji}
+                      </option>
                     ))}
-                    {studentFormData.penguji_catung_eng && !pengujiList.some((p) => p.penguji === studentFormData.penguji_catung_eng) && (
-                      <option value={studentFormData.penguji_catung_eng}>{studentFormData.penguji_catung_eng}</option>
-                    )}
+                    {studentFormData.penguji_catung_eng &&
+                      !pengujiList.some(
+                        (p) => p.penguji === studentFormData.penguji_catung_eng,
+                      ) && (
+                        <option value={studentFormData.penguji_catung_eng}>
+                          {studentFormData.penguji_catung_eng}
+                        </option>
+                      )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Pewawancara Orang Tua</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Pewawancara Orang Tua
+                  </label>
                   <select
                     value={studentFormData.interview_walmur}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, interview_walmur: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        interview_walmur: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   >
                     <option value="">-- Pilih Pewawancara --</option>
                     {pengujiList.map((p) => (
-                      <option key={`interview-${p.email_penguji}`} value={p.penguji}>{p.penguji}</option>
+                      <option
+                        key={`interview-${p.email_penguji}`}
+                        value={p.penguji}
+                      >
+                        {p.penguji}
+                      </option>
                     ))}
-                    {studentFormData.interview_walmur && !pengujiList.some((p) => p.penguji === studentFormData.interview_walmur) && (
-                      <option value={studentFormData.interview_walmur}>{studentFormData.interview_walmur}</option>
-                    )}
+                    {studentFormData.interview_walmur &&
+                      !pengujiList.some(
+                        (p) => p.penguji === studentFormData.interview_walmur,
+                      ) && (
+                        <option value={studentFormData.interview_walmur}>
+                          {studentFormData.interview_walmur}
+                        </option>
+                      )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Ruangan Wawancara Orang Tua</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Ruangan Wawancara Orang Tua
+                  </label>
                   <input
                     type="text"
                     value={studentFormData.ruangan_walmur}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, ruangan_walmur: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        ruangan_walmur: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Hari & Tanggal Ujian</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Hari & Tanggal Ujian
+                  </label>
                   <input
                     type="date"
                     value={toISODate(studentFormData.hari_tanggal)}
-                    onChange={(e) => setStudentFormData({ ...studentFormData, hari_tanggal: e.target.value })}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        hari_tanggal: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                     required
                   />
                   <p className="mt-1.5 text-[10px] text-slate-500 flex items-center gap-1.5">
-                    {getModeUjianForDate(sesiUjianList, studentFormData.hari_tanggal) === 'Online' ? (
+                    {getModeUjianForDate(
+                      sesiUjianList,
+                      studentFormData.hari_tanggal,
+                    ) === "Online" ? (
                       <Wifi className="w-3 h-3 text-emerald-600" />
                     ) : (
                       <WifiOff className="w-3 h-3 text-slate-400" />
                     )}
-                    Mode sesi: <strong>{getModeUjianForDate(sesiUjianList, studentFormData.hari_tanggal)}</strong>
-                    <span className="text-slate-400">(diatur lewat panel Mode Ujian per Tanggal)</span>
+                    Mode sesi:{" "}
+                    <strong>
+                      {getModeUjianForDate(
+                        sesiUjianList,
+                        studentFormData.hari_tanggal,
+                      )}
+                    </strong>
+                    <span className="text-slate-400">
+                      (diatur lewat panel Mode Ujian per Tanggal)
+                    </span>
                   </p>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Qur'an / Arab</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Waktu Ujian Qur'an / Arab
+                  </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
                       step={300}
                       value={studentTimeInputs.waktu_alq_arab.start}
-                      onChange={(e) => handleTimeInputChange('waktu_alq_arab', 'start', e.target.value)}
+                      onChange={(e) =>
+                        handleTimeInputChange(
+                          "waktu_alq_arab",
+                          "start",
+                          e.target.value,
+                        )
+                      }
                       className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                       aria-label="Jam mulai ujian Qur'an / Arab"
                     />
@@ -3764,7 +4831,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="time"
                       step={300}
                       value={studentTimeInputs.waktu_alq_arab.end}
-                      onChange={(e) => handleTimeInputChange('waktu_alq_arab', 'end', e.target.value)}
+                      onChange={(e) =>
+                        handleTimeInputChange(
+                          "waktu_alq_arab",
+                          "end",
+                          e.target.value,
+                        )
+                      }
                       className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                       aria-label="Jam selesai ujian Qur'an / Arab"
                     />
@@ -3772,13 +4845,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Catung / English</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Waktu Ujian Catung / English
+                  </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
                       step={300}
                       value={studentTimeInputs.waktu_catung_eng.start}
-                      onChange={(e) => handleTimeInputChange('waktu_catung_eng', 'start', e.target.value)}
+                      onChange={(e) =>
+                        handleTimeInputChange(
+                          "waktu_catung_eng",
+                          "start",
+                          e.target.value,
+                        )
+                      }
                       className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                       aria-label="Jam mulai ujian Catung / English"
                     />
@@ -3787,7 +4868,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="time"
                       step={300}
                       value={studentTimeInputs.waktu_catung_eng.end}
-                      onChange={(e) => handleTimeInputChange('waktu_catung_eng', 'end', e.target.value)}
+                      onChange={(e) =>
+                        handleTimeInputChange(
+                          "waktu_catung_eng",
+                          "end",
+                          e.target.value,
+                        )
+                      }
                       className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                       aria-label="Jam selesai ujian Catung / English"
                     />
@@ -3795,13 +4882,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Waktu Wawancara Orang Tua</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Waktu Wawancara Orang Tua
+                  </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
                       step={300}
                       value={studentTimeInputs.waktu_interview.start}
-                      onChange={(e) => handleTimeInputChange('waktu_interview', 'start', e.target.value)}
+                      onChange={(e) =>
+                        handleTimeInputChange(
+                          "waktu_interview",
+                          "start",
+                          e.target.value,
+                        )
+                      }
                       className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                       aria-label="Jam mulai wawancara orang tua"
                     />
@@ -3810,7 +4905,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="time"
                       step={300}
                       value={studentTimeInputs.waktu_interview.end}
-                      onChange={(e) => handleTimeInputChange('waktu_interview', 'end', e.target.value)}
+                      onChange={(e) =>
+                        handleTimeInputChange(
+                          "waktu_interview",
+                          "end",
+                          e.target.value,
+                        )
+                      }
                       className="w-full min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                       aria-label="Jam selesai wawancara orang tua"
                     />
@@ -3818,7 +4919,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-800 block mb-1">Waktu Ujian Keseluruhan (Otomatis)</label>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Waktu Ujian Keseluruhan (Otomatis)
+                  </label>
                   <input
                     type="text"
                     value={studentFormData.waktu_all}
@@ -3826,7 +4929,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-[#1E3A8A] font-mono font-bold focus:outline-none"
                     placeholder="Otomatis dari tiga waktu ujian"
                   />
-                  <p className="mt-1 text-[10px] text-slate-500">Diambil dari jam paling awal sampai paling akhir.</p>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Diambil dari jam paling awal sampai paling akhir.
+                  </p>
                 </div>
               </div>
 
@@ -3842,7 +4947,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="submit"
                   className="px-5 py-2 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold rounded-xl shadow cursor-pointer"
                 >
-                  {isEditMode ? 'Simpan Perubahan' : 'Tambahkan Siswa'}
+                  {isEditMode ? "Simpan Perubahan" : "Tambahkan Siswa"}
                 </button>
               </div>
             </form>
@@ -3857,7 +4962,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-[#1E3A8A] text-white p-5 flex items-center justify-between border-b-4 border-[#D97706]">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-amber-400" />
-                <h3 className="font-extrabold text-base">Bulk Import Data Jadwal Siswa</h3>
+                <h3 className="font-extrabold text-base">
+                  Bulk Import Data Jadwal Siswa
+                </h3>
               </div>
               <button
                 type="button"
@@ -3885,13 +4992,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                 </div>
                 <p className="text-[11px] text-amber-900 leading-relaxed">
-                  Unggah file berformat <strong>.csv</strong> atau <strong>.xlsx</strong>. Jika kolom <code className="bg-amber-100 px-1 rounded font-bold font-mono">id</code> sudah ada di database, data lama akan <strong>otomatis ditimpa (overwrite)</strong> dengan data baru dari file.
+                  Unggah file berformat <strong>.csv</strong> atau{" "}
+                  <strong>.xlsx</strong>. Jika kolom{" "}
+                  <code className="bg-amber-100 px-1 rounded font-bold font-mono">
+                    id
+                  </code>{" "}
+                  sudah ada di database, data lama akan{" "}
+                  <strong>otomatis ditimpa (overwrite)</strong> dengan data baru
+                  dari file.
                 </p>
               </div>
 
               {/* Upload Input */}
               <div>
-                <label className="font-bold text-slate-800 block mb-2">Pilih File CSV / Excel:</label>
+                <label className="font-bold text-slate-800 block mb-2">
+                  Pilih File CSV / Excel:
+                </label>
                 <input
                   type="file"
                   accept=".csv, .xlsx, .xls"
@@ -3905,16 +5021,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="space-y-3">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                      <span className="block text-[10px] text-blue-700 uppercase font-bold">Total Terbaca</span>
-                      <strong className="text-base text-blue-900">{bulkParsedData.length}</strong>
+                      <span className="block text-[10px] text-blue-700 uppercase font-bold">
+                        Total Terbaca
+                      </span>
+                      <strong className="text-base text-blue-900">
+                        {bulkParsedData.length}
+                      </strong>
                     </div>
                     <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                      <span className="block text-[10px] text-emerald-700 uppercase font-bold">Data Baru</span>
-                      <strong className="text-base text-emerald-900">{bulkParsedData.length - bulkOverlapCount}</strong>
+                      <span className="block text-[10px] text-emerald-700 uppercase font-bold">
+                        Data Baru
+                      </span>
+                      <strong className="text-base text-emerald-900">
+                        {bulkParsedData.length - bulkOverlapCount}
+                      </strong>
                     </div>
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                      <span className="block text-[10px] text-amber-700 uppercase font-bold">Menimpa ID Lama</span>
-                      <strong className="text-base text-amber-900">{bulkOverlapCount}</strong>
+                      <span className="block text-[10px] text-amber-700 uppercase font-bold">
+                        Menimpa ID Lama
+                      </span>
+                      <strong className="text-base text-amber-900">
+                        {bulkOverlapCount}
+                      </strong>
                     </div>
                   </div>
 
@@ -3933,11 +5061,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <tbody className="divide-y divide-slate-100">
                         {bulkParsedData.slice(0, 10).map((row) => (
                           <tr key={row.id} className="hover:bg-slate-50">
-                            <td className="p-2 font-mono font-bold text-slate-800">{row.id}</td>
-                            <td className="p-2 font-semibold text-slate-900">{row.nama_siswa}</td>
+                            <td className="p-2 font-mono font-bold text-slate-800">
+                              {row.id}
+                            </td>
+                            <td className="p-2 font-semibold text-slate-900">
+                              {row.nama_siswa}
+                            </td>
                             <td className="p-2">{row.kelas}</td>
                             <td className="p-2">{row.hari_tanggal}</td>
-                            <td className="p-2 truncate max-w-[140px]">{row.penguji_alq_arab || '-'}</td>
+                            <td className="p-2 truncate max-w-[140px]">
+                              {row.penguji_alq_arab || "-"}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -3945,7 +5079,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   {bulkParsedData.length > 10 && (
                     <p className="text-[10px] text-slate-500 italic text-right">
-                      * Menampilkan 10 dari {bulkParsedData.length} calon siswa yang siap diimpor.
+                      * Menampilkan 10 dari {bulkParsedData.length} calon siswa
+                      yang siap diimpor.
                     </p>
                   )}
                 </div>
@@ -3954,13 +5089,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Error messages if any */}
               {bulkParseErrors.length > 0 && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 space-y-1">
-                  <span className="font-bold block">Peringatan Baris Dilewati:</span>
+                  <span className="font-bold block">
+                    Peringatan Baris Dilewati:
+                  </span>
                   <ul className="list-disc pl-4 space-y-0.5 text-[11px] max-h-24 overflow-y-auto">
                     {bulkParseErrors.slice(0, 5).map((err, i) => (
                       <li key={i}>{err}</li>
                     ))}
                     {bulkParseErrors.length > 5 && (
-                      <li>...dan {bulkParseErrors.length - 5} baris lainnya.</li>
+                      <li>
+                        ...dan {bulkParseErrors.length - 5} baris lainnya.
+                      </li>
                     )}
                   </ul>
                 </div>
@@ -3983,7 +5122,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="px-5 py-2 bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-50 text-white font-bold rounded-xl shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <Upload className="w-4 h-4 text-amber-400" />
-                  <span>{isImporting ? 'Menyimpan ke Database...' : `Proses Impor ${bulkParsedData.length} Siswa`}</span>
+                  <span>
+                    {isImporting
+                      ? "Menyimpan ke Database..."
+                      : `Proses Impor ${bulkParsedData.length} Siswa`}
+                  </span>
                 </button>
               </div>
             </div>
@@ -3997,8 +5140,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="bg-[#1E3A8A] text-white p-5 flex items-start justify-between border-b-4 border-[#D97706]">
               <div>
-                <h3 className="font-extrabold text-base">Tambah / Atur Tanggal Ujian</h3>
-                <p className="text-[11px] text-blue-200 mt-0.5">Tanggal tanpa siswa tetap bisa disiapkan lebih awal.</p>
+                <h3 className="font-extrabold text-base">
+                  Tambah / Atur Tanggal Ujian
+                </h3>
+                <p className="text-[11px] text-blue-200 mt-0.5">
+                  Tanggal tanpa siswa tetap bisa disiapkan lebih awal.
+                </p>
               </div>
               <button
                 type="button"
@@ -4010,9 +5157,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveSessionDate} className="p-6 space-y-4 text-xs text-slate-700">
+            <form
+              onSubmit={handleSaveSessionDate}
+              className="p-6 space-y-4 text-xs text-slate-700"
+            >
               <div>
-                <label className="font-bold text-slate-800 block mb-1">Tanggal Ujian</label>
+                <label className="font-bold text-slate-800 block mb-1">
+                  Tanggal Ujian
+                </label>
                 <input
                   type="date"
                   value={sessionDateForm.date}
@@ -4028,17 +5180,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-slate-800 block mb-1">Mode Ujian</label>
+                <label className="font-bold text-slate-800 block mb-1">
+                  Mode Ujian
+                </label>
                 <select
                   value={sessionDateForm.mode}
-                  onChange={(e) => setSessionDateForm({ ...sessionDateForm, mode: e.target.value as ModeUjian })}
+                  onChange={(e) =>
+                    setSessionDateForm({
+                      ...sessionDateForm,
+                      mode: e.target.value as ModeUjian,
+                    })
+                  }
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                 >
                   <option value="Offline">Offline</option>
                   <option value="Online">Online</option>
                 </select>
                 <p className="mt-1.5 text-[10px] text-slate-500">
-                  Jika tanggal sudah ada, mode pada tanggal tersebut akan diperbarui.
+                  Jika tanggal sudah ada, mode pada tanggal tersebut akan
+                  diperbarui.
                 </p>
               </div>
 
@@ -4085,7 +5245,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-[#1E3A8A] text-white p-5 flex items-start justify-between border-b-4 border-[#D97706]">
               <div>
                 <h3 className="font-bold text-lg">Detail Hasil Penilaian</h3>
-                <p className="text-xs text-blue-100 mt-1">Rekapitulasi nilai siswa</p>
+                <p className="text-xs text-blue-100 mt-1">
+                  Rekapitulasi nilai siswa
+                </p>
               </div>
               <button
                 onClick={() => setViewingGradeRecord(null)}
@@ -4099,49 +5261,89 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Nama Siswa</p>
-                  <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.nama_siswa}</p>
-                  <p className="text-xs font-mono text-[#1E3A8A]">{viewingGradeRecord.id_siswa}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Nama Siswa
+                  </p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {viewingGradeRecord.nama_siswa}
+                  </p>
+                  <p className="text-xs font-mono text-[#1E3A8A]">
+                    {viewingGradeRecord.id_siswa}
+                  </p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Kelas</p>
-                  <p className="text-sm font-bold text-slate-800">{getStudentKelas(viewingGradeRecord.id_siswa)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Kelas
+                  </p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {getStudentKelas(viewingGradeRecord.id_siswa)}
+                  </p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Kategori Ujian</p>
-                  <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.kategori_ujian}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Kategori Ujian
+                  </p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {viewingGradeRecord.kategori_ujian}
+                  </p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Skor Akhir</p>
-                  <p className="text-sm font-bold font-mono text-emerald-700">{viewingGradeRecord.skor_akhir_rata2.toFixed(2)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Skor Akhir
+                  </p>
+                  <p className="text-sm font-bold font-mono text-emerald-700">
+                    {viewingGradeRecord.skor_akhir_rata2.toFixed(2)}
+                  </p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Penguji</p>
-                  <p className="text-sm font-bold text-slate-800">{viewingGradeRecord.nama_penguji}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Penguji
+                  </p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {viewingGradeRecord.nama_penguji}
+                  </p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Waktu Input</p>
-                  <p className="text-sm font-semibold text-slate-800">{formatWaktuInput(viewingGradeRecord.timestamp)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Waktu Input
+                  </p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {formatWaktuInput(viewingGradeRecord.timestamp)}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Rincian Skor & Catatan</h4>
-                {buildGradeDetailRows(viewingGradeRecord.detail_skor_json).length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">Tidak ada rincian skor.</p>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Rincian Skor & Catatan
+                </h4>
+                {buildGradeDetailRows(viewingGradeRecord.detail_skor_json)
+                  .length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">
+                    Tidak ada rincian skor.
+                  </p>
                 ) : (
                   <div className="space-y-2">
-                    {buildGradeDetailRows(viewingGradeRecord.detail_skor_json).map((row) => (
-                      <div key={row.key} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    {buildGradeDetailRows(
+                      viewingGradeRecord.detail_skor_json,
+                    ).map((row) => (
+                      <div
+                        key={row.key}
+                        className="bg-slate-50 border border-slate-200 rounded-xl p-3"
+                      >
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-slate-700">{row.label}</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            {row.label}
+                          </span>
                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-bold font-mono text-xs rounded">
                             {row.score}
                           </span>
                         </div>
                         {row.note && (
                           <p className="mt-1.5 text-xs text-slate-500 italic">
-                            <span className="font-semibold not-italic text-slate-600">Catatan: </span>
+                            <span className="font-semibold not-italic text-slate-600">
+                              Catatan:{" "}
+                            </span>
                             {row.note}
                           </p>
                         )}
@@ -4152,9 +5354,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Catatan Umum</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Catatan Umum
+                </h4>
                 <p className="text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded-xl p-3 whitespace-pre-line">
-                  {viewingGradeRecord.catatan_umum || viewingGradeRecord.detail_skor_json?.catatan || '-'}
+                  {viewingGradeRecord.catatan_umum ||
+                    viewingGradeRecord.detail_skor_json?.catatan ||
+                    "-"}
                 </p>
               </div>
             </div>
@@ -4194,7 +5400,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           siswa={editingGradeStudent}
           kategori={editingGradeKategori}
           existingNilai={nilaiList.find(
-            n => n.id_siswa.toUpperCase() === editingGradeStudent.id.toUpperCase() && n.kategori_ujian === editingGradeKategori
+            (n) =>
+              n.id_siswa.toUpperCase() ===
+                editingGradeStudent.id.toUpperCase() &&
+              n.kategori_ujian === editingGradeKategori,
           )}
           session={session}
           onClose={() => setIsGradeModalOpen(false)}

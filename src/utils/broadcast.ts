@@ -284,7 +284,7 @@ export function buildPesanPenguji(
     APP_LINK,
     ``,
     `Jazakumullah khairan.`,
-    `Panitia SPMB Al-Wildan 29`,
+    `Panitia SPMB AL-WILDAN 29`,
   ].join('\n');
 }
 
@@ -315,7 +315,7 @@ export function buildPesanTimekeeper(
     APP_LINK,
     ``,
     `Jazakumullah khairan.`,
-    `Panitia SPMB Al-Wildan 29`,
+    `Panitia SPMB AL-WILDAN 29`,
   ].join('\n');
 }
 

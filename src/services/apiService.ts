@@ -389,11 +389,11 @@ class ApiService {
     if (!matchedOfficer && !isSuperAdmin) {
       return {
         success: false,
-        message: 'Email tidak ditemukan dalam daftar penguji resmi Al-Wildan 29 Depok.'
+        message: 'Email tidak ditemukan dalam daftar penguji resmi AL-WILDAN 29 DEPOK.'
       };
     }
 
-    const officialName = matchedOfficer ? matchedOfficer.penguji : 'Tim Kurikulum Al-Wildan 29 (Super Admin)';
+    const officialName = matchedOfficer ? matchedOfficer.penguji : 'Tim Kurikulum AL-WILDAN 29 (Super Admin)';
     const jadwalList = this.getJadwalList();
 
     // Determine roles from schedule sheet
