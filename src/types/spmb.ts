@@ -204,12 +204,28 @@ const BULAN_INDONESIA: Record<string, number> = {
 
 /**
  * Normalisasi tanggal ke format ISO (yyyy-mm-dd).
- * Mendukung data lama seperti "Minggu, 20 September 2026".
+ * Mendukung format:
+ * - ISO: "2026-11-14", "2026-11-14T07:00:00Z"
+ * - Excel Serial Date: "46340.291666666664" atau 46340
+ * - Format Indonesia teks: "Sabtu, 14 November 2026", "14 November 2026"
+ * - Format DMY numerik: "14/11/2026", "14-11-2026"
  */
-export function toISODate(value: string): string {
+export function toISODate(value: string | number): string {
   const raw = String(value || '').trim();
   if (!raw) return '';
 
+  // 1. Excel Serial Date Number (contoh: 46340.291666666664 -> 2026-11-14)
+  const num = parseFloat(raw);
+  if (!isNaN(num) && /^\d+(\.\d+)?$/.test(raw) && num > 25000 && num < 80000) {
+    const utcDays = Math.floor(num - 25569);
+    const dateInfo = new Date(utcDays * 86400 * 1000);
+    const y = dateInfo.getUTCFullYear();
+    const m = String(dateInfo.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dateInfo.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 2. ISO DateTime yyyy-mm-ddTHH:mm:ss
   const isoDateTimeMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})T/);
   if (isoDateTimeMatch) {
     const parsed = new Date(raw);
@@ -220,22 +236,38 @@ export function toISODate(value: string): string {
     return `${isoDateTimeMatch[1]}-${isoDateTimeMatch[2]}-${isoDateTimeMatch[3]}`;
   }
 
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  // 3. ISO Date yyyy-mm-dd atau yyyy/mm/dd
+  const isoMatch = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2, '0')}-${String(isoMatch[3]).padStart(2, '0')}`;
+  }
 
-  const match = raw.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
-  if (match) {
-    const day = parseInt(match[1], 10);
-    const month = BULAN_INDONESIA[match[2].toLowerCase()];
-    const year = parseInt(match[3], 10);
+  // 4. Format DMY numerik: DD/MM/YYYY atau DD-MM-YYYY
+  const dmyMatch = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const day = String(dmyMatch[1]).padStart(2, '0');
+    const month = String(dmyMatch[2]).padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // 5. Format teks Indonesia: "14 November 2026" atau "Sabtu, 14 November 2026"
+  const textMatch = raw.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if (textMatch) {
+    const day = parseInt(textMatch[1], 10);
+    const month = BULAN_INDONESIA[textMatch[2].toLowerCase()];
+    const year = parseInt(textMatch[3], 10);
     if (month && day >= 1 && day <= 31) {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }
 
-  const parsed = new Date(raw);
-  if (!isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  // 6. Fallback parse JS Date umum (asalkan bukan angka string acak)
+  if (!/^\d+$/.test(raw)) {
+    const parsed = new Date(raw);
+    if (!isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+    }
   }
 
   return '';

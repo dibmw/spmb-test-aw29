@@ -30,7 +30,8 @@ import {
   firestoreBulkMigrate,
   firestoreVerifyOfficer,
   firestoreBulkUpsertJadwal,
-  firestoreBulkUpsertPenguji
+  firestoreBulkUpsertPenguji,
+  firestoreSanitizeLegacyDates
 } from './firebase';
 
 export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyCOLKJEtL480pr5f3YJP4nNq80OiBgeInZI6XWVNvQC1prD4K-8LX7K85UjxiEjOFJ/exec';
@@ -429,7 +430,25 @@ class ApiService {
   // Data Fetching
   public getJadwalList(): SiswaJadwal[] {
     const raw = localStorage.getItem(STORAGE_KEYS.JADWAL);
-    return raw ? JSON.parse(raw) : INITIAL_JADWAL_LIST;
+    const list: SiswaJadwal[] = raw ? JSON.parse(raw) : INITIAL_JADWAL_LIST;
+    let modified = false;
+    const normalized = list.map((item) => {
+      const cleanDate = toISODate(item.hari_tanggal);
+      if (cleanDate && cleanDate !== item.hari_tanggal) {
+        modified = true;
+        return { ...item, hari_tanggal: cleanDate };
+      }
+      return item;
+    });
+    if (modified) {
+      localStorage.setItem(STORAGE_KEYS.JADWAL, JSON.stringify(normalized));
+      if (isFirebaseConfigured) {
+        firestoreSanitizeLegacyDates(normalized).catch((err) => {
+          console.warn('Silent sanitize legacy dates fail:', err);
+        });
+      }
+    }
+    return normalized;
   }
 
   public getPengujiList(): PengujiAccount[] {
@@ -784,6 +803,11 @@ class ApiService {
       return { success: false, total: 0, updated: 0, added: 0, message: 'Tidak ada data calon siswa yang diimpor.' };
     }
 
+    const sanitizedJadwals = newJadwals.map((s) => ({
+      ...s,
+      hari_tanggal: toISODate(s.hari_tanggal) || String(s.hari_tanggal || '').trim()
+    }));
+
     const current = this.getJadwalList();
     const currentMap = new Map<string, number>();
     current.forEach((s, idx) => {
@@ -793,7 +817,7 @@ class ApiService {
     let added = 0;
     let updated = 0;
 
-    newJadwals.forEach((siswa) => {
+    sanitizedJadwals.forEach((siswa) => {
       const cleanId = String(siswa.id).trim().toUpperCase();
       const existingIdx = currentMap.get(cleanId);
       if (existingIdx !== undefined) {
@@ -814,7 +838,7 @@ class ApiService {
     // Simpan ke Firestore secara batch
     if (isFirebaseConfigured) {
       try {
-        await firestoreBulkUpsertJadwal(newJadwals);
+        await firestoreBulkUpsertJadwal(sanitizedJadwals);
       } catch (err) {
         console.error('Firestore bulk upsert error:', err);
       }

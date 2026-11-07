@@ -17,7 +17,6 @@ import {
   subscribeToPenguji
 } from './services/firebase';
 import { SiswaJadwal, PresensiRecord, NilaiRecord, UserSession, Role, SesiUjian } from './types/spmb';
-import { SCHOOL_LOGO_URL } from './data/mockData';
 import { MapPin, ShieldCheck, MessageCircle, ExternalLink } from 'lucide-react';
 
 class ErrorBoundary extends (Component as any) {

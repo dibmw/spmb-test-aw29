@@ -4,7 +4,6 @@ import { SCHOOL_LOGO_URL } from '../data/mockData';
 interface SchoolLogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'light' | 'dark';
 }
 
 export const SchoolLogo: React.FC<SchoolLogoProps> = ({ 

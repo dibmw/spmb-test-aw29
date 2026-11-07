@@ -12,10 +12,9 @@ import {
   query,
   where,
   Firestore,
-  Unsubscribe,
-  enableIndexedDbPersistence
+  Unsubscribe
 } from 'firebase/firestore';
-import { SiswaJadwal, PengujiAccount, PresensiRecord, NilaiRecord, SesiUjian, KategoriUjian } from '../types/spmb';
+import { SiswaJadwal, PengujiAccount, PresensiRecord, NilaiRecord, SesiUjian, KategoriUjian, toISODate } from '../types/spmb';
 
 // Ambil konfigurasi dari environment variables Vite
 const firebaseConfig = {
@@ -84,7 +83,7 @@ export function subscribeToJadwal(callback: (jadwal: SiswaJadwal[]) => void): Un
         interview_walmur: String(item.interview_walmur || '').trim(),
         timekeeper_walmur: String(item.timekeeper_walmur || '').trim(),
         waktu_interview: String(item.waktu_interview || '').trim(),
-        hari_tanggal: String(item.hari_tanggal || '').trim(),
+        hari_tanggal: toISODate(item.hari_tanggal) || String(item.hari_tanggal || '').trim(),
         status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : 'Aktif',
         status_kehadiran_siswa: item.status_kehadiran_siswa || '',
         status_kehadiran_walmur: item.status_kehadiran_walmur || '',
@@ -235,8 +234,34 @@ export function subscribeToSesiUjian(callback: (sesi: SesiUjian[]) => void): Uns
 
 export async function firestoreSaveJadwal(siswa: SiswaJadwal): Promise<void> {
   if (!db) throw new Error('Firebase belum dikonfigurasi.');
+  const cleanDate = toISODate(siswa.hari_tanggal) || String(siswa.hari_tanggal || '').trim();
+  const cleanSiswa = { ...siswa, hari_tanggal: cleanDate };
   const docRef = doc(db, COLLECTIONS.JADWAL, String(siswa.id));
-  await setDoc(docRef, siswa, { merge: true });
+  await setDoc(docRef, cleanSiswa, { merge: true });
+}
+
+// Auto-repair / sanitasi tanggal serial Excel atau legacy di Firestore
+export async function firestoreSanitizeLegacyDates(list: SiswaJadwal[]): Promise<number> {
+  if (!db || !list || list.length === 0) return 0;
+  const needsFix = list.filter((s) => {
+    const raw = String(s.hari_tanggal || '').trim();
+    const normalized = toISODate(raw);
+    return normalized && normalized !== raw;
+  });
+  if (needsFix.length === 0) return 0;
+
+  const BATCH_SIZE = 400;
+  for (let i = 0; i < needsFix.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    const chunk = needsFix.slice(i, i + BATCH_SIZE);
+    for (const s of chunk) {
+      const cleanDate = toISODate(s.hari_tanggal);
+      const docRef = doc(db, COLLECTIONS.JADWAL, String(s.id));
+      batch.set(docRef, { hari_tanggal: cleanDate }, { merge: true });
+    }
+    await batch.commit();
+  }
+  return needsFix.length;
 }
 
 export async function firestoreBulkUpsertJadwal(
@@ -251,8 +276,9 @@ export async function firestoreBulkUpsertJadwal(
     const chunk = jadwals.slice(i, i + BATCH_SIZE);
     for (const s of chunk) {
       const cleanId = String(s.id).trim();
+      const cleanDate = toISODate(s.hari_tanggal) || String(s.hari_tanggal || '').trim();
       const docRef = doc(db, COLLECTIONS.JADWAL, cleanId);
-      batch.set(docRef, { ...s, id: cleanId }, { merge: true });
+      batch.set(docRef, { ...s, id: cleanId, hari_tanggal: cleanDate }, { merge: true });
     }
     await batch.commit();
   }

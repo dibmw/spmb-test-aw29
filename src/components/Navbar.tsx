@@ -5,7 +5,6 @@ import {
 } from '../types/spmb';
 import { SchoolLogo } from './SchoolLogo';
 import { 
-  Search, 
   QrCode, 
   FileCheck, 
   Shield, 

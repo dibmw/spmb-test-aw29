@@ -151,8 +151,10 @@ export async function parseJadwalFile(file: File): Promise<ParseJadwalResult> {
       rawStatus.toLowerCase() === 'selesai' ? 'Selesai' :
       rawStatus.toLowerCase() === 'reschedule' ? 'Reschedule' : 'Aktif';
 
-    const rawDate = String(normalizedRow['hari_tanggal'] || normalizedRow['tanggal'] || '').trim();
-    const cleanDate = toISODate(rawDate) || rawDate;
+    const rawDateVal = normalizedRow['hari_tanggal'] !== undefined && normalizedRow['hari_tanggal'] !== ''
+      ? normalizedRow['hari_tanggal']
+      : normalizedRow['tanggal'];
+    const cleanDate = toISODate(rawDateVal) || String(rawDateVal || '').trim();
 
     const siswa: SiswaJadwal = {
       id: String(rawId).trim(),
