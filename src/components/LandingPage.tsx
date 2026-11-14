@@ -225,19 +225,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
                             isOnline
                               ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
                               : 'bg-slate-100 text-slate-600 border-slate-200'
                           }`}>
-                            {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+                            {isOnline ? <Wifi className="w-3.5 h-3.5 shrink-0" /> : <WifiOff className="w-3.5 h-3.5 shrink-0" />}
                             {mode}
                           </span>
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-[#1E3A8A] border border-blue-200">
-                            <CalendarDays className="w-3.5 h-3.5" />
+                            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
                             {formatTanggalUjian(siswa.hari_tanggal)}
                           </span>
+                          {siswa.waktu_all && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              <Clock className="w-3.5 h-3.5 text-[#1E3A8A] shrink-0" />
+                              <span className="font-mono">{siswa.waktu_all}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -275,19 +281,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
-                          <span className="inline-flex items-center gap-1.5 text-slate-600">
-                            <Clock className="w-3.5 h-3.5 text-[#1E3A8A]" />
-                            Total waktu ujian:
-                            <strong className="text-slate-900 font-mono">{siswa.waktu_all || '-'}</strong>
-                          </span>
                           {isOnline ? (
                             <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold">
-                              <Monitor className="w-3.5 h-3.5" /> Ujian dilakukan secara online
+                              <Monitor className="w-3.5 h-3.5 shrink-0" /> Ujian dilakukan secara online
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 text-slate-600">
-                              <UserCheck className="w-3.5 h-3.5 text-[#D97706]" />
-                              Ruang siswa: <strong className="text-slate-900">{siswa.ruangan_siswa}</strong>
+                              <UserCheck className="w-3.5 h-3.5 text-[#D97706] shrink-0" />
+                              Ruang siswa: <strong className="text-slate-900">{siswa.ruangan_siswa || '-'}</strong>
                             </span>
                           )}
                         </div>
