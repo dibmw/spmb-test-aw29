@@ -38,10 +38,9 @@ export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyCOLKJE
 const PREV_DEFAULT_GAS_URLS = [
   'https://script.google.com/macros/s/AKfycbzq3IHLcodfvYCSuD8j4beiH30pdLV1zNMBWOcXMKUAHN8OEc5KENttMEmo7cDjBZaz/exec'
 ];
-export const DEFAULT_APP_SECRET_KEY =
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_SECRET_KEY)
-    ? String(import.meta.env.VITE_APP_SECRET_KEY).trim()
-    : '';
+// Kunci rahasia dikelola secara aman di serverless proxy (api/sheets-proxy),
+// sehingga browser klien tidak lagi menyimpan atau mengekspos token rahasia.
+export const DEFAULT_APP_SECRET_KEY = '';
 
 const STORAGE_KEYS = {
   JADWAL: 'spmb29_jadwal',
@@ -880,7 +879,8 @@ class ApiService {
       }
 
       if (!rawData) {
-        const res = await fetch(`${targetUrl}&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}`);
+        const secretParam = DEFAULT_APP_SECRET_KEY ? `&secret_key=${encodeURIComponent(DEFAULT_APP_SECRET_KEY)}` : '';
+        const res = await fetch(`${targetUrl}${secretParam}`);
         const json = await res.json();
         if (json.status === 'success' && json.data) {
           rawData = json.data;

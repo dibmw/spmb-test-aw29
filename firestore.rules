@@ -1,22 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Selama fase SPMB / Pengujian:
-    // Izinkan read dan write untuk data SPMB (Jadwal, Nilai, Presensi, Penguji, Sesi)
+    // Validasi skema proteksi data SPMB AL-WILDAN 29
+    // Catatan: Karena sistem login klien saat ini tidak menggunakan Firebase Auth UID,
+    // proteksi dilakukan lewat verifikasi integritas skema data (schema integrity check).
+    
     match /spmb_jadwal/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['nama_siswa', 'kelas']);
+      allow delete: if true;
     }
-    match /spmb_penguji/{id} {
-      allow read, write: if true;
-    }
+
     match /spmb_presensi/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id_siswa', 'tipe_presensi']);
+      allow delete: if true;
     }
+
     match /spmb_nilai/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id_siswa', 'kategori_ujian', 'nama_penguji']);
+      allow delete: if true;
     }
+
     match /spmb_sesi_ujian/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['mode_ujian', 'hari_tanggal']);
+      allow delete: if true;
+    }
+
+    match /spmb_penguji/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['penguji', 'email_penguji']);
+      allow delete: if true;
     }
   }
 }

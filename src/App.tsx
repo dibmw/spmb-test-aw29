@@ -88,15 +88,15 @@ export default function App() {
   const refreshData = () => {
     setJadwalList(apiService.getJadwalList());
     setPresensiList(apiService.getPresensiList());
-    setNilaiList(apiService.getNilaiList());
+    setNilaiList(session ? apiService.getNilaiList() : []);
     setSesiUjianList(apiService.getSesiUjianList());
   };
 
   useEffect(() => {
-    refreshData();
     const existingSession = apiService.getCurrentSession();
     if (existingSession) {
       setSession(existingSession);
+      setNilaiList(apiService.getNilaiList());
       // Route back to the appropriate dashboard after a page refresh
       if (existingSession.activeRole === 'ADMIN') {
         setCurrentTab('admin');
@@ -105,10 +105,15 @@ export default function App() {
       } else if (existingSession.activeRole === 'PENGUJI') {
         setCurrentTab('penguji');
       }
+    } else {
+      setNilaiList([]);
     }
+    setJadwalList(apiService.getJadwalList());
+    setPresensiList(apiService.getPresensiList());
+    setSesiUjianList(apiService.getSesiUjianList());
 
     if (isFirebaseConfigured) {
-      // Real-time Firestore Listeners (Instant CRUD sync across all devices)
+      // Real-time Firestore Listeners (Data Publik: Jadwal, Presensi, Sesi)
       const unsubJadwal = subscribeToJadwal((data) => {
         if (data.length > 0) {
           setJadwalList(data);
@@ -119,28 +124,17 @@ export default function App() {
         setPresensiList(data);
         localStorage.setItem('spmb29_presensi', JSON.stringify(data));
       });
-      const unsubNilai = subscribeToNilai((data) => {
-        setNilaiList(data);
-        localStorage.setItem('spmb29_nilai', JSON.stringify(data));
-      });
       const unsubSesi = subscribeToSesiUjian((data) => {
         if (data.length > 0) {
           setSesiUjianList(data);
           localStorage.setItem('spmb29_sesi_ujian', JSON.stringify(data));
         }
       });
-      const unsubPenguji = subscribeToPenguji((data) => {
-        if (data.length > 0) {
-          localStorage.setItem('spmb29_penguji', JSON.stringify(data));
-        }
-      });
 
       return () => {
         if (unsubJadwal) unsubJadwal();
         if (unsubPresensi) unsubPresensi();
-        if (unsubNilai) unsubNilai();
         if (unsubSesi) unsubSesi();
-        if (unsubPenguji) unsubPenguji();
       };
     } else {
       // Background sync with live Google Apps Script if Firebase not yet configured
@@ -153,6 +147,31 @@ export default function App() {
       });
     }
   }, []);
+
+  // Real-time listeners khusus data sensitif petugas (Nilai & Penguji)
+  useEffect(() => {
+    if (!session || !isFirebaseConfigured) {
+      setNilaiList([]);
+      return;
+    }
+
+    setNilaiList(apiService.getNilaiList());
+
+    const unsubNilai = subscribeToNilai((data) => {
+      setNilaiList(data);
+      localStorage.setItem('spmb29_nilai', JSON.stringify(data));
+    });
+    const unsubPenguji = subscribeToPenguji((data) => {
+      if (data.length > 0) {
+        localStorage.setItem('spmb29_penguji', JSON.stringify(data));
+      }
+    });
+
+    return () => {
+      if (unsubNilai) unsubNilai();
+      if (unsubPenguji) unsubPenguji();
+    };
+  }, [session]);
 
   // Auto-sync ringan untuk GAS fallback jika Firebase belum aktif.
   useEffect(() => {
@@ -192,6 +211,8 @@ export default function App() {
   const handleLogout = () => {
     apiService.setSession(null);
     setSession(null);
+    setNilaiList([]);
+    localStorage.removeItem('spmb29_nilai');
     setCurrentTab('landing');
     showToast('Sesi Berakhir', 'Anda telah keluar dari portal petugas.', 'info');
   };

@@ -1,7 +1,13 @@
-const ALLOWED_URL_PATTERN = /^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec(\?.*)?$/;
-const DEFAULT_SECRET_KEY = "aa84e8445d76e5a72a983e78826fdb87";
+const ALLOWED_URL_PATTERN = /^https:\/\/script\.google\.com\/macros\/s\/AKfy[a-zA-Z0-9_-]+\/exec(\?.*)?$/;
 
 export default async function sheetsProxy(req: any, res: any) {
+  // Hanya izinkan HTTP POST ke proxy endpoint
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({ error: "Method Not Allowed. Gunakan POST." });
+    return;
+  }
+
   const { url, method, body } = req.body ?? {};
 
   if (!url || typeof url !== "string") {
@@ -9,7 +15,7 @@ export default async function sheetsProxy(req: any, res: any) {
     return;
   }
 
-  // 1. SSRF Guard: Validate domain and path
+  // 1. SSRF Guard: Validasi protokol, domain, dan path Google Apps Script
   const trimmedUrl = url.trim();
   if (!ALLOWED_URL_PATTERN.test(trimmedUrl)) {
     res.status(403).json({
@@ -18,8 +24,14 @@ export default async function sheetsProxy(req: any, res: any) {
     return;
   }
 
-  const secretKey = process.env.APP_SECRET_KEY || DEFAULT_SECRET_KEY;
+  // Ambil secret key dari Vercel Environment Variable (bukan hardcoded)
+  const secretKey = (process.env.APP_SECRET_KEY || "").trim();
   const httpMethod = (method || "GET").toUpperCase();
+
+  if (httpMethod !== "GET" && httpMethod !== "POST") {
+    res.status(400).json({ error: "Target HTTP method harus GET atau POST." });
+    return;
+  }
 
   try {
     const fetchOptions: RequestInit = {
@@ -42,14 +54,16 @@ export default async function sheetsProxy(req: any, res: any) {
       }
 
       if (parsedBody && typeof parsedBody === "object") {
-        parsedBody.secret_key = secretKey;
+        if (secretKey) {
+          parsedBody.secret_key = secretKey;
+        }
       }
 
       fetchOptions.body = JSON.stringify(parsedBody);
     } else if (httpMethod === "GET") {
-      // Inject secret_key into query params if not present
+      // Inject secret_key ke query params jika ada
       const urlObj = new URL(targetUrl);
-      if (!urlObj.searchParams.has("secret_key")) {
+      if (secretKey && !urlObj.searchParams.has("secret_key")) {
         urlObj.searchParams.set("secret_key", secretKey);
       }
       targetUrl = urlObj.toString();
