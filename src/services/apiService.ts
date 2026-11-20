@@ -184,7 +184,7 @@ class ApiService {
             timekeeper_walmur: String(item.timekeeper_walmur || '').trim(),
             waktu_interview: String(item.waktu_interview || '').trim(),
             hari_tanggal: String(item.hari_tanggal || item['hari tanggal'] || '').trim(),
-            status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : 'Aktif',
+            status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : item.status === 'Batal Daftar' ? 'Batal Daftar' : 'Aktif',
             status_kehadiran_siswa: item.status_kehadiran_siswa === 'Hadir' || item.status_kehadiran_siswa === 'Belum Hadir'
               ? item.status_kehadiran_siswa
               : '',

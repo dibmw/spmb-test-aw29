@@ -17,7 +17,7 @@ export interface SiswaJadwal {
   timekeeper_walmur: string;
   waktu_interview: string;
   hari_tanggal: string;
-  status: 'Aktif' | 'Reschedule' | 'Selesai';
+  status: 'Aktif' | 'Reschedule' | 'Selesai' | 'Batal Daftar';
    status_kehadiran_siswa?: 'Hadir' | 'Belum Hadir' | '';
    status_kehadiran_walmur?: 'Hadir' | 'Belum Hadir' | '';
    gelombang?: string;

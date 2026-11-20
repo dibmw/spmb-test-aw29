@@ -103,6 +103,7 @@ type SessionDateRow = {
   activeCount: number;
   selesaiCount: number;
   rescheduleCount: number;
+  batalCount: number;
   mode: ModeUjian;
   id_sesi: string;
   waktuRange: string;
@@ -435,6 +436,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           activeCount: 0,
           selesaiCount: 0,
           rescheduleCount: 0,
+          batalCount: 0,
           mode: sesi?.mode_ujian === "Online" ? "Online" : "Offline",
           id_sesi: sesi?.id_sesi || "",
           waktuRange: "",
@@ -446,6 +448,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         row.selesaiCount += 1;
       } else if (siswa.status === "Reschedule") {
         row.rescheduleCount += 1;
+      } else if (siswa.status === "Batal Daftar") {
+        row.batalCount += 1;
       } else {
         row.activeCount += 1;
       }
@@ -469,6 +473,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           activeCount: 0,
           selesaiCount: 0,
           rescheduleCount: 0,
+          batalCount: 0,
           mode: sesi.mode_ujian,
           id_sesi: sesi.id_sesi,
           waktuRange: "",
@@ -1013,12 +1018,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       Aktif: "Aktifkan Kembali?",
       Reschedule: "Tandai Reschedule?",
       Selesai: "Tandai Selesai?",
+      "Batal Daftar": "Tandai Batal Daftar?",
     };
     setConfirmDialog({
       title: titles[nextStatus],
       message: `Status jadwal "${siswa.nama_siswa}" (${siswa.id}) akan diubah menjadi ${nextStatus}.`,
       confirmLabel: "Ya, Lanjutkan",
-      variant: nextStatus === "Aktif" ? "info" : "warning",
+      variant: nextStatus === "Aktif" ? "info" : nextStatus === "Batal Daftar" ? "danger" : "warning",
       onConfirm: () => {
         const res = apiService.saveJadwal(
           { ...siswa, status: nextStatus },
@@ -1030,7 +1036,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               ? "Ditandai Selesai"
               : nextStatus === "Reschedule"
                 ? "Diubah ke Reschedule"
-                : "Diaktifkan",
+                : nextStatus === "Batal Daftar"
+                  ? "Diubah ke Batal Daftar"
+                  : "Diaktifkan",
             res.message,
             "success",
           );
@@ -2251,6 +2259,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <span className="block">
                                 {row.activeCount} siswa aktif
                               </span>
+                              {row.batalCount > 0 && (
+                                <span className="block text-[10px] font-bold text-rose-500">
+                                  {row.batalCount} batal
+                                </span>
+                              )}
                               {row.count > row.activeCount && (
                                 <span className="block text-[10px] font-normal text-slate-400">
                                   dari {row.count} total
@@ -2553,6 +2566,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <option value="Aktif">Status: Aktif</option>
                   <option value="Reschedule">Status: Reschedule</option>
                   <option value="Selesai">Status: Selesai</option>
+                  <option value="Batal Daftar">Status: Batal Daftar</option>
                   <option value="Semua">Status: Semua</option>
                 </select>
 
@@ -2854,13 +2868,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 ? "bg-slate-200 text-slate-600 border-slate-300"
                                 : s.status === "Reschedule"
                                   ? "bg-amber-100 text-amber-700 border-amber-300"
-                                  : "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                  : s.status === "Batal Daftar"
+                                    ? "bg-rose-100 text-rose-700 border-rose-300"
+                                    : "bg-emerald-100 text-emerald-700 border-emerald-300"
                             }`}
                             title="Ubah status siswa"
                           >
                             <option value="Aktif">Aktif</option>
                             <option value="Reschedule">Reschedule</option>
                             <option value="Selesai">Selesai</option>
+                            <option value="Batal Daftar">Batal Daftar</option>
                           </select>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
@@ -4613,6 +4630,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <option key={g} value={g} />
                     ))}
                   </datalist>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-800 block mb-1">
+                    Status Jadwal / Pendaftaran
+                  </label>
+                  <select
+                    value={studentFormData.status || "Aktif"}
+                    onChange={(e) =>
+                      setStudentFormData({
+                        ...studentFormData,
+                        status: e.target.value as SiswaJadwal["status"],
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold focus:bg-white focus:outline-none"
+                  >
+                    <option value="Aktif">Aktif</option>
+                    <option value="Reschedule">Reschedule</option>
+                    <option value="Selesai">Selesai</option>
+                    <option value="Batal Daftar">Batal Daftar</option>
+                  </select>
                 </div>
 
                 <div>

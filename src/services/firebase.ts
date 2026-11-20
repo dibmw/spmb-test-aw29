@@ -84,7 +84,7 @@ export function subscribeToJadwal(callback: (jadwal: SiswaJadwal[]) => void): Un
         timekeeper_walmur: String(item.timekeeper_walmur || '').trim(),
         waktu_interview: String(item.waktu_interview || '').trim(),
         hari_tanggal: toISODate(item.hari_tanggal) || String(item.hari_tanggal || '').trim(),
-        status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : 'Aktif',
+        status: item.status === 'Selesai' ? 'Selesai' : item.status === 'Reschedule' ? 'Reschedule' : item.status === 'Batal Daftar' ? 'Batal Daftar' : 'Aktif',
         status_kehadiran_siswa: item.status_kehadiran_siswa || '',
         status_kehadiran_walmur: item.status_kehadiran_walmur || '',
         gelombang: String(item.gelombang || '').trim()

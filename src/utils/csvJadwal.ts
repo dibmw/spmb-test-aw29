@@ -149,7 +149,8 @@ export async function parseJadwalFile(file: File): Promise<ParseJadwalResult> {
     const rawStatus = String(normalizedRow['status'] || 'Aktif').trim();
     const status: SiswaJadwal['status'] =
       rawStatus.toLowerCase() === 'selesai' ? 'Selesai' :
-      rawStatus.toLowerCase() === 'reschedule' ? 'Reschedule' : 'Aktif';
+      rawStatus.toLowerCase() === 'reschedule' ? 'Reschedule' :
+      rawStatus.toLowerCase() === 'batal daftar' || rawStatus.toLowerCase() === 'batal' ? 'Batal Daftar' : 'Aktif';
 
     const rawDateVal = normalizedRow['hari_tanggal'] !== undefined && normalizedRow['hari_tanggal'] !== ''
       ? normalizedRow['hari_tanggal']
